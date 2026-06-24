@@ -1,0 +1,8 @@
+.panel {
+  width: 320px;
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--mantine-spacing-md);
+  background-color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-6));
+  border-left: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+}
