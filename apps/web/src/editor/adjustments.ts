@@ -18,6 +18,7 @@ export interface ColorOption {
   max: number
   step: number
   defaultValue: number
+  group: string
 }
 
 /** Basic tone adjustments shown in the Adjustments panel. */
@@ -31,13 +32,15 @@ export const basicAdjustments: SliderOption[] = [
 ]
 
 export const colorAdjustement: ColorOption[] = [
-  { key: 'whiteBalance', label: 'White Balance', min: -5, max: 5, step: 0.1, defaultValue: 0 },
-  { key: 'presence', label: 'Presence', min: -100, max: 100, step: 1, defaultValue: 0 },
+  { key: 'temperature', label: 'Temperature', min: -100, max: 100, step: 1, defaultValue: 0, group: 'White Balance' },
+  { key: 'tint', label: 'Tint', min: -100, max: 100, step: 1, defaultValue: 0, group: 'White Balance' },
+  { key: 'vibrance', label: 'Vibrance', min: -100, max: 100, step: 1, defaultValue: 0, group: 'Presence' },
+  { key: 'saturation', label: 'Saturation', min: -100, max: 100, step: 1, defaultValue: 0, group: 'Presence' },
 ]
 
 export const detailsAdjustement: ColorOption[] = [
-  { key: 'sharpness', label: 'Sharpness', min: -5, max: 5, step: 0.1, defaultValue: 0 },
-  { key: 'threshold', label: 'Threshold', min: -100, max: 100, step: 1, defaultValue: 0 },
+  { key: 'sharpness', label: 'Sharpness', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
+  { key: 'threshold', label: 'Threshold', min: -100, max: 100, step: 1, defaultValue: 0, group: '' },
 ]
 
 /**
