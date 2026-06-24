@@ -14,7 +14,7 @@ import {
   IconInfoCircle
 } from '@tabler/icons-react';
 import { Group, Tooltip, UnstyledButton, Menu } from '@mantine/core';
-import classes from './NavBar.module.css';
+import classes from '../styles/TopNavBar.module.css';
 
 interface MenuItem {
   label: string;

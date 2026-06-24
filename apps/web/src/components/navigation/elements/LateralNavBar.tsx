@@ -5,7 +5,7 @@ import {
   IconFileExport
 } from '@tabler/icons-react';
 import { Stack, Tooltip, UnstyledButton } from '@mantine/core';
-import classes from './RightNavBar.module.css';
+import classes from '../styles/LateralNavBar.module.css';
 
 interface RightNavBarProps {
     active: string;
@@ -17,7 +17,7 @@ interface ToolLink {
   icon: typeof IconInfoCircle;
 }
 
-const toolsMockData: ToolLink[] = [
+const lateralNavBarButtons: ToolLink[] = [
   { icon: IconInfoCircle, label: 'Info' },
   { icon: IconAdjustments, label: 'Adjustments' },
   { icon: IconCrop, label: 'Crop' },
@@ -31,8 +31,8 @@ const toolsMockData: ToolLink[] = [
  * tool panel can be rendered alongside the rail. Selecting a tool calls
  * `onChange` with its label.
  */
-export function RightNavBar({ active, onChange }: RightNavBarProps) {
-  const tools = toolsMockData.map((tool) => (
+export function LateralNavBar({ active, onChange }: RightNavBarProps) {
+  const tools = lateralNavBarButtons.map((tool) => (
     <Tooltip
       key={tool.label}
       label={tool.label}
