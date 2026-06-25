@@ -90,6 +90,14 @@ export function AdjustmentsPanel() {
           </Stack>
         </Accordion.Panel>
       </Accordion.Item>
+      <Accordion.Item value='Curves'>
+        <Accordion.Control><Text fw={700}>Curves</Text></Accordion.Control>
+        <Accordion.Panel>
+          <Stack gap={'md'}>
+            
+          </Stack>
+        </Accordion.Panel>
+      </Accordion.Item>
     </Accordion>
   );
 }

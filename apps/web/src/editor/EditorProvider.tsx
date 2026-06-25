@@ -1,8 +1,9 @@
 import { useReducer } from 'react'
 import type { ReactNode } from 'react'
-import { basicAdjustments, buildDefaults } from './adjustments'
+import { buildDefaultCurves } from './curves'
+import type { ChannelId, CurvePoint } from './curves'
 import { EditorContext } from './editorContext'
-import { editorReducer } from './editorReducer'
+import { editorReducer, buildInitialAdjustments } from './editorReducer'
 
 interface EditorProviderProps {
   children: ReactNode
@@ -10,25 +11,36 @@ interface EditorProviderProps {
 
 /**
  * Provides the shared editor store to the component tree. Seeds the adjustment
- * values from the Basic slider defaults.
+ * values from every slider group and the curves from the identity line.
  */
 export function EditorProvider({ children }: EditorProviderProps) {
-  const [adjustments, dispatch] = useReducer(
-    editorReducer,
-    null,
-    () => buildDefaults(basicAdjustments),
-  )
+  const [state, dispatch] = useReducer(editorReducer, null, () => ({
+    adjustments: buildInitialAdjustments(),
+    curves: buildDefaultCurves(),
+  }))
 
   const setAdjustment = (key: string, value: number) => {
     dispatch({ type: 'SET', key, value })
   }
 
-  const resetAdjustments = () => {
-    dispatch({ type: 'RESET' })
+  const setCurve = (channel: ChannelId, points: CurvePoint[]) => {
+    dispatch({ type: 'SET_CURVE', channel, points })
+  }
+
+  const resetCurves = () => {
+    dispatch({ type: 'RESET_CURVES' })
   }
 
   return (
-    <EditorContext value={{ adjustments, setAdjustment, resetAdjustments }}>
+    <EditorContext
+      value={{
+        adjustments: state.adjustments,
+        curves: state.curves,
+        setAdjustment,
+        setCurve,
+        resetCurves,
+      }}
+    >
       {children}
     </EditorContext>
   )
