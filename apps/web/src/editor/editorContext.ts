@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, use } from 'react'
 
 /**
  * Shared editor state. For now it holds the live adjustment values; the canvas
@@ -21,7 +21,7 @@ export const EditorContext = createContext<EditorState | null>(null)
  * @throws if used outside of an `EditorProvider`.
  */
 export function useEditor(): EditorState {
-  const context = useContext(EditorContext)
+  const context = use(EditorContext)
   if (context === null) {
     throw new Error('useEditor must be used within an EditorProvider')
   }

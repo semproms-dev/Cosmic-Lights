@@ -15,7 +15,7 @@ export function AdjustmentsPanel() {
   return (
     <Accordion multiple defaultValue={['basic']}>
       <Accordion.Item value="basic">
-        <Accordion.Control><b>Basic</b></Accordion.Control>
+        <Accordion.Control><Text fw={700}>Basic</Text></Accordion.Control>
         <Accordion.Panel>
           <Stack gap="md">
             {basicAdjustments.map((option) => (
@@ -33,7 +33,7 @@ export function AdjustmentsPanel() {
         </Accordion.Panel>
       </Accordion.Item>
       <Accordion.Item value='Color'>
-        <Accordion.Control><b>Color</b></Accordion.Control>
+        <Accordion.Control><Text fw={700}>Color</Text></Accordion.Control>
         <Accordion.Panel>
           <Stack gap="md">
             {colorsByGroup.map(([group, options]) => (
@@ -56,7 +56,7 @@ export function AdjustmentsPanel() {
         </Accordion.Panel>
       </Accordion.Item>
       <Accordion.Item value='Details'>
-        <Accordion.Control><b>Details</b></Accordion.Control>
+        <Accordion.Control><Text fw={700}>Details</Text></Accordion.Control>
         <Accordion.Panel>
           <Stack gap="md">
             {detailsAdjustement.map((option) => (

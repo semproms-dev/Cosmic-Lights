@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useReducer } from 'react'
 import type { ReactNode } from 'react'
 import { basicAdjustments, buildDefaults } from './adjustments'
 import { EditorContext } from './editorContext'
+import { editorReducer } from './editorReducer'
 
 interface EditorProviderProps {
   children: ReactNode
@@ -12,22 +13,23 @@ interface EditorProviderProps {
  * values from the Basic slider defaults.
  */
 export function EditorProvider({ children }: EditorProviderProps) {
-  const [adjustments, setAdjustments] = useState<Record<string, number>>(() =>
-    buildDefaults(basicAdjustments),
+  const [adjustments, dispatch] = useReducer(
+    editorReducer,
+    null,
+    () => buildDefaults(basicAdjustments),
   )
 
-  const setAdjustment = useCallback((key: string, value: number) => {
-    setAdjustments((previous) => ({ ...previous, [key]: value }))
-  }, [])
+  const setAdjustment = (key: string, value: number) => {
+    dispatch({ type: 'SET', key, value })
+  }
 
-  const resetAdjustments = useCallback(() => {
-    setAdjustments(buildDefaults(basicAdjustments))
-  }, [])
+  const resetAdjustments = () => {
+    dispatch({ type: 'RESET' })
+  }
 
-  const value = useMemo(
-    () => ({ adjustments, setAdjustment, resetAdjustments }),
-    [adjustments, setAdjustment, resetAdjustments],
+  return (
+    <EditorContext value={{ adjustments, setAdjustment, resetAdjustments }}>
+      {children}
+    </EditorContext>
   )
-
-  return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
 }
