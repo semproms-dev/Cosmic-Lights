@@ -1,28 +1,42 @@
-import { Slider, type SliderProps } from '@mantine/core';
+import { Group, Slider, Stack, Text } from '@mantine/core';
+import classes from '../styles/GradientSlider.module.css';
 
-interface GradientSliderProps extends SliderProps {
+interface GradientSliderProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
   gradient: string;
 }
 
-export function GradientSlider({ gradient, ...props }: GradientSliderProps) {
+export function GradientSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  gradient,
+}: GradientSliderProps) {
   return (
-    <Slider
-      min={-100}
-      max={100}
-      defaultValue={0}
-      label={null}
-      size={6}          // track thickness
-      thumbSize={18}
-      styles={{
-        track: { background: gradient },
-        bar: { background: 'transparent' },   // don't let the fill cover the gradient
-        thumb: {
-          background: '#fff',
-          borderColor: 'rgba(0,0,0,0.15)',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-        },
-      }}
-      {...props}
-    />
+    <Stack gap={4} className={classes.root} style={{ '--gradient': gradient } as React.CSSProperties}>
+      <Group justify="space-between" gap="xs">
+        <Text size="sm">{label}</Text>
+        <Text size="sm" c="dimmed">
+          {value}
+        </Text>
+      </Group>
+      <Slider
+        value={value}
+        onChange={onChange}
+        min={min}
+        max={max}
+        step={step}
+        label={null}
+        thumbLabel={label}
+      />
+    </Stack>
   );
 }

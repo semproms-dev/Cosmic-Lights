@@ -1,0 +1,11 @@
+.root {
+  width: 100%;
+}
+
+.root :global(.m_c9ade57f::before) {
+  background: var(--gradient);
+}
+
+.root :global(.m_38aeed47) {
+  background-color: transparent;
+}
