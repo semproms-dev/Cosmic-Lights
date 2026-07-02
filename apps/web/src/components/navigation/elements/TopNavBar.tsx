@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import {
   IconGauge,
@@ -15,6 +15,7 @@ import {
 } from '@tabler/icons-react';
 import { Group, Tooltip, UnstyledButton, Menu } from '@mantine/core';
 import classes from '../styles/TopNavBar.module.css';
+import { OpenImageButton } from '../../canvas/OpenImageButton';
 
 interface MenuItem {
   label: string;
@@ -28,9 +29,15 @@ interface MainLink {
   items: MenuItem[]
 }
 
-const mainLinksMockdata: MainLink[] = [
+
+export function NavBar() {
+  const [active, setActive] = useState('File');
+  const [openedLabel, setOpenedLabel] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const mainLinksMockdata: MainLink[] = [
   { icon: IconFile, label: 'File', items: [
-    { icon: IconFolderOpen, label: 'Open...', onClick: () => {} },
+    { icon: IconFolderOpen, label: 'Open...', onClick: () => {fileInputRef.current?.click()}},
     { icon: IconPhoto, label: 'Export JPG...', onClick: () => {} }
   ]},
   { icon: IconGauge, label: 'Edit', items: [
@@ -45,10 +52,6 @@ const mainLinksMockdata: MainLink[] = [
     { icon: IconInfoCircle, label: 'About CosmicLights', onClick: () => {} }
   ]}
 ];
-
-export function NavBar() {
-  const [active, setActive] = useState('File');
-  const [openedLabel, setOpenedLabel] = useState('');
 
   const mainLinks = mainLinksMockdata.map((link) => (
     <Menu
@@ -101,6 +104,7 @@ export function NavBar() {
   return (
     <nav className={classes.navbar}>
       <Group gap="xs">{mainLinks}</Group>
+      <OpenImageButton fileInputRef={fileInputRef}/>
     </nav>
   );
 }

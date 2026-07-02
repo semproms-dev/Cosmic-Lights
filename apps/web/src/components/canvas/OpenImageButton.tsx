@@ -4,11 +4,11 @@ import { useEditor } from '../../editor/editorContext'
 /** RAW extensions the file picker accepts. */
 const RAW_ACCEPT = '.arw,.cr2,.cr3,.nef,.dng,.raf,.orf,.rw2'
 
-/**
- * Temporary M1 file picker: decodes the chosen RAW into the editor store.
- * Will be folded into the top nav's document icon in M2.
- */
-export function OpenImageButton() {
+interface OpenImageButtonProps {
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+}
+
+export function OpenImageButton({fileInputRef}: OpenImageButtonProps) {
   const { loadImage, imageStatus } = useEditor()
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -22,6 +22,8 @@ export function OpenImageButton() {
     <input
       type="file"
       accept={RAW_ACCEPT}
+      ref={fileInputRef}
+      hidden={true}
       disabled={imageStatus === 'loading'}
       onChange={handleChange}
     />

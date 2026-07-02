@@ -8,8 +8,9 @@ import { InfoPanel } from '../components/panels/InfoPanel'
 import { CropPanel } from '../components/panels/CropPanel'
 import { ExportPanel } from '../components/panels/ExportPanel'
 import { Canvas } from '../components/canvas/Canvas'
-import { OpenImageButton } from '../components/canvas/OpenImageButton'
 import classes from './index.module.css'
+import { LoadingOverlay } from '@mantine/core'
+import { useEditor } from '../editor/editorContext'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -30,6 +31,7 @@ const PANELS: Record<string, ComponentType> = {
  */
 function HomePage() {
   const [activeTool, setActiveTool] = useState('Adjustments')
+  const {imageStatus} = useEditor();
 
   /**
    * Selecting a tool opens its panel; selecting the already-active tool toggles
@@ -46,9 +48,7 @@ function HomePage() {
       <NavBar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>
-            <OpenImageButton />
-          </div>
+          <LoadingOverlay visible={imageStatus === 'loading'}/>
           <Canvas />
         </div>
         {ActivePanel && (
