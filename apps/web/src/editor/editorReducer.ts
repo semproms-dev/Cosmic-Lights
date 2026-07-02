@@ -6,6 +6,7 @@ import {
 } from './adjustments'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
+import type { ImageState, ImageStatus, LoadedImage } from './image'
 
 /**
  * Estado completo del editor: los valores de los sliders y las curvas de tono,
@@ -16,12 +17,19 @@ export interface EditorStoreState {
   adjustments: Record<string, number>
   /** Puntos de control de la curva de tonos, por canal. */
   curves: Curves
+  /** Imagen RAW decodificada y lista para pintar, o `null` si no hay ninguna. */
+  image: ImageState
+  /** Estado de la carga/decodificación de la imagen. */
+  imageStatus: ImageStatus
 }
 
 export type EditorAction =
   | { type: 'SET'; key: string; value: number }
   | { type: 'SET_CURVE'; channel: ChannelId; points: CurvePoint[] }
   | { type: 'RESET_CURVES' }
+  | { type: 'SET_IMAGE'; image: LoadedImage }
+  | { type: 'SET_IMAGE_STATUS'; status: ImageStatus }
+  | { type: 'CLEAR_IMAGE' }
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -56,6 +64,12 @@ export function editorReducer(
       }
     case 'RESET_CURVES':
       return { ...state, curves: buildDefaultCurves() }
+    case 'SET_IMAGE':
+      return { ...state, image: action.image, imageStatus: 'idle' }
+    case 'SET_IMAGE_STATUS':
+      return { ...state, imageStatus: action.status }
+    case 'CLEAR_IMAGE':
+      return { ...state, image: null }
     default:
       return state
   }

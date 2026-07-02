@@ -1,0 +1,41 @@
+import type { Metadata } from "libraw-wasm";
+
+export interface LoadedImage {
+    bitmap: ImageBitmap,
+    width: number,
+    height: number,
+    fileName: string,
+    metadata: Metadata,
+}
+
+export type ImageState = LoadedImage | null;
+export type ImageStatus = 'idle' | 'loading' | 'error';
+
+
+/**
+ * It transforms rgb -> rgba (we add an alpha channel)
+ * Returns a new array rgba: Uint8ClampedArray
+ *
+ * @param rgb - The rgb array
+ * @param width
+ * @param height
+ * @returns A new rgb array with alpha channel
+ */
+export const rgbToRgba = (
+    rgb: Uint8Array,
+    width: number,
+    height: number,
+): Uint8ClampedArray<ArrayBuffer> => {
+    const pixels = width * height;
+    const rgba = new Uint8ClampedArray(pixels * 4)
+
+    for(let i = 0; i < pixels; i++) {
+        rgba[i * 4 + 0] = rgb[i*3 + 0];
+        rgba[i * 4 + 1] = rgb[i*3 + 1];
+        rgba[i * 4 + 2] = rgb[i*3 + 2];
+        rgba[i * 4 + 3] = 255;
+    }
+
+    return rgba;
+
+}

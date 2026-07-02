@@ -1,5 +1,6 @@
 import { createContext, use } from 'react'
 import type { ChannelId, CurvePoint, Curves } from './curves'
+import type { ImageState, ImageStatus } from './image'
 
 /**
  * Shared editor state. For now it holds the live adjustment values; the canvas
@@ -10,6 +11,12 @@ export interface EditorState {
   adjustments: Record<string, number>
   /** Current tone-curve control points, keyed by channel. */
   curves: Curves
+  /** Decoded RAW image ready to draw, or `null` if none is open. */
+  image: ImageState
+  /** Load/decode status of the current image. */
+  imageStatus: ImageStatus
+  /** Decodes a RAW file and stores it for the canvas to draw. */
+  loadImage: (file: File) => Promise<void>
   /** Updates a single adjustment value. */
   setAdjustment: (key: string, value: number) => void
   /** Replaces the control points of one curve channel. */
