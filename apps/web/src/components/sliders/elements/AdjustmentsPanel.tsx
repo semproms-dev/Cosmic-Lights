@@ -3,6 +3,7 @@ import { basicAdjustments, colorAdjustement, detailsAdjustement } from '../../..
 import { useEditor } from '../../../editor/editorContext';
 import { ControlSlider } from './ControlSlider';
 import { GradientSlider } from './GradientSlider';
+import { CurvesPanel } from '../../panels/CurvesPanel/CurvesPanel';
 import { groupBy } from '../../../utils';
 
 const TEMPERATURE_GRADIENT = 'linear-gradient(to right, #2690f0, #ffffff, #f5c542)';
@@ -93,9 +94,7 @@ export function AdjustmentsPanel() {
       <Accordion.Item value='Curves'>
         <Accordion.Control><Text fw={700}>Curves</Text></Accordion.Control>
         <Accordion.Panel>
-          <Stack gap={'md'}>
-            
-          </Stack>
+          <CurvesPanel />
         </Accordion.Panel>
       </Accordion.Item>
     </Accordion>
