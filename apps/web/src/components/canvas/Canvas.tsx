@@ -1,51 +1,84 @@
 import { useEffect, useRef } from 'react'
 import { useEditor } from '../../editor/editorContext'
+import { WebGLRenderer } from '../../editor/gl/renderer'
+import { logger } from '../../logger'
 
 /**
- * Central editor canvas. Draws the decoded image scaled to fit its container
- * (letterboxed, aspect preserved) and redraws on image change or resize. Reads
- * the current image from the shared editor store.
+ * Central editor canvas. Renders the decoded image through the WebGL pipeline,
+ * applying the live adjustments from the shared editor store. Redraws on image
+ * change, adjustment change or resize, batching each into a single animation
+ * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas() {
-  const { image } = useEditor()
+  const { image, adjustments } = useEditor()
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const rendererRef = useRef<WebGLRenderer | null>(null)
 
+  // Create the renderer once, bound to the canvas's WebGL2 context.
   useEffect(() => {
     const canvas = canvasRef.current
     if (canvas === null) {
       return
     }
-    const ctx = canvas.getContext('2d')
-    if (ctx === null) {
+    const gl = canvas.getContext('webgl2')
+    if (gl === null) {
+      logger.error('Canvas: WebGL2 is not available in this browser')
       return
     }
+    rendererRef.current = new WebGLRenderer(gl)
+    return () => {
+      rendererRef.current?.dispose()
+      rendererRef.current = null
+    }
+  }, [])
+
+  // Upload the decoded frame to the GPU only when the image itself changes.
+  useEffect(() => {
+    if (image === null) {
+      return
+    }
+    rendererRef.current?.uploadImage(image.bitmap)
+  }, [image])
+
+  // Redraw on image/adjustment change or resize, coalesced into one frame.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (canvas === null) {
+      return
+    }
+    let frame = 0
 
     const draw = () => {
-      const rect = canvas.getBoundingClientRect()
-      const dpr = window.devicePixelRatio || 1
-      canvas.width = rect.width * dpr
-      canvas.height = rect.height * dpr
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      if (image === null) {
+      frame = 0
+      const renderer = rendererRef.current
+      if (renderer === null) {
         return
       }
-
-      // Fit: scale to fit while preserving aspect ratio, then centre.
-      const scale = Math.min(canvas.width / image.width, canvas.height / image.height)
-      const drawW = image.width * scale
-      const drawH = image.height * scale
-      const offX = (canvas.width - drawW) / 2
-      const offY = (canvas.height - drawH) / 2
-      ctx.drawImage(image.bitmap, offX, offY, drawW, drawH)
+      const rect = canvas.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      const width = Math.round(rect.width * dpr)
+      const height = Math.round(rect.height * dpr)
+      canvas.width = width
+      canvas.height = height
+      renderer.render(adjustments.exposure ?? 0, adjustments.contrast ?? 0, width, height)
     }
 
-    draw()
+    const schedule = () => {
+      if (frame === 0) {
+        frame = requestAnimationFrame(draw)
+      }
+    }
 
-    const observer = new ResizeObserver(draw)
+    schedule()
+    const observer = new ResizeObserver(schedule)
     observer.observe(canvas)
-    return () => observer.disconnect()
-  }, [image])
+    return () => {
+      observer.disconnect()
+      if (frame !== 0) {
+        cancelAnimationFrame(frame)
+      }
+    }
+  }, [image, adjustments])
 
   return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
 }
