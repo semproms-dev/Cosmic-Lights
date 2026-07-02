@@ -23,7 +23,7 @@ export const decodeRaw = async (buffer: ArrayBuffer): Promise<DecodedRaw> => {
   const raw = new LibRaw()
   try {
     await raw.open(new Uint8Array(buffer), { halfSize: true, useCameraWb: true })
-    const metadata = await raw.metadata()
+    const metadata = await raw.metadata(true)
     const image = await raw.imageData()
 
     if (!metadata || !image) {

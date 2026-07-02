@@ -47,3 +47,6 @@ AGENTS.MD
 CLAUDE.md
 *.yaml
 *.md
+
+# Working docs (planning / pseudocode)
+/docs/
