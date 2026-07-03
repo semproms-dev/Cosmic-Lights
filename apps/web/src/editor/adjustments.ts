@@ -40,6 +40,9 @@ export const colorAdjustement: ColorOption[] = [
 
 export const detailsAdjustement: ColorOption[] = [
   { key: 'sharpness', label: 'Sharpness', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
+  { key: 'clarity', label: 'Clarity', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
+  { key: 'dehaze', label: 'Dehaze', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
+  { key: 'texture', label: 'Texture', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
   { key: 'threshold', label: 'Threshold', min: -100, max: 100, step: 1, defaultValue: 0, group: '' },
 ]
 

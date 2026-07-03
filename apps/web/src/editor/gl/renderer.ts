@@ -2,6 +2,38 @@ import { createProgram } from './glContext'
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shaders'
 
 /**
+ * The per-frame adjustment values the shader needs, already defaulted (no
+ * `undefined`). The host component reads these from the store and fills any
+ * missing slider with its zero value before handing them over.
+ */
+export interface RenderAdjustments {
+  /** Exposure in stops; `rgb *= 2^exposure`. */
+  exposure: number
+  /** Contrast in [-100, 100]; scales rgb around the 0.5 pivot. */
+  contrast: number
+  /** Highlights in [-100, 100]; luma-masked offset on bright zones. */
+  highlights: number
+  /** Shadows in [-100, 100]; luma-masked offset on dark zones. */
+  shadows: number
+  /** Whites in [-100, 100]; luma-masked offset on the brightest extreme. */
+  whites: number
+  /** Blacks in [-100, 100]; luma-masked offset on the darkest extreme. */
+  blacks: number
+  /** Temperature in [-100, 100]; blue↔amber channel gains (multiplicative). */
+  temperature: number
+  /** Tint in [-100, 100]; green↔magenta green-channel gain (multiplicative). */
+  tint: number
+  /** Vibrance in [-100, 100]; saturation weighted toward muted pixels. */
+  vibrance: number
+  /** Saturation in [-100, 100]; uniform luma↔color blend. */
+  saturation: number
+  /** Sharpness in [-5, 5]; unsharp-mask amount on luma (negatives soften). */
+  sharpness: number
+  /** Threshold in [-100, 100]; dead-band that spares sub-threshold detail from the sharpen. */
+  threshold: number
+}
+
+/**
  * Owns the WebGL2 resources for the editor pipeline: the program, the geometry
  * (a single full-screen quad) and the image texture. The React layer feeds it
  * the decoded image and the current adjustment values and asks it to draw.
@@ -28,6 +60,9 @@ export class WebGLRenderer {
   private readonly uTint: WebGLUniformLocation | null
   private readonly uVibrance: WebGLUniformLocation | null
   private readonly uSaturation: WebGLUniformLocation | null
+  private readonly uTexel: WebGLUniformLocation | null
+  private readonly uSharpness: WebGLUniformLocation | null
+  private readonly uThreshold: WebGLUniformLocation | null
 
   private imageWidth = 0
   private imageHeight = 0
@@ -83,6 +118,9 @@ export class WebGLRenderer {
     this.uTint = gl.getUniformLocation(this.program, 'uTint')
     this.uVibrance = gl.getUniformLocation(this.program, 'uVibrance')
     this.uSaturation = gl.getUniformLocation(this.program, 'uSaturation')
+    this.uTexel = gl.getUniformLocation(this.program, 'uTexel')
+    this.uSharpness = gl.getUniformLocation(this.program, 'uSharpness')
+    this.uThreshold = gl.getUniformLocation(this.program, 'uThreshold')
 
     gl.clearColor(0, 0, 0, 0)
   }
@@ -109,20 +147,11 @@ export class WebGLRenderer {
    * Draws the current image with the given adjustments into the canvas at the
    * given backing-store size. Fits the image to the canvas, preserving aspect.
    *
-   * @param exposure - Exposure in stops; `rgb *= 2^exposure`.
-   * @param contrast - Contrast in [-100, 100]; scales rgb around the 0.5 pivot.
-   * @param highlights - Highlights in [-100, 100]; luma-masked offset on bright zones.
-   * @param shadows - Shadows in [-100, 100]; luma-masked offset on dark zones.
-   * @param whites - Whites in [-100, 100]; luma-masked offset on the brightest extreme.
-   * @param blacks - Blacks in [-100, 100]; luma-masked offset on the darkest extreme.
-   * @param temperature - Temperature in [-100, 100]; blue↔amber channel gains (multiplicative).
-   * @param tint - Tint in [-100, 100]; green↔magenta green-channel gain (multiplicative).
-   * @param vibrance - Vibrance in [-100, 100]; saturation weighted toward muted pixels.
-   * @param saturation - Saturation in [-100, 100]; uniform luma↔color blend.
+   * @param adjustments - The defaulted per-frame adjustment values.
    * @param canvasWidth - Canvas backing-store width in device pixels.
    * @param canvasHeight - Canvas backing-store height in device pixels.
    */
-  render(exposure: number, contrast: number, highlights: number, shadows: number, whites: number, blacks: number, temperature: number, tint: number, vibrance: number, saturation: number, canvasWidth: number, canvasHeight: number): void {
+  render(adjustments: RenderAdjustments, canvasWidth: number, canvasHeight: number): void {
     const gl = this.gl
     gl.viewport(0, 0, canvasWidth, canvasHeight)
     gl.clear(gl.COLOR_BUFFER_BIT)
@@ -144,16 +173,20 @@ export class WebGLRenderer {
     gl.useProgram(this.program)
     gl.bindVertexArray(this.vao)
     gl.uniform2f(this.uScale, scaleX, scaleY)
-    gl.uniform1f(this.uExposure, exposure)
-    gl.uniform1f(this.uContrast, contrast)
-    gl.uniform1f(this.uHighlights, highlights)
-    gl.uniform1f(this.uShadows, shadows)
-    gl.uniform1f(this.uWhites, whites)
-    gl.uniform1f(this.uBlacks, blacks)
-    gl.uniform1f(this.uTemperature, temperature)
-    gl.uniform1f(this.uTint, tint)
-    gl.uniform1f(this.uVibrance, vibrance)
-    gl.uniform1f(this.uSaturation, saturation)
+    gl.uniform1f(this.uExposure, adjustments.exposure)
+    gl.uniform1f(this.uContrast, adjustments.contrast)
+    gl.uniform1f(this.uHighlights, adjustments.highlights)
+    gl.uniform1f(this.uShadows, adjustments.shadows)
+    gl.uniform1f(this.uWhites, adjustments.whites)
+    gl.uniform1f(this.uBlacks, adjustments.blacks)
+    gl.uniform1f(this.uTemperature, adjustments.temperature)
+    gl.uniform1f(this.uTint, adjustments.tint)
+    gl.uniform1f(this.uVibrance, adjustments.vibrance)
+    gl.uniform1f(this.uSaturation, adjustments.saturation)
+    // Texel size in UV space so the sharpen can reach its neighbours.
+    gl.uniform2f(this.uTexel, 1 / this.imageWidth, 1 / this.imageHeight)
+    gl.uniform1f(this.uSharpness, adjustments.sharpness)
+    gl.uniform1f(this.uThreshold, adjustments.threshold)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.uniform1i(this.uImage, 0)

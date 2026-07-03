@@ -66,7 +66,20 @@ export function Canvas() {
       const height = Math.round(rect.height * dpr)
       canvas.width = width
       canvas.height = height
-      renderer.render(adjustments.exposure ?? 0, adjustments.contrast ?? 0, adjustments.highlights ?? 0, adjustments.shadows ?? 0, adjustments.whites ?? 0, adjustments.blacks ?? 0, adjustments.temperature ?? 0, adjustments.tint ?? 0, adjustments.vibrance ?? 0, adjustments.saturation ?? 0, width, height)
+      renderer.render({
+        exposure: adjustments.exposure ?? 0,
+        contrast: adjustments.contrast ?? 0,
+        highlights: adjustments.highlights ?? 0,
+        shadows: adjustments.shadows ?? 0,
+        whites: adjustments.whites ?? 0,
+        blacks: adjustments.blacks ?? 0,
+        temperature: adjustments.temperature ?? 0,
+        tint: adjustments.tint ?? 0,
+        vibrance: adjustments.vibrance ?? 0,
+        saturation: adjustments.saturation ?? 0,
+        sharpness: adjustments.sharpness ?? 0,
+        threshold: adjustments.threshold ?? 0,
+      }, width, height)
     }
 
     const schedule = () => {

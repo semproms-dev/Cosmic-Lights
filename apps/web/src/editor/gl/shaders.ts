@@ -3,9 +3,10 @@
  *
  * The vertex shader draws a single full-screen quad and scales it in clip space
  * so the image keeps its aspect ratio (letterboxed) inside the canvas. The
- * fragment shader is the pixel pipeline: exposure, contrast and highlights so
- * far; every future adjustment plugs in here as another uniform and a couple of
- * lines.
+ * fragment shader is the pixel pipeline: tone (exposure/contrast/zones), colour
+ * (white balance + presence) and details (unsharp mask + threshold). Every
+ * point-wise adjustment plugs in as another uniform and a couple of lines; the
+ * details group is the first that samples neighbouring texels (see `uTexel`).
  */
 
 /** Full-screen quad; `uScale` letterboxes the image to preserve its aspect. */
@@ -23,7 +24,7 @@ void main() {
 }
 `
 
-/** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation. */
+/** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation → sharpness/threshold. */
 export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 
@@ -42,6 +43,18 @@ uniform float uTemperature;
 uniform float uTint;
 uniform float uVibrance;
 uniform float uSaturation;
+// Details group: size of one texel in UV space (1/width, 1/height) so the
+// unsharp mask can reach its 8 neighbours, plus the two Details sliders.
+uniform vec2 uTexel;
+uniform float uSharpness;
+uniform float uThreshold;
+
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+/** Rec.709 luma of the raw texture at a given UV (used by the 3x3 sharpen). */
+float sampleLuma(vec2 uv) {
+  return dot(texture(uImage, uv).rgb, LUMA);
+}
 
 void main() {
   vec4 texel = texture(uImage, vUv);
@@ -57,7 +70,7 @@ void main() {
   float sat = uSaturation / 100.0;
   // Clamp luma before raising to a power so an over-exposed pixel (luma > 1)
   // can't push the tone offsets super-linearly past their intended strength.
-  float luma = clamp(dot(rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+  float luma = clamp(dot(rgb, LUMA), 0.0, 1.0);
   float dark = 1.0 - luma;
   // Zone masks: highlights/shadows use ^2 (broad ranges), whites/blacks use ^4
   // (concentrated on the extremes) so the four sliders act on distinct tones.
@@ -72,12 +85,36 @@ void main() {
   // Presence: recompute luma on the CURRENT rgb (post tone + WB), NOT the frozen
   // zone luma above, and unclamped so mix() preserves luma exactly. One lumaC
   // serves both blends.
-  float lumaC = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+  float lumaC = dot(rgb, LUMA);
   // Vibrance boosts muted pixels more (weighted by 1 - current saturation);
   // saturation scales every pixel uniformly.
   float curSat = max(rgb.r, max(rgb.g, rgb.b)) - min(rgb.r, min(rgb.g, rgb.b));
   rgb = mix(vec3(lumaC), rgb, 1.0 + vib * (1.0 - curSat));
   rgb = mix(vec3(lumaC), rgb, 1.0 + sat);
+  // Details (unsharp mask). SINGLE-PASS caveat: the 3x3 blur samples the RAW
+  // texture, not the tone/colour result above, so the sharpen sees pre-graded
+  // luma. Acceptable for a small fixed radius; the multi-pass FBO path will fix
+  // it later. Sharpen on LUMA and add the same delta to RGB to avoid colour
+  // fringes. amount = uSharpness (-5..5); negative amounts soften.
+  float blurLuma = (
+    sampleLuma(vUv + uTexel * vec2(-1.0, -1.0)) +
+    sampleLuma(vUv + uTexel * vec2( 0.0, -1.0)) +
+    sampleLuma(vUv + uTexel * vec2( 1.0, -1.0)) +
+    sampleLuma(vUv + uTexel * vec2(-1.0,  0.0)) +
+    sampleLuma(vUv                            ) +
+    sampleLuma(vUv + uTexel * vec2( 1.0,  0.0)) +
+    sampleLuma(vUv + uTexel * vec2(-1.0,  1.0)) +
+    sampleLuma(vUv + uTexel * vec2( 0.0,  1.0)) +
+    sampleLuma(vUv + uTexel * vec2( 1.0,  1.0))
+  ) / 9.0;
+  float detail = sampleLuma(vUv) - blurLuma;
+  // Threshold = dead-band against noise: 0..100 maps to a 0..0.1 luma band;
+  // details weaker than the band are ignored. smoothstep instead of a hard if
+  // to avoid a visible edge in the effect itself. Negatives clamp to 0 (sharpen
+  // everything). At 0, only the softest micro-detail (< the ramp) is spared.
+  float thr = max(uThreshold, 0.0) / 1000.0;
+  float mask = smoothstep(thr, thr + 0.02, abs(detail));
+  rgb += uSharpness * detail * mask;
   fragColor = vec4(clamp(rgb, 0.0, 1.0), texel.a);
 }
 `
