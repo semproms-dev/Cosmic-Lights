@@ -1,5 +1,6 @@
 import { render as testingLibraryRender } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
+import { ContextMenuProvider } from 'mantine-contextmenu'
 import type { ReactNode } from 'react'
 import { EditorProvider } from '../editor/EditorProvider'
 
@@ -12,7 +13,9 @@ export function render(ui: ReactNode) {
   return testingLibraryRender(ui, {
     wrapper: ({ children }) => (
       <MantineProvider defaultColorScheme="dark">
-        <EditorProvider>{children}</EditorProvider>
+        <ContextMenuProvider>
+          <EditorProvider>{children}</EditorProvider>
+        </ContextMenuProvider>
       </MantineProvider>
     ),
   })

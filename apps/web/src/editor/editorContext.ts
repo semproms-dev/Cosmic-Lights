@@ -23,6 +23,8 @@ export interface EditorState {
   setCurve: (channel: ChannelId, points: CurvePoint[]) => void
   /** Restores every curve channel to the identity line. */
   resetCurves: () => void
+  /** Resets all the adjustements */
+  resetAdjustements: () => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

@@ -9,6 +9,7 @@
     "lint": "pnpm -r lint"
   },
   "dependencies": {
-    "icons-react": "^3.7.1"
+    "icons-react": "^3.7.1",
+    "mantine-contextmenu": "^9.3.1"
   }
 }

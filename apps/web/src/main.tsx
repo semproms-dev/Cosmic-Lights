@@ -2,7 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { MantineProvider } from '@mantine/core'
+import { ContextMenuProvider } from 'mantine-contextmenu'
 import '@mantine/core/styles.css'
+import 'mantine-contextmenu/styles.css'
 import './index.css'
 import { routeTree } from './routeTree.gen'
 import { logger } from './logger'
@@ -23,7 +25,9 @@ if (!rootElement) {
   createRoot(rootElement).render(
     <StrictMode>
       <MantineProvider defaultColorScheme="dark">
-        <RouterProvider router={router} />
+        <ContextMenuProvider>
+          <RouterProvider router={router} />
+        </ContextMenuProvider>
       </MantineProvider>
     </StrictMode>,
   )

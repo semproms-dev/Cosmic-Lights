@@ -36,6 +36,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
     dispatch({ type: 'RESET_CURVES' })
   }
 
+  const resetAdjustements = () => {
+    dispatch({ type: 'RESET_ADJUSTEMENTS' })
+  }
+
   /**
    * Decodes a RAW file and stores the result for the canvas to draw. Runs the
    * async decode off the reducer (which stays pure); reports failures through
@@ -70,6 +74,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
         setAdjustment,
         setCurve,
         resetCurves,
+        resetAdjustements,
         loadImage,
       }}
     >

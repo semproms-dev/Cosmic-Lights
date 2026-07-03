@@ -22,8 +22,8 @@ describe('formatShutterSpeed', () => {
 
 describe('formatAperture', () => {
   it('renders the f-number with one decimal place', () => {
-    expect(formatAperture(2.8)).toBe('2.8');
-    expect(formatAperture(4)).toBe('4.0');
-    expect(formatAperture(1.7999)).toBe('1.8');
+    expect(formatAperture(2.8)).toBe('f/2.8');
+    expect(formatAperture(4)).toBe('f/4.0');
+    expect(formatAperture(1.7999)).toBe('f/1.8');
   });
 });

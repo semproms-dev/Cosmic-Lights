@@ -30,6 +30,7 @@ export type EditorAction =
   | { type: 'SET_IMAGE'; image: LoadedImage }
   | { type: 'SET_IMAGE_STATUS'; status: ImageStatus }
   | { type: 'CLEAR_IMAGE' }
+  | { type: 'RESET_ADJUSTEMENTS'}
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -70,6 +71,8 @@ export function editorReducer(
       return { ...state, imageStatus: action.status }
     case 'CLEAR_IMAGE':
       return { ...state, image: null }
+    case 'RESET_ADJUSTEMENTS':
+      return { ...state, adjustments: buildInitialAdjustments() }
     default:
       return state
   }

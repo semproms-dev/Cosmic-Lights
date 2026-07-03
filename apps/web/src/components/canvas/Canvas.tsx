@@ -2,6 +2,10 @@ import { useEffect, useRef } from 'react'
 import { useEditor } from '../../editor/editorContext'
 import { WebGLRenderer } from '../../editor/gl/renderer'
 import { logger } from '../../logger'
+import { useDisclosure } from '@mantine/hooks'
+import { useContextMenu } from 'mantine-contextmenu'
+import { IconZoomReset } from '@tabler/icons-react'
+import { ConfirmDialog } from '../window/ConfirmDialog'
 
 /**
  * Central editor canvas. Renders the decoded image through the WebGL pipeline,
@@ -10,9 +14,11 @@ import { logger } from '../../logger'
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas() {
-  const { image, adjustments } = useEditor()
+  const { image, adjustments, resetAdjustements, resetCurves } = useEditor()
+  const [resetOpened, { open: openReset, close: closeReset }] = useDisclosure(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
+  const { showContextMenu } = useContextMenu()
 
   // Create the renderer once, bound to the canvas's WebGL2 context.
   useEffect(() => {
@@ -80,5 +86,24 @@ export function Canvas() {
     }
   }, [image, adjustments])
 
-  return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+  return <>
+    <canvas onContextMenu={showContextMenu([
+      {
+        key: 'reset',
+        icon: <IconZoomReset/>,
+        title: 'Reset changes',
+        onClick: () => openReset()
+      },
+    ])} ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+    <ConfirmDialog
+      opened={resetOpened}
+      onClose={closeReset}
+      onConfirm={() => { resetAdjustements(); resetCurves(); closeReset() }}
+      title="Reset changes"
+      message="This will reset all adjustment sliders and tone curves to their default values."
+      confirmLabel="Reset"
+      confirmColor="red"
+    />
+  </>
 }
+
