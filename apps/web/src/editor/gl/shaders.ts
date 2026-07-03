@@ -11,16 +11,108 @@
 
 /** Full-screen quad; `uScale` letterboxes the image to preserve its aspect. */
 export const VERTEX_SHADER = `#version 300 es
-in vec2 aPos;
+// Pin the location so a single shared VAO works for every program that uses
+// this vertex shader (the pipeline pass and the copy/composite pass).
+layout(location = 0) in vec2 aPos;
 uniform vec2 uScale;
+// 1.0 when this pass samples an FBO texture, 0.0 when it samples the uploaded
+// RAW. Rendering into an FBO stores it inverted vs a texture uploaded with
+// UNPACK_FLIP_Y, so a pass reading an FBO flips V to cancel that inversion.
+// Doing it per-pass keeps every pass correct regardless of how many there are.
+uniform float uFlipV;
 out vec2 vUv;
 
 void main() {
   vUv = aPos * 0.5 + 0.5;
-  // WebGL's texture origin is bottom-left but the image's is top-left, so flip
-  // the vertical texture coordinate to draw the image the right way up.
-  vUv.y = 1.0 - vUv.y;
+  vUv.y = mix(vUv.y, 1.0 - vUv.y, uFlipV);
   gl_Position = vec4(aPos * uScale, 0.0, 1.0);
+}
+`
+
+/**
+ * Composite pass (final blit to the canvas): combines the developed image with
+ * its large blur to apply the local-contrast effects that all need that blur —
+ * clarity and dehaze (texture will join later). The letterbox lives in the
+ * shared vertex shader's `uScale`. Every slider is the identity at 0.
+ *
+ * - Clarity: large-radius unsharp mask on luma, biased to the midtones.
+ * - Dehaze (option B, pragmatic): haze = lifted blacks + flat contrast + low
+ *   saturation + cool tint, so removing it lowers the black point, adds local
+ *   contrast, restores saturation and warms the tint (all scaled by `d`, and
+ *   reversed for negative dehaze = adding haze).
+ */
+export const CLARITY_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uDeveloped;   // the sharp, graded image
+uniform sampler2D uBlur;        // its large-radius blur
+uniform float uClarity;         // -5..5
+uniform float uDehaze;          // -5..5
+
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+void main() {
+  vec4 base = texture(uDeveloped, vUv);
+  vec3 rgb = base.rgb;
+  float clarityAmt = uClarity * 0.2;              // slider → strength (k, tunable)
+  float d = uDehaze * 0.15;                        // slider → strength (k, tunable)
+
+  // Shared large-radius local contrast (clarity + dehaze both use the blur).
+  float L = dot(rgb, LUMA);                        // developed luma
+  float B = dot(texture(uBlur, vUv).rgb, LUMA);    // blurred luma
+  float D = L - B;                                 // local microcontrast
+  float w = 1.0 - pow(2.0 * L - 1.0, 2.0);         // midtone mask: 0 at black/white, 1 at mid
+  float Lp = L + (clarityAmt + d) * w * D;         // dehaze adds its own local contrast
+  rgb *= Lp / max(L, 1e-4);                        // rescale RGB → preserve hue
+
+  // Dehaze tone/colour (option B). Each term is the identity when d = 0.
+  float bl = d * 0.5;                              // black-point lift (gentler than d)
+  rgb = (rgb - bl) / (1.0 - bl);                   // recover haze-lifted blacks
+  float Ld = dot(rgb, LUMA);
+  rgb = mix(vec3(Ld), rgb, 1.0 + d);               // restore saturation lost to haze
+  rgb += d * 0.05 * vec3(1.0, 0.0, -1.0);          // warm the tint against the cool haze
+
+  fragColor = vec4(clamp(rgb, 0.0, 1.0), base.a);
+}
+`
+
+/**
+ * One 1D pass of a separable Gaussian blur. Run it twice (horizontal then
+ * vertical, via `uDirection`) to get a full 2D blur at cost 2·r instead of r².
+ * `uDirection` is the per-texel step along the blur axis: (1/w, 0) horizontal,
+ * (0, 1/h) vertical. `uRadius` is the truncation radius in texels (≈ 3·sigma).
+ * This is the large-radius blur clarity/dehaze/texture are built on.
+ */
+export const BLUR_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uSource;
+uniform vec2 uDirection;
+uniform float uRadius;
+
+// Hard cap on taps per side (compile-time loop bound); samples beyond uRadius
+// are skipped, so the effective radius is driven by the uniform.
+const int MAX_RADIUS = 48;
+
+void main() {
+  // sigma = radius/3 so the Gaussian has decayed to ~1% at the truncation edge.
+  float sigma = max(uRadius / 3.0, 1e-4);
+  float twoSigma2 = 2.0 * sigma * sigma;
+  vec3 sum = vec3(0.0);
+  float wsum = 0.0;
+  for (int i = -MAX_RADIUS; i <= MAX_RADIUS; i++) {
+    if (float(abs(i)) > uRadius) { continue; }
+    float w = exp(-float(i * i) / twoSigma2);
+    sum += texture(uSource, vUv + uDirection * float(i)).rgb * w;
+    wsum += w;
+  }
+  fragColor = vec4(sum / wsum, 1.0);
 }
 `
 

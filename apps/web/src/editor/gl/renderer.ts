@@ -1,5 +1,6 @@
-import { createProgram } from './glContext'
-import { FRAGMENT_SHADER, VERTEX_SHADER } from './shaders'
+import { createProgram, createRenderTarget, deleteRenderTarget } from './glContext'
+import type { RenderTarget } from './glContext'
+import { BLUR_FRAGMENT_SHADER, CLARITY_FRAGMENT_SHADER, FRAGMENT_SHADER, VERTEX_SHADER } from './shaders'
 
 /**
  * The per-frame adjustment values the shader needs, already defaulted (no
@@ -31,6 +32,10 @@ export interface RenderAdjustments {
   sharpness: number
   /** Threshold in [-100, 100]; dead-band that spares sub-threshold detail from the sharpen. */
   threshold: number
+  /** Clarity in [-5, 5]; large-radius midtone local-contrast (negatives soften). */
+  clarity: number
+  /** Dehaze in [-5, 5]; removes atmospheric haze (negatives add it). */
+  dehaze: number
 }
 
 /**
@@ -49,6 +54,7 @@ export class WebGLRenderer {
   private readonly buffer: WebGLBuffer
   private readonly texture: WebGLTexture
   private readonly uScale: WebGLUniformLocation | null
+  private readonly uFlipV: WebGLUniformLocation | null
   private readonly uImage: WebGLUniformLocation | null
   private readonly uExposure: WebGLUniformLocation | null
   private readonly uContrast: WebGLUniformLocation | null
@@ -63,6 +69,32 @@ export class WebGLRenderer {
   private readonly uTexel: WebGLUniformLocation | null
   private readonly uSharpness: WebGLUniformLocation | null
   private readonly uThreshold: WebGLUniformLocation | null
+
+  // Second program: the final composite to the canvas — applies clarity by
+  // combining the developed image with its blur. Uniform locations are distinct
+  // from the pipeline program's (locations are per-program).
+  private readonly clarityProgram: WebGLProgram
+  private readonly uClarityScale: WebGLUniformLocation | null
+  private readonly uClarityFlipV: WebGLUniformLocation | null
+  private readonly uClarityDeveloped: WebGLUniformLocation | null
+  private readonly uClarityBlur: WebGLUniformLocation | null
+  private readonly uClarity: WebGLUniformLocation | null
+  private readonly uDehaze: WebGLUniformLocation | null
+
+  // Third program: one 1D Gaussian pass, run twice (H then V) for a separable blur.
+  private readonly blurProgram: WebGLProgram
+  private readonly uBlurScale: WebGLUniformLocation | null
+  private readonly uBlurFlipV: WebGLUniformLocation | null
+  private readonly uBlurSource: WebGLUniformLocation | null
+  private readonly uBlurDirection: WebGLUniformLocation | null
+  private readonly uBlurRadius: WebGLUniformLocation | null
+
+  // The developed image (tone/colour/details) rendered off-screen, so later
+  // passes can sample it. Recreated whenever the image size changes.
+  private developed: RenderTarget | null = null
+  // Ping-pong targets for the separable blur: H writes blurA, V writes blurB.
+  private blurA: RenderTarget | null = null
+  private blurB: RenderTarget | null = null
 
   private imageWidth = 0
   private imageHeight = 0
@@ -107,6 +139,7 @@ export class WebGLRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 
     this.uScale = gl.getUniformLocation(this.program, 'uScale')
+    this.uFlipV = gl.getUniformLocation(this.program, 'uFlipV')
     this.uImage = gl.getUniformLocation(this.program, 'uImage')
     this.uExposure = gl.getUniformLocation(this.program, 'uExposure')
     this.uContrast = gl.getUniformLocation(this.program, 'uContrast')
@@ -122,6 +155,21 @@ export class WebGLRenderer {
     this.uSharpness = gl.getUniformLocation(this.program, 'uSharpness')
     this.uThreshold = gl.getUniformLocation(this.program, 'uThreshold')
 
+    this.clarityProgram = createProgram(gl, VERTEX_SHADER, CLARITY_FRAGMENT_SHADER)
+    this.uClarityScale = gl.getUniformLocation(this.clarityProgram, 'uScale')
+    this.uClarityFlipV = gl.getUniformLocation(this.clarityProgram, 'uFlipV')
+    this.uClarityDeveloped = gl.getUniformLocation(this.clarityProgram, 'uDeveloped')
+    this.uClarityBlur = gl.getUniformLocation(this.clarityProgram, 'uBlur')
+    this.uClarity = gl.getUniformLocation(this.clarityProgram, 'uClarity')
+    this.uDehaze = gl.getUniformLocation(this.clarityProgram, 'uDehaze')
+
+    this.blurProgram = createProgram(gl, VERTEX_SHADER, BLUR_FRAGMENT_SHADER)
+    this.uBlurScale = gl.getUniformLocation(this.blurProgram, 'uScale')
+    this.uBlurFlipV = gl.getUniformLocation(this.blurProgram, 'uFlipV')
+    this.uBlurSource = gl.getUniformLocation(this.blurProgram, 'uSource')
+    this.uBlurDirection = gl.getUniformLocation(this.blurProgram, 'uDirection')
+    this.uBlurRadius = gl.getUniformLocation(this.blurProgram, 'uRadius')
+
     gl.clearColor(0, 0, 0, 0)
   }
 
@@ -134,13 +182,28 @@ export class WebGLRenderer {
   uploadImage(bitmap: ImageBitmap): void {
     const gl = this.gl
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
-    // An ImageBitmap already arrives with its top row first, matching the UV
-    // mapping in the vertex shader, so we must NOT flip on upload.
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    // Flip vertically on upload so texture V=1 is the image's top row. With this
+    // done once here, no shader needs to flip, which keeps orientation
+    // consistent across the multi-pass (FBO) pipeline.
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap)
     this.imageWidth = bitmap.width
     this.imageHeight = bitmap.height
     this.hasImage = true
+
+    // The off-screen targets live at image resolution; rebuild on size change.
+    if (this.developed !== null) {
+      deleteRenderTarget(gl, this.developed)
+    }
+    if (this.blurA !== null) {
+      deleteRenderTarget(gl, this.blurA)
+    }
+    if (this.blurB !== null) {
+      deleteRenderTarget(gl, this.blurB)
+    }
+    this.developed = createRenderTarget(gl, bitmap.width, bitmap.height)
+    this.blurA = createRenderTarget(gl, bitmap.width, bitmap.height)
+    this.blurB = createRenderTarget(gl, bitmap.width, bitmap.height)
   }
 
   /**
@@ -151,28 +214,52 @@ export class WebGLRenderer {
    * @param canvasWidth - Canvas backing-store width in device pixels.
    * @param canvasHeight - Canvas backing-store height in device pixels.
    */
+  /**
+   * Runs one 1D Gaussian pass: blurs `sourceTexture` along `(dirX, dirY)` into
+   * `target`. Composed twice (H then V) it yields a separable 2D blur.
+   *
+   * @param sourceTexture - The texture to blur (a previous pass's FBO texture).
+   * @param target - The render target to write the blurred result into.
+   * @param dirX - Per-texel step on X (1/width for a horizontal pass, else 0).
+   * @param dirY - Per-texel step on Y (1/height for a vertical pass, else 0).
+   * @param radius - Blur radius in texels (≈ 3·sigma).
+   */
+  private blur1D(sourceTexture: WebGLTexture, target: RenderTarget, dirX: number, dirY: number, radius: number): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    gl.useProgram(this.blurProgram)
+    gl.uniform2f(this.uBlurScale, 1, 1)
+    gl.uniform1f(this.uBlurFlipV, 1) // samples an FBO texture
+    gl.uniform2f(this.uBlurDirection, dirX, dirY)
+    gl.uniform1f(this.uBlurRadius, radius)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, sourceTexture)
+    gl.uniform1i(this.uBlurSource, 0)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+  }
+
   render(adjustments: RenderAdjustments, canvasWidth: number, canvasHeight: number): void {
     const gl = this.gl
-    gl.viewport(0, 0, canvasWidth, canvasHeight)
-    gl.clear(gl.COLOR_BUFFER_BIT)
-    if (!this.hasImage || canvasWidth === 0 || canvasHeight === 0) {
+    if (!this.hasImage || this.developed === null || this.blurA === null || this.blurB === null || canvasWidth === 0 || canvasHeight === 0) {
+      // Nothing to draw: just clear the canvas.
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      gl.viewport(0, 0, canvasWidth, canvasHeight)
+      gl.clear(gl.COLOR_BUFFER_BIT)
       return
     }
+    const developed = this.developed
+    const blurA = this.blurA
+    const blurB = this.blurB
 
-    // Letterbox: shrink the quad on the axis that would otherwise overflow.
-    const canvasAspect = canvasWidth / canvasHeight
-    const imageAspect = this.imageWidth / this.imageHeight
-    let scaleX = 1
-    let scaleY = 1
-    if (imageAspect > canvasAspect) {
-      scaleY = canvasAspect / imageAspect
-    } else {
-      scaleX = imageAspect / canvasAspect
-    }
-
+    // ── Pass 1: run the pixel pipeline into the developed target, at image
+    // resolution and filling the whole quad (no letterbox here). ──
+    gl.bindFramebuffer(gl.FRAMEBUFFER, developed.framebuffer)
+    gl.viewport(0, 0, developed.width, developed.height)
     gl.useProgram(this.program)
     gl.bindVertexArray(this.vao)
-    gl.uniform2f(this.uScale, scaleX, scaleY)
+    gl.uniform2f(this.uScale, 1, 1)
+    gl.uniform1f(this.uFlipV, 0) // samples the RAW upload: no flip
     gl.uniform1f(this.uExposure, adjustments.exposure)
     gl.uniform1f(this.uContrast, adjustments.contrast)
     gl.uniform1f(this.uHighlights, adjustments.highlights)
@@ -191,15 +278,62 @@ export class WebGLRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.uniform1i(this.uImage, 0)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+    // ── Passes 2-3: separable Gaussian blur of the developed image. ──
+    // H: developed → blurA, then V: blurA → blurB (= the large blur).
+    const texelX = 1 / this.imageWidth
+    const texelY = 1 / this.imageHeight
+    const blurRadius = 40 // TEMP fixed radius for the Hito B checkpoint; clarity will drive it in Hito C.
+    this.blur1D(developed.texture, blurA, texelX, 0, blurRadius)
+    this.blur1D(blurA.texture, blurB, 0, texelY, blurRadius)
+
+    // ── Pass 4: clarity composite (developed + blur) → canvas, letterboxed. ──
+    // Shrink the quad on the axis that would otherwise overflow.
+    const canvasAspect = canvasWidth / canvasHeight
+    const imageAspect = this.imageWidth / this.imageHeight
+    let scaleX = 1
+    let scaleY = 1
+    if (imageAspect > canvasAspect) {
+      scaleY = canvasAspect / imageAspect
+    } else {
+      scaleX = imageAspect / canvasAspect
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, canvasWidth, canvasHeight)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    gl.useProgram(this.clarityProgram)
+    gl.uniform2f(this.uClarityScale, scaleX, scaleY)
+    gl.uniform1f(this.uClarityFlipV, 1) // samples FBO textures: flip to cancel their inversion
+    gl.uniform1f(this.uClarity, adjustments.clarity)
+    gl.uniform1f(this.uDehaze, adjustments.dehaze)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, developed.texture)
+    gl.uniform1i(this.uClarityDeveloped, 0)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, blurB.texture)
+    gl.uniform1i(this.uClarityBlur, 1)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     gl.bindVertexArray(null)
   }
 
   /** Releases every GL resource. Call when the host canvas unmounts. */
   dispose(): void {
     const gl = this.gl
+    if (this.developed !== null) {
+      deleteRenderTarget(gl, this.developed)
+    }
+    if (this.blurA !== null) {
+      deleteRenderTarget(gl, this.blurA)
+    }
+    if (this.blurB !== null) {
+      deleteRenderTarget(gl, this.blurB)
+    }
     gl.deleteTexture(this.texture)
     gl.deleteBuffer(this.buffer)
     gl.deleteVertexArray(this.vao)
     gl.deleteProgram(this.program)
+    gl.deleteProgram(this.clarityProgram)
+    gl.deleteProgram(this.blurProgram)
   }
 }

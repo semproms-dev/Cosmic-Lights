@@ -79,6 +79,8 @@ export function Canvas() {
         saturation: adjustments.saturation ?? 0,
         sharpness: adjustments.sharpness ?? 0,
         threshold: adjustments.threshold ?? 0,
+        clarity: adjustments.clarity ?? 0,
+        dehaze: adjustments.dehaze ?? 0,
       }, width, height)
     }
 
