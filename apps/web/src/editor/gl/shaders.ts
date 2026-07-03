@@ -23,12 +23,13 @@ void main() {
 }
 `
 
-/** Pixel pipeline: exposure (rgb *= 2^stops) → highlights → shadows → whites → blacks → contrast. */
+/** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation. */
 export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 
 in vec2 vUv;
 out vec4 fragColor;
+
 
 uniform sampler2D uImage;
 uniform float uExposure;
@@ -37,6 +38,10 @@ uniform float uHighlights;
 uniform float uShadows;
 uniform float uWhites;
 uniform float uBlacks;
+uniform float uTemperature;
+uniform float uTint;
+uniform float uVibrance;
+uniform float uSaturation;
 
 void main() {
   vec4 texel = texture(uImage, vUv);
@@ -46,6 +51,10 @@ void main() {
   float sh = uShadows / 100.0;
   float wh = uWhites / 100.0;
   float bl = uBlacks / 100.0;
+  float t = uTemperature / 100.0;
+  float ti = uTint / 100.0;
+  float vib = uVibrance / 100.0;
+  float sat = uSaturation / 100.0;
   // Clamp luma before raising to a power so an over-exposed pixel (luma > 1)
   // can't push the tone offsets super-linearly past their intended strength.
   float luma = clamp(dot(rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
@@ -57,6 +66,18 @@ void main() {
   rgb += wh * 0.25 * (luma * luma * luma * luma);
   rgb += bl * 0.25 * (dark * dark * dark * dark);
   rgb = (rgb - 0.5) * k + 0.5;
+  rgb.r *= 1.0 + t * 0.3;
+  rgb.b *= 1.0 - t * 0.3;
+  rgb.g *= 1.0 - ti * 0.3;
+  // Presence: recompute luma on the CURRENT rgb (post tone + WB), NOT the frozen
+  // zone luma above, and unclamped so mix() preserves luma exactly. One lumaC
+  // serves both blends.
+  float lumaC = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+  // Vibrance boosts muted pixels more (weighted by 1 - current saturation);
+  // saturation scales every pixel uniformly.
+  float curSat = max(rgb.r, max(rgb.g, rgb.b)) - min(rgb.r, min(rgb.g, rgb.b));
+  rgb = mix(vec3(lumaC), rgb, 1.0 + vib * (1.0 - curSat));
+  rgb = mix(vec3(lumaC), rgb, 1.0 + sat);
   fragColor = vec4(clamp(rgb, 0.0, 1.0), texel.a);
 }
 `

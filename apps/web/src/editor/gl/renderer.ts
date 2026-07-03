@@ -24,6 +24,10 @@ export class WebGLRenderer {
   private readonly uShadows: WebGLUniformLocation | null
   private readonly uWhites: WebGLUniformLocation | null
   private readonly uBlacks: WebGLUniformLocation | null
+  private readonly uTemperature: WebGLUniformLocation | null
+  private readonly uTint: WebGLUniformLocation | null
+  private readonly uVibrance: WebGLUniformLocation | null
+  private readonly uSaturation: WebGLUniformLocation | null
 
   private imageWidth = 0
   private imageHeight = 0
@@ -75,6 +79,10 @@ export class WebGLRenderer {
     this.uShadows = gl.getUniformLocation(this.program, 'uShadows')
     this.uWhites = gl.getUniformLocation(this.program, 'uWhites')
     this.uBlacks = gl.getUniformLocation(this.program, 'uBlacks')
+    this.uTemperature = gl.getUniformLocation(this.program, 'uTemperature')
+    this.uTint = gl.getUniformLocation(this.program, 'uTint')
+    this.uVibrance = gl.getUniformLocation(this.program, 'uVibrance')
+    this.uSaturation = gl.getUniformLocation(this.program, 'uSaturation')
 
     gl.clearColor(0, 0, 0, 0)
   }
@@ -107,10 +115,14 @@ export class WebGLRenderer {
    * @param shadows - Shadows in [-100, 100]; luma-masked offset on dark zones.
    * @param whites - Whites in [-100, 100]; luma-masked offset on the brightest extreme.
    * @param blacks - Blacks in [-100, 100]; luma-masked offset on the darkest extreme.
+   * @param temperature - Temperature in [-100, 100]; blue↔amber channel gains (multiplicative).
+   * @param tint - Tint in [-100, 100]; green↔magenta green-channel gain (multiplicative).
+   * @param vibrance - Vibrance in [-100, 100]; saturation weighted toward muted pixels.
+   * @param saturation - Saturation in [-100, 100]; uniform luma↔color blend.
    * @param canvasWidth - Canvas backing-store width in device pixels.
    * @param canvasHeight - Canvas backing-store height in device pixels.
    */
-  render(exposure: number, contrast: number, highlights: number, shadows: number, whites: number, blacks: number, canvasWidth: number, canvasHeight: number): void {
+  render(exposure: number, contrast: number, highlights: number, shadows: number, whites: number, blacks: number, temperature: number, tint: number, vibrance: number, saturation: number, canvasWidth: number, canvasHeight: number): void {
     const gl = this.gl
     gl.viewport(0, 0, canvasWidth, canvasHeight)
     gl.clear(gl.COLOR_BUFFER_BIT)
@@ -138,6 +150,10 @@ export class WebGLRenderer {
     gl.uniform1f(this.uShadows, shadows)
     gl.uniform1f(this.uWhites, whites)
     gl.uniform1f(this.uBlacks, blacks)
+    gl.uniform1f(this.uTemperature, temperature)
+    gl.uniform1f(this.uTint, tint)
+    gl.uniform1f(this.uVibrance, vibrance)
+    gl.uniform1f(this.uSaturation, saturation)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.uniform1i(this.uImage, 0)
