@@ -20,6 +20,10 @@ export class WebGLRenderer {
   private readonly uImage: WebGLUniformLocation | null
   private readonly uExposure: WebGLUniformLocation | null
   private readonly uContrast: WebGLUniformLocation | null
+  private readonly uHighlights: WebGLUniformLocation | null
+  private readonly uShadows: WebGLUniformLocation | null
+  private readonly uWhites: WebGLUniformLocation | null
+  private readonly uBlacks: WebGLUniformLocation | null
 
   private imageWidth = 0
   private imageHeight = 0
@@ -67,6 +71,10 @@ export class WebGLRenderer {
     this.uImage = gl.getUniformLocation(this.program, 'uImage')
     this.uExposure = gl.getUniformLocation(this.program, 'uExposure')
     this.uContrast = gl.getUniformLocation(this.program, 'uContrast')
+    this.uHighlights = gl.getUniformLocation(this.program, 'uHighlights')
+    this.uShadows = gl.getUniformLocation(this.program, 'uShadows')
+    this.uWhites = gl.getUniformLocation(this.program, 'uWhites')
+    this.uBlacks = gl.getUniformLocation(this.program, 'uBlacks')
 
     gl.clearColor(0, 0, 0, 0)
   }
@@ -94,10 +102,15 @@ export class WebGLRenderer {
    * given backing-store size. Fits the image to the canvas, preserving aspect.
    *
    * @param exposure - Exposure in stops; `rgb *= 2^exposure`.
+   * @param contrast - Contrast in [-100, 100]; scales rgb around the 0.5 pivot.
+   * @param highlights - Highlights in [-100, 100]; luma-masked offset on bright zones.
+   * @param shadows - Shadows in [-100, 100]; luma-masked offset on dark zones.
+   * @param whites - Whites in [-100, 100]; luma-masked offset on the brightest extreme.
+   * @param blacks - Blacks in [-100, 100]; luma-masked offset on the darkest extreme.
    * @param canvasWidth - Canvas backing-store width in device pixels.
    * @param canvasHeight - Canvas backing-store height in device pixels.
    */
-  render(exposure: number, contrast: number, canvasWidth: number, canvasHeight: number): void {
+  render(exposure: number, contrast: number, highlights: number, shadows: number, whites: number, blacks: number, canvasWidth: number, canvasHeight: number): void {
     const gl = this.gl
     gl.viewport(0, 0, canvasWidth, canvasHeight)
     gl.clear(gl.COLOR_BUFFER_BIT)
@@ -121,6 +134,10 @@ export class WebGLRenderer {
     gl.uniform2f(this.uScale, scaleX, scaleY)
     gl.uniform1f(this.uExposure, exposure)
     gl.uniform1f(this.uContrast, contrast)
+    gl.uniform1f(this.uHighlights, highlights)
+    gl.uniform1f(this.uShadows, shadows)
+    gl.uniform1f(this.uWhites, whites)
+    gl.uniform1f(this.uBlacks, blacks)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.uniform1i(this.uImage, 0)
