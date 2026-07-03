@@ -36,6 +36,8 @@ export interface RenderAdjustments {
   clarity: number
   /** Dehaze in [-5, 5]; removes atmospheric haze (negatives add it). */
   dehaze: number
+  /** Texture in [-5, 5]; small-radius fine-detail local-contrast (negatives soften). */
+  texture: number
 }
 
 /**
@@ -78,8 +80,10 @@ export class WebGLRenderer {
   private readonly uClarityFlipV: WebGLUniformLocation | null
   private readonly uClarityDeveloped: WebGLUniformLocation | null
   private readonly uClarityBlur: WebGLUniformLocation | null
+  private readonly uClarityBlurSmall: WebGLUniformLocation | null
   private readonly uClarity: WebGLUniformLocation | null
   private readonly uDehaze: WebGLUniformLocation | null
+  private readonly uTexture: WebGLUniformLocation | null
 
   // Third program: one 1D Gaussian pass, run twice (H then V) for a separable blur.
   private readonly blurProgram: WebGLProgram
@@ -92,9 +96,11 @@ export class WebGLRenderer {
   // The developed image (tone/colour/details) rendered off-screen, so later
   // passes can sample it. Recreated whenever the image size changes.
   private developed: RenderTarget | null = null
-  // Ping-pong targets for the separable blur: H writes blurA, V writes blurB.
+  // Blur targets: blurA is shared scratch for the H pass; blurB holds the large
+  // blur (clarity/dehaze), blurC the small blur (texture).
   private blurA: RenderTarget | null = null
   private blurB: RenderTarget | null = null
+  private blurC: RenderTarget | null = null
 
   private imageWidth = 0
   private imageHeight = 0
@@ -160,8 +166,10 @@ export class WebGLRenderer {
     this.uClarityFlipV = gl.getUniformLocation(this.clarityProgram, 'uFlipV')
     this.uClarityDeveloped = gl.getUniformLocation(this.clarityProgram, 'uDeveloped')
     this.uClarityBlur = gl.getUniformLocation(this.clarityProgram, 'uBlur')
+    this.uClarityBlurSmall = gl.getUniformLocation(this.clarityProgram, 'uBlurSmall')
     this.uClarity = gl.getUniformLocation(this.clarityProgram, 'uClarity')
     this.uDehaze = gl.getUniformLocation(this.clarityProgram, 'uDehaze')
+    this.uTexture = gl.getUniformLocation(this.clarityProgram, 'uTexture')
 
     this.blurProgram = createProgram(gl, VERTEX_SHADER, BLUR_FRAGMENT_SHADER)
     this.uBlurScale = gl.getUniformLocation(this.blurProgram, 'uScale')
@@ -201,9 +209,13 @@ export class WebGLRenderer {
     if (this.blurB !== null) {
       deleteRenderTarget(gl, this.blurB)
     }
+    if (this.blurC !== null) {
+      deleteRenderTarget(gl, this.blurC)
+    }
     this.developed = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurA = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurB = createRenderTarget(gl, bitmap.width, bitmap.height)
+    this.blurC = createRenderTarget(gl, bitmap.width, bitmap.height)
   }
 
   /**
@@ -241,7 +253,7 @@ export class WebGLRenderer {
 
   render(adjustments: RenderAdjustments, canvasWidth: number, canvasHeight: number): void {
     const gl = this.gl
-    if (!this.hasImage || this.developed === null || this.blurA === null || this.blurB === null || canvasWidth === 0 || canvasHeight === 0) {
+    if (!this.hasImage || this.developed === null || this.blurA === null || this.blurB === null || this.blurC === null || canvasWidth === 0 || canvasHeight === 0) {
       // Nothing to draw: just clear the canvas.
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
       gl.viewport(0, 0, canvasWidth, canvasHeight)
@@ -251,6 +263,7 @@ export class WebGLRenderer {
     const developed = this.developed
     const blurA = this.blurA
     const blurB = this.blurB
+    const blurC = this.blurC
 
     // ── Pass 1: run the pixel pipeline into the developed target, at image
     // resolution and filling the whole quad (no letterbox here). ──
@@ -279,13 +292,21 @@ export class WebGLRenderer {
     gl.uniform1i(this.uImage, 0)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
-    // ── Passes 2-3: separable Gaussian blur of the developed image. ──
-    // H: developed → blurA, then V: blurA → blurB (= the large blur).
-    const texelX = 1 / this.imageWidth
-    const texelY = 1 / this.imageHeight
-    const blurRadius = 40 // TEMP fixed radius for the Hito B checkpoint; clarity will drive it in Hito C.
-    this.blur1D(developed.texture, blurA, texelX, 0, blurRadius)
-    this.blur1D(blurA.texture, blurB, 0, texelY, blurRadius)
+    // ── Passes 2-5: two separable Gaussian blurs of the developed image. ──
+    // Large (clarity/dehaze) → blurB; small (texture) → blurC. blurA is the
+    // shared H-pass scratch, reused once the large blur has consumed it.
+    // Skipped when no local-contrast slider is active: the composite is then the
+    // identity regardless of the (unused) blur textures, so 4 passes are saved.
+    if (adjustments.clarity !== 0 || adjustments.dehaze !== 0 || adjustments.texture !== 0) {
+      const texelX = 1 / this.imageWidth
+      const texelY = 1 / this.imageHeight
+      const largeRadius = 40 // mid-sized structures (clarity/dehaze)
+      const smallRadius = 8 // fine detail (texture)
+      this.blur1D(developed.texture, blurA, texelX, 0, largeRadius)
+      this.blur1D(blurA.texture, blurB, 0, texelY, largeRadius)
+      this.blur1D(developed.texture, blurA, texelX, 0, smallRadius)
+      this.blur1D(blurA.texture, blurC, 0, texelY, smallRadius)
+    }
 
     // ── Pass 4: clarity composite (developed + blur) → canvas, letterboxed. ──
     // Shrink the quad on the axis that would otherwise overflow.
@@ -307,12 +328,16 @@ export class WebGLRenderer {
     gl.uniform1f(this.uClarityFlipV, 1) // samples FBO textures: flip to cancel their inversion
     gl.uniform1f(this.uClarity, adjustments.clarity)
     gl.uniform1f(this.uDehaze, adjustments.dehaze)
+    gl.uniform1f(this.uTexture, adjustments.texture)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, developed.texture)
     gl.uniform1i(this.uClarityDeveloped, 0)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, blurB.texture)
     gl.uniform1i(this.uClarityBlur, 1)
+    gl.activeTexture(gl.TEXTURE2)
+    gl.bindTexture(gl.TEXTURE_2D, blurC.texture)
+    gl.uniform1i(this.uClarityBlurSmall, 2)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     gl.bindVertexArray(null)
   }
@@ -328,6 +353,9 @@ export class WebGLRenderer {
     }
     if (this.blurB !== null) {
       deleteRenderTarget(gl, this.blurB)
+    }
+    if (this.blurC !== null) {
+      deleteRenderTarget(gl, this.blurC)
     }
     gl.deleteTexture(this.texture)
     gl.deleteBuffer(this.buffer)

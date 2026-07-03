@@ -81,6 +81,7 @@ export function Canvas() {
         threshold: adjustments.threshold ?? 0,
         clarity: adjustments.clarity ?? 0,
         dehaze: adjustments.dehaze ?? 0,
+        texture: adjustments.texture ?? 0,
       }, width, height)
     }
 

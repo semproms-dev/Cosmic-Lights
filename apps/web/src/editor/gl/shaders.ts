@@ -36,6 +36,8 @@ void main() {
  * shared vertex shader's `uScale`. Every slider is the identity at 0.
  *
  * - Clarity: large-radius unsharp mask on luma, biased to the midtones.
+ * - Texture: the same USM with a small-radius blur, so it lifts fine detail
+ *   (skin, fabric) instead of mid-sized structures.
  * - Dehaze (option B, pragmatic): haze = lifted blacks + flat contrast + low
  *   saturation + cool tint, so removing it lowers the black point, adds local
  *   contrast, restores saturation and warms the tint (all scaled by `d`, and
@@ -49,8 +51,10 @@ out vec4 fragColor;
 
 uniform sampler2D uDeveloped;   // the sharp, graded image
 uniform sampler2D uBlur;        // its large-radius blur
+uniform sampler2D uBlurSmall;   // its small-radius blur (for texture)
 uniform float uClarity;         // -5..5
 uniform float uDehaze;          // -5..5
+uniform float uTexture;         // -5..5
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
@@ -58,14 +62,18 @@ void main() {
   vec4 base = texture(uDeveloped, vUv);
   vec3 rgb = base.rgb;
   float clarityAmt = uClarity * 0.2;              // slider → strength (k, tunable)
+  float textureAmt = uTexture * 0.2;              // slider → strength (k, tunable)
   float d = uDehaze * 0.15;                        // slider → strength (k, tunable)
 
-  // Shared large-radius local contrast (clarity + dehaze both use the blur).
+  // Local contrast in two frequency bands: clarity/dehaze on the large blur,
+  // texture on the small blur. One midtone-weighted rescale folds them together.
   float L = dot(rgb, LUMA);                        // developed luma
-  float B = dot(texture(uBlur, vUv).rgb, LUMA);    // blurred luma
-  float D = L - B;                                 // local microcontrast
+  float B = dot(texture(uBlur, vUv).rgb, LUMA);    // large-blur luma
+  float Bs = dot(texture(uBlurSmall, vUv).rgb, LUMA); // small-blur luma
+  float D = L - B;                                 // mid-frequency microcontrast
+  float Ds = L - Bs;                               // fine-frequency detail
   float w = 1.0 - pow(2.0 * L - 1.0, 2.0);         // midtone mask: 0 at black/white, 1 at mid
-  float Lp = L + (clarityAmt + d) * w * D;         // dehaze adds its own local contrast
+  float Lp = L + w * ((clarityAmt + d) * D + textureAmt * Ds);
   rgb *= Lp / max(L, 1e-4);                        // rescale RGB → preserve hue
 
   // Dehaze tone/colour (option B). Each term is the identity when d = 0.
