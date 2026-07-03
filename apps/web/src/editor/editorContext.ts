@@ -15,6 +15,8 @@ export interface EditorState {
   image: ImageState
   /** Load/decode status of the current image. */
   imageStatus: ImageStatus
+  /** Whether the current image has unsaved changes. */
+  imageDirty: boolean
   /** Decodes a RAW file and stores it for the canvas to draw. */
   loadImage: (file: File) => Promise<void>
   /** Updates a single adjustment value. */

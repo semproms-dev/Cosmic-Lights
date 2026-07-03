@@ -22,6 +22,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
     curves: buildDefaultCurves(),
     image: null,
     imageStatus: 'idle' as const,
+    imageDirty: false,
   }))
 
   const setAdjustment = (key: string, value: number) => {
@@ -58,6 +59,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         type: 'SET_IMAGE',
         image: { bitmap, width, height, fileName: file.name, metadata },
       })
+      resetAdjustements()
+      resetCurves()
     } catch (error) {
       logger.error('loadImage failed', error)
       dispatch({ type: 'SET_IMAGE_STATUS', status: 'error' })
@@ -71,6 +74,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
         curves: state.curves,
         image: state.image,
         imageStatus: state.imageStatus,
+        imageDirty: state.imageDirty,
         setAdjustment,
         setCurve,
         resetCurves,

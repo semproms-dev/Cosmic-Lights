@@ -13,6 +13,7 @@ const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreStat
   curves: buildDefaultCurves(),
   image: null,
   imageStatus: 'idle',
+  imageDirty: false,
   ...overrides,
 })
 
@@ -35,13 +36,22 @@ describe('editorReducer — image slice', () => {
     expect(next.image).toBeNull()
   })
 
-  it('SET_IMAGE stores the image and forces the status back to idle', () => {
-    const state = createState({ imageStatus: 'loading' })
+  it('SET_IMAGE stores the image, forces the status back to idle and clears the dirty flag', () => {
+    const state = createState({ imageStatus: 'loading', imageDirty: true })
 
     const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
 
     expect(next.image).toBe(fakeImage)
     expect(next.imageStatus).toBe('idle')
+    expect(next.imageDirty).toBe(false)
+  })
+
+  it('SET marks the image dirty; RESET_ADJUSTEMENTS clears it again', () => {
+    const dirtied = editorReducer(createState(), { type: 'SET', key: 'exposure', value: 1 })
+    expect(dirtied.imageDirty).toBe(true)
+
+    const reset = editorReducer(dirtied, { type: 'RESET_ADJUSTEMENTS' })
+    expect(reset.imageDirty).toBe(false)
   })
 
   it('CLEAR_IMAGE drops the image', () => {

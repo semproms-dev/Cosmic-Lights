@@ -21,6 +21,8 @@ export interface EditorStoreState {
   image: ImageState
   /** Estado de la carga/decodificación de la imagen. */
   imageStatus: ImageStatus
+  /** ¿Ha sido la imagen modificada? */
+  imageDirty: boolean
 }
 
 export type EditorAction =
@@ -57,22 +59,24 @@ export function editorReducer(
       return {
         ...state,
         adjustments: { ...state.adjustments, [action.key]: action.value },
+        imageDirty: true,
       }
     case 'SET_CURVE':
       return {
         ...state,
         curves: { ...state.curves, [action.channel]: action.points },
+        imageDirty: true,
       }
     case 'RESET_CURVES':
-      return { ...state, curves: buildDefaultCurves() }
+      return { ...state, curves: buildDefaultCurves(), imageDirty: false }
     case 'SET_IMAGE':
-      return { ...state, image: action.image, imageStatus: 'idle' }
+      return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false }
     case 'SET_IMAGE_STATUS':
       return { ...state, imageStatus: action.status }
     case 'CLEAR_IMAGE':
       return { ...state, image: null }
     case 'RESET_ADJUSTEMENTS':
-      return { ...state, adjustments: buildInitialAdjustments() }
+      return { ...state, adjustments: buildInitialAdjustments(), imageDirty: false }
     default:
       return state
   }
