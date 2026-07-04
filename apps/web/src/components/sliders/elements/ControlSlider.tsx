@@ -1,5 +1,7 @@
 import { Group, Slider, Stack, Text } from '@mantine/core';
 import classes from '../styles/ControlSlider.module.css';
+import { useHover } from '@mantine/hooks';
+import { useEditor } from '../../../editor/editorContext';
 
 interface ControlSliderProps {
   label: string;
@@ -23,10 +25,12 @@ export function ControlSlider({
   step,
   onChange,
 }: ControlSliderProps) {
+  const { hovered, ref } = useHover();
+  const {setAdjustment} = useEditor();
   return (
     <Stack gap={4} className={classes.control}>
       <Group justify="space-between" gap="xs">
-        <Text size="sm">{label}</Text>
+        <Text size="sm" onClick={() => setAdjustment(label.toLocaleLowerCase(), 0)} style={{cursor: 'pointer'}} ref={ref}>{hovered ? 'Reset' : label}</Text>
         <Text size="sm" c="dimmed">
           {value}
         </Text>
