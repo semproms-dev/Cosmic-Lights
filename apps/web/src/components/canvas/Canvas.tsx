@@ -15,11 +15,18 @@ import { ConfirmDialog } from '../window/ConfirmDialog'
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas() {
-  const { image, adjustments, curves, resetAdjustements, resetCurves } = useEditor()
+  const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage } = useEditor()
   const [resetOpened, { open: openReset, close: closeReset }] = useDisclosure(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
   const { showContextMenu } = useContextMenu()
+
+  const handleDrop = (e: React.DragEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0];
+    if(!file) return;
+    loadImage(file)
+  }
 
   // Create the renderer once, bound to the canvas's WebGL2 context.
   useEffect(() => {
@@ -118,7 +125,7 @@ export function Canvas() {
         title: 'Reset changes',
         onClick: () => openReset()
       },
-    ])} ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+    ])} onDragOver={(e) => {e.preventDefault()}} onDrop={handleDrop} ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
     <ConfirmDialog
       opened={resetOpened}
       onClose={closeReset}
