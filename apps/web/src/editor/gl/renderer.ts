@@ -46,8 +46,9 @@ export interface RenderAdjustments {
  * the decoded image and the current adjustment values and asks it to draw.
  *
  * The renderer never reads from the store directly; it is a thin, imperative
- * wrapper so the pipeline can later grow (more uniforms, a curves LUT, extra
- * passes) without touching the component that hosts it.
+ * wrapper so the pipeline can grow (more uniforms, passes) without touching the
+ * component that hosts it. Curve math stays in the React layer: the host compiles
+ * the curves into a flat LUT buffer and hands it over via `uploadCurves`.
  */
 export class WebGLRenderer {
   private readonly gl: WebGL2RenderingContext
@@ -55,9 +56,13 @@ export class WebGLRenderer {
   private readonly vao: WebGLVertexArrayObject
   private readonly buffer: WebGLBuffer
   private readonly texture: WebGLTexture
+  // 256×4 R8 tone-curve LUT (one row per channel: master rgb, red, green, blue).
+  // Re-uploaded only when the curves change, sampled by the pipeline program.
+  private readonly curveLut: WebGLTexture
   private readonly uScale: WebGLUniformLocation | null
   private readonly uFlipV: WebGLUniformLocation | null
   private readonly uImage: WebGLUniformLocation | null
+  private readonly uCurveLut: WebGLUniformLocation | null
   private readonly uExposure: WebGLUniformLocation | null
   private readonly uContrast: WebGLUniformLocation | null
   private readonly uHighlights: WebGLUniformLocation | null
@@ -144,9 +149,35 @@ export class WebGLRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 
+    // Tone-curve LUT texture. Single-channel (R8), 256 input entries × 4 channel
+    // rows, LINEAR so lookups interpolate smoothly between entries. Seeded with an
+    // identity ramp so the pipeline is a passthrough until the host uploads curves.
+    const curveLut = gl.createTexture()
+    if (curveLut === null) {
+      throw new Error('Failed to create curve LUT texture')
+    }
+    this.curveLut = curveLut
+    gl.bindTexture(gl.TEXTURE_2D, curveLut)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    const identityLut = new Uint8Array(256 * 4)
+    for (let row = 0; row < 4; row++) {
+      for (let i = 0; i < 256; i++) {
+        identityLut[row * 256 + i] = i
+      }
+    }
+    // R8 rows are 256 bytes, but set UNPACK_ALIGNMENT to 1 to be format-agnostic,
+    // and FLIP_Y to false so channel rows are not swapped (uploadImage sets it true).
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 4, 0, gl.RED, gl.UNSIGNED_BYTE, identityLut)
+
     this.uScale = gl.getUniformLocation(this.program, 'uScale')
     this.uFlipV = gl.getUniformLocation(this.program, 'uFlipV')
     this.uImage = gl.getUniformLocation(this.program, 'uImage')
+    this.uCurveLut = gl.getUniformLocation(this.program, 'uCurveLut')
     this.uExposure = gl.getUniformLocation(this.program, 'uExposure')
     this.uContrast = gl.getUniformLocation(this.program, 'uContrast')
     this.uHighlights = gl.getUniformLocation(this.program, 'uHighlights')
@@ -216,6 +247,23 @@ export class WebGLRenderer {
     this.blurA = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurB = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurC = createRenderTarget(gl, bitmap.width, bitmap.height)
+  }
+
+  /**
+   * Uploads the compiled tone-curve LUTs to the GPU. Call only when the curves
+   * change, not on every adjustment. The buffer is the flat 256×4 R8 layout from
+   * `compileCurveTexture` (row 0 = master rgb, rows 1–3 = red/green/blue).
+   *
+   * @param data - `256 * 4` bytes, row-major, each entry an output value 0..255.
+   */
+  uploadCurves(data: Uint8Array): void {
+    const gl = this.gl
+    gl.bindTexture(gl.TEXTURE_2D, this.curveLut)
+    // Match the R8 upload state from the constructor: tight rows, no vertical flip
+    // (uploadImage leaves FLIP_Y true, which would swap the channel rows).
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 4, 0, gl.RED, gl.UNSIGNED_BYTE, data)
   }
 
   /**
@@ -290,6 +338,9 @@ export class WebGLRenderer {
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.uniform1i(this.uImage, 0)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.curveLut)
+    gl.uniform1i(this.uCurveLut, 1)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
     // ── Passes 2-5: two separable Gaussian blurs of the developed image. ──
@@ -358,6 +409,7 @@ export class WebGLRenderer {
       deleteRenderTarget(gl, this.blurC)
     }
     gl.deleteTexture(this.texture)
+    gl.deleteTexture(this.curveLut)
     gl.deleteBuffer(this.buffer)
     gl.deleteVertexArray(this.vao)
     gl.deleteProgram(this.program)

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useEditor } from '../../editor/editorContext'
+import { compileCurveTexture } from '../../editor/curvesMath'
 import { WebGLRenderer } from '../../editor/gl/renderer'
 import { logger } from '../../logger'
 import { useDisclosure } from '@mantine/hooks'
@@ -14,7 +15,7 @@ import { ConfirmDialog } from '../window/ConfirmDialog'
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas() {
-  const { image, adjustments, resetAdjustements, resetCurves } = useEditor()
+  const { image, adjustments, curves, resetAdjustements, resetCurves } = useEditor()
   const [resetOpened, { open: openReset, close: closeReset }] = useDisclosure(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
@@ -45,6 +46,13 @@ export function Canvas() {
     }
     rendererRef.current?.uploadImage(image.bitmap)
   }, [image])
+
+  // Recompile and upload the tone-curve LUTs only when the curves change. Runs
+  // before the redraw effect below (both depend on `curves`) so the texture is
+  // current by the time the frame draws.
+  useEffect(() => {
+    rendererRef.current?.uploadCurves(compileCurveTexture(curves))
+  }, [curves])
 
   // Redraw on image/adjustment change or resize, coalesced into one frame.
   useEffect(() => {
@@ -100,7 +108,7 @@ export function Canvas() {
         cancelAnimationFrame(frame)
       }
     }
-  }, [image, adjustments])
+  }, [image, adjustments, curves])
 
   return <>
     <canvas onContextMenu={showContextMenu([

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { CurvePoint } from './curves'
+import type { CurvePoint, Curves } from './curves'
+import { buildDefaultCurves } from './curves'
 import {
+  CURVE_TEXTURE_ROWS,
   clampToNeighbors,
+  compileCurveTexture,
   compileLut,
   insertPoint,
   interpolateMonotone,
@@ -108,6 +111,38 @@ describe('compileLut', () => {
     for (let i = 0; i < 256; i++) {
       expect(lut[i]).toBeGreaterThanOrEqual(0)
       expect(lut[i]).toBeLessThanOrEqual(100)
+    }
+  })
+})
+
+describe('compileCurveTexture', () => {
+  it('packs an identity ramp for default curves (shader passthrough guardian)', () => {
+    const data = compileCurveTexture(buildDefaultCurves())
+
+    expect(data).toHaveLength(256 * CURVE_TEXTURE_ROWS.length)
+    for (let row = 0; row < CURVE_TEXTURE_ROWS.length; row++) {
+      for (let i = 0; i < 256; i++) {
+        expect(data[row * 256 + i]).toBe(i)
+      }
+    }
+  })
+
+  it('writes each channel into its own row in CURVE_TEXTURE_ROWS order', () => {
+    // Invert only the red channel; every other row must stay an identity ramp.
+    const curves: Curves = { ...buildDefaultCurves(), red: [{ x: 0, y: 255 }, { x: 255, y: 0 }] }
+    const data = compileCurveTexture(curves)
+    const redRow = CURVE_TEXTURE_ROWS.indexOf('red')
+
+    for (let i = 0; i < 256; i++) {
+      expect(data[redRow * 256 + i]).toBe(255 - i)
+    }
+    for (let row = 0; row < CURVE_TEXTURE_ROWS.length; row++) {
+      if (row === redRow) {
+        continue
+      }
+      for (let i = 0; i < 256; i++) {
+        expect(data[row * 256 + i]).toBe(i)
+      }
     }
   })
 })

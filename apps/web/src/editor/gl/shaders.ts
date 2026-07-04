@@ -4,9 +4,10 @@
  * The vertex shader draws a single full-screen quad and scales it in clip space
  * so the image keeps its aspect ratio (letterboxed) inside the canvas. The
  * fragment shader is the pixel pipeline: tone (exposure/contrast/zones), colour
- * (white balance + presence) and details (unsharp mask + threshold). Every
- * point-wise adjustment plugs in as another uniform and a couple of lines; the
- * details group is the first that samples neighbouring texels (see `uTexel`).
+ * (white balance + presence), tone curves (a per-channel LUT texture) and
+ * details (unsharp mask + threshold). Every point-wise adjustment plugs in as
+ * another uniform and a couple of lines; the details group is the first that
+ * samples neighbouring texels (see `uTexel`).
  */
 
 /** Full-screen quad; `uScale` letterboxes the image to preserve its aspect. */
@@ -124,7 +125,7 @@ void main() {
 }
 `
 
-/** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation → sharpness/threshold. */
+/** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation → curves → sharpness/threshold. */
 export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 
@@ -133,6 +134,9 @@ out vec4 fragColor;
 
 
 uniform sampler2D uImage;
+// Tone-curve LUT: a 256×4 texture (one row per channel, master rgb + red/green/
+// blue). The R8 texel at (input, channel) is that channel's output value.
+uniform sampler2D uCurveLut;
 uniform float uExposure;
 uniform float uContrast;
 uniform float uHighlights;
@@ -154,6 +158,20 @@ const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 /** Rec.709 luma of the raw texture at a given UV (used by the 3x3 sharpen). */
 float sampleLuma(vec2 uv) {
   return dot(texture(uImage, uv).rgb, LUMA);
+}
+
+/**
+ * Maps one channel value through its tone-curve LUT row.
+ *
+ * The value is clamped to 0..1 and remapped to the texel centres of the 256-wide
+ * LUT (so input 0 hits entry 0 and input 1 hits entry 255); LINEAR filtering then
+ * interpolates smoothly between entries. row selects the channel (0 = master
+ * rgb, 1/2/3 = red/green/blue); +0.5/4 lands on the row centre so no vertical
+ * interpolation bleeds between channels. Identity curves make this a no-op.
+ */
+float applyCurve(float v, float row) {
+  float u = clamp(v, 0.0, 1.0) * (255.0 / 256.0) + (0.5 / 256.0);
+  return texture(uCurveLut, vec2(u, (row + 0.5) / 4.0)).r;
 }
 
 void main() {
@@ -191,6 +209,14 @@ void main() {
   float curSat = max(rgb.r, max(rgb.g, rgb.b)) - min(rgb.r, min(rgb.g, rgb.b));
   rgb = mix(vec3(lumaC), rgb, 1.0 + vib * (1.0 - curSat));
   rgb = mix(vec3(lumaC), rgb, 1.0 + sat);
+  // Tone curves. Per-channel red/green/blue first, then the master rgb curve on
+  // every channel (Photoshop's order). Identity LUTs leave rgb untouched.
+  rgb.r = applyCurve(rgb.r, 1.0);
+  rgb.g = applyCurve(rgb.g, 2.0);
+  rgb.b = applyCurve(rgb.b, 3.0);
+  rgb.r = applyCurve(rgb.r, 0.0);
+  rgb.g = applyCurve(rgb.g, 0.0);
+  rgb.b = applyCurve(rgb.b, 0.0);
   // Details (unsharp mask). SINGLE-PASS caveat: the 3x3 blur samples the RAW
   // texture, not the tone/colour result above, so the sharpen sees pre-graded
   // luma. Acceptable for a small fixed radius; the multi-pass FBO path will fix

@@ -1,5 +1,13 @@
 import { clamp } from "../utils";
-import type { CurvePoint } from "./curves";
+import type { ChannelId, CurvePoint, Curves } from "./curves";
+
+/**
+ * Channel order of the rows in the GPU curve texture. The fragment shader relies
+ * on this exact order: row 0 is the master `rgb` curve, rows 1–3 are the
+ * per-channel red/green/blue curves. Kept separate from `CHANNELS` (whose order
+ * is cosmetic, driven by the tab layout) so the GPU contract never shifts.
+ */
+export const CURVE_TEXTURE_ROWS: ChannelId[] = ['rgb', 'red', 'green', 'blue'];
 
 /**
  * Builds a monotone cubic interpolator (Fritsch–Carlson) over the given points.
@@ -97,6 +105,28 @@ export const compileLut = (points: CurvePoint[]): number[] => {
     return lut;
 
 }
+
+/**
+ * Packs every curve channel into a flat 256×N texture buffer for the GPU.
+ *
+ * Each channel in `CURVE_TEXTURE_ROWS` becomes one 256-entry row (index = input
+ * value, entry = output value, both 0..255). The renderer uploads this as an R8
+ * texture the fragment shader samples once per channel. Identity curves yield a
+ * ramp (`data[row * 256 + i] === i`), which the shader treats as a passthrough.
+ *
+ * @param curves - The control points of every channel.
+ * @returns A `Uint8Array` of `256 * CURVE_TEXTURE_ROWS.length` bytes, row-major.
+ */
+export const compileCurveTexture = (curves: Curves): Uint8Array => {
+    const data = new Uint8Array(256 * CURVE_TEXTURE_ROWS.length);
+    CURVE_TEXTURE_ROWS.forEach((channel, row) => {
+        const lut = compileLut(curves[channel]);
+        for (let i = 0; i < 256; i++) {
+            data[row * 256 + i] = lut[i];
+        }
+    });
+    return data;
+};
 
 /**
  * Returns a new array of points sorted ascending by `x`.
