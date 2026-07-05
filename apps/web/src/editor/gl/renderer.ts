@@ -1,6 +1,8 @@
 import { createProgram, createRenderTarget, deleteRenderTarget } from './glContext'
 import type { RenderTarget } from './glContext'
 import { BLUR_FRAGMENT_SHADER, CLARITY_FRAGMENT_SHADER, FRAGMENT_SHADER, VERTEX_SHADER } from './shaders'
+import { cropToUvTransform } from '../crop'
+import type { CropRegion } from '../image'
 
 /**
  * The per-frame adjustment values the shader needs, already defaulted (no
@@ -87,6 +89,8 @@ export class WebGLRenderer {
   private readonly uClarityBlur: WebGLUniformLocation | null
   private readonly uClarityBlurSmall: WebGLUniformLocation | null
   private readonly uClarity: WebGLUniformLocation | null
+  private readonly uCropOffset: WebGLUniformLocation | null
+  private readonly uCropScale: WebGLUniformLocation | null
   private readonly uDehaze: WebGLUniformLocation | null
   private readonly uTexture: WebGLUniformLocation | null
 
@@ -97,6 +101,9 @@ export class WebGLRenderer {
   private readonly uBlurSource: WebGLUniformLocation | null
   private readonly uBlurDirection: WebGLUniformLocation | null
   private readonly uBlurRadius: WebGLUniformLocation | null
+  private cropOffset: [number, number] = [0, 0]
+  private cropScale: [number, number] = [1, 1]
+  private cropAspect: number | null = null
 
   // The developed image (tone/colour/details) rendered off-screen, so later
   // passes can sample it. Recreated whenever the image size changes.
@@ -201,6 +208,8 @@ export class WebGLRenderer {
     this.uClarity = gl.getUniformLocation(this.clarityProgram, 'uClarity')
     this.uDehaze = gl.getUniformLocation(this.clarityProgram, 'uDehaze')
     this.uTexture = gl.getUniformLocation(this.clarityProgram, 'uTexture')
+    this.uCropOffset = gl.getUniformLocation(this.clarityProgram, 'uCropOffset')
+    this.uCropScale = gl.getUniformLocation(this.clarityProgram, 'uCropScale')
 
     this.blurProgram = createProgram(gl, VERTEX_SHADER, BLUR_FRAGMENT_SHADER)
     this.uBlurScale = gl.getUniformLocation(this.blurProgram, 'uScale')
@@ -264,6 +273,20 @@ export class WebGLRenderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 4, 0, gl.RED, gl.UNSIGNED_BYTE, data)
+  }
+
+  setCrop(region: CropRegion | null, imageWidth: number, imageHeight: number) : void {
+    if(region === null) {
+      this.cropOffset = [0,0];
+      this.cropScale = [1,1];
+      this.cropAspect = null;
+      return;
+    }
+
+    const {offsetX, offsetY, scaleX, scaleY} = cropToUvTransform(region, imageWidth, imageHeight);
+    this.cropOffset = [offsetX, offsetY];
+    this.cropScale = [scaleX, scaleY];
+    this.cropAspect = region.width / region.height;
   }
 
   /**
@@ -362,7 +385,10 @@ export class WebGLRenderer {
     // ── Pass 4: clarity composite (developed + blur) → canvas, letterboxed. ──
     // Shrink the quad on the axis that would otherwise overflow.
     const canvasAspect = canvasWidth / canvasHeight
-    const imageAspect = this.imageWidth / this.imageHeight
+    // Letterbox against the crop's aspect (not the full frame's) so the cropped
+    // region fills the canvas without stretching. Falls back to the full image
+    // when there is no crop.
+    const imageAspect = this.cropAspect ?? this.imageWidth / this.imageHeight
     let scaleX = 1
     let scaleY = 1
     if (imageAspect > canvasAspect) {
@@ -377,6 +403,12 @@ export class WebGLRenderer {
     gl.useProgram(this.clarityProgram)
     gl.uniform2f(this.uClarityScale, scaleX, scaleY)
     gl.uniform1f(this.uClarityFlipV, 1) // samples FBO textures: flip to cancel their inversion
+    // Non-destructive crop: the shader remaps the quad onto this UV region.
+    // Defaults to identity ([0,0]/[1,1]) until setCrop is called, so passing
+    // them unconditionally is what keeps the image visible (an unset uScale-like
+    // uniform would default to 0 and collapse the sample to a single texel).
+    gl.uniform2f(this.uCropOffset, this.cropOffset[0], this.cropOffset[1])
+    gl.uniform2f(this.uCropScale, this.cropScale[0], this.cropScale[1])
     gl.uniform1f(this.uClarity, adjustments.clarity)
     gl.uniform1f(this.uDehaze, adjustments.dehaze)
     gl.uniform1f(this.uTexture, adjustments.texture)

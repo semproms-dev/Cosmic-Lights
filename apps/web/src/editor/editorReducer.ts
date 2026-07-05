@@ -6,7 +6,7 @@ import {
 } from './adjustments'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
-import type { ImageState, ImageStatus, LoadedImage } from './image'
+import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
 
 /**
  * Estado completo del editor: los valores de los sliders y las curvas de tono,
@@ -23,6 +23,8 @@ export interface EditorStoreState {
   imageStatus: ImageStatus
   /** ¿Ha sido la imagen modificada? */
   imageDirty: boolean
+  /** Region recortada por el usuario  */
+  cropRegion: CropRegion | null
 }
 
 export type EditorAction =
@@ -33,6 +35,8 @@ export type EditorAction =
   | { type: 'SET_IMAGE_STATUS'; status: ImageStatus }
   | { type: 'CLEAR_IMAGE' }
   | { type: 'RESET_ADJUSTEMENTS'}
+  | { type: 'SET_CROP', cropRegion: CropRegion | null}
+  | { type: 'CLEAR_CROP'}
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -70,13 +74,17 @@ export function editorReducer(
     case 'RESET_CURVES':
       return { ...state, curves: buildDefaultCurves(), imageDirty: false }
     case 'SET_IMAGE':
-      return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false }
+      return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false, cropRegion: null }
     case 'SET_IMAGE_STATUS':
       return { ...state, imageStatus: action.status }
     case 'CLEAR_IMAGE':
       return { ...state, image: null }
     case 'RESET_ADJUSTEMENTS':
       return { ...state, adjustments: buildInitialAdjustments(), imageDirty: false }
+    case 'SET_CROP':
+      return { ...state, cropRegion: action.cropRegion, imageDirty: true}
+    case 'CLEAR_CROP':
+      return { ...state, cropRegion: null, imageDirty: false }
     default:
       return state
   }

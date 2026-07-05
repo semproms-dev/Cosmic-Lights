@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildDefaultCurves } from './curves'
-import type { LoadedImage } from './image'
+import type { CropRegion, LoadedImage } from './image'
 import {
   buildInitialAdjustments,
   editorReducer,
@@ -14,6 +14,7 @@ const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreStat
   image: null,
   imageStatus: 'idle',
   imageDirty: false,
+  cropRegion: null,
   ...overrides,
 })
 
@@ -25,6 +26,9 @@ const fakeImage = {
   fileName: 'test.arw',
   metadata: {},
 } as unknown as LoadedImage
+
+/** A sample crop region in image pixels. */
+const fakeRegion: CropRegion = { x: 10, y: 20, width: 40, height: 30 }
 
 describe('editorReducer — image slice', () => {
   it('SET_IMAGE_STATUS updates the status and leaves the image untouched', () => {
@@ -78,5 +82,40 @@ describe('editorReducer — image slice', () => {
 
     expect(next.adjustments).toBe(state.adjustments)
     expect(next.curves).toBe(state.curves)
+  })
+})
+
+describe('editorReducer — crop slice', () => {
+  it('SET_CROP stores the region and marks the image dirty', () => {
+    const state = createState()
+
+    const next = editorReducer(state, { type: 'SET_CROP', cropRegion: fakeRegion })
+
+    expect(next.cropRegion).toEqual(fakeRegion)
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('CLEAR_CROP resets the crop region to null', () => {
+    const state = createState({ cropRegion: fakeRegion })
+
+    const next = editorReducer(state, { type: 'CLEAR_CROP' })
+
+    expect(next.cropRegion).toBeNull()
+  })
+
+  it('SET_IMAGE discards any active crop', () => {
+    const state = createState({ cropRegion: fakeRegion })
+
+    const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
+
+    expect(next.cropRegion).toBeNull()
+  })
+
+  it('does not mutate the previous state on SET_CROP', () => {
+    const state = createState()
+
+    editorReducer(state, { type: 'SET_CROP', cropRegion: fakeRegion })
+
+    expect(state.cropRegion).toBeNull()
   })
 })

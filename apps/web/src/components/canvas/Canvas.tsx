@@ -15,7 +15,7 @@ import { ConfirmDialog } from '../window/ConfirmDialog'
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas() {
-  const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage } = useEditor()
+  const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage, cropRegion } = useEditor()
   const [resetOpened, { open: openReset, close: closeReset }] = useDisclosure(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
@@ -81,6 +81,9 @@ export function Canvas() {
       const height = Math.round(rect.height * dpr)
       canvas.width = width
       canvas.height = height
+      if(image != null) {
+        renderer.setCrop(cropRegion, image.width, image.height)
+      }
       renderer.render({
         exposure: adjustments.exposure ?? 0,
         contrast: adjustments.contrast ?? 0,
@@ -115,7 +118,7 @@ export function Canvas() {
         cancelAnimationFrame(frame)
       }
     }
-  }, [image, adjustments, curves])
+  }, [image, adjustments, curves, cropRegion])
 
   return <>
     <canvas onContextMenu={showContextMenu([

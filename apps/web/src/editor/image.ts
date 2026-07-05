@@ -12,6 +12,13 @@ export type ImageState = LoadedImage | null;
 export type ImageStatus = 'idle' | 'loading' | 'error';
 
 
+export interface CropRegion {
+    x: number,
+    y: number,
+    width: number,
+    height: number
+}
+
 /**
  * It transforms rgb -> rgba (we add an alpha channel)
  * Returns a new array rgba: Uint8ClampedArray

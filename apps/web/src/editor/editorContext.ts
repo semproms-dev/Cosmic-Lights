@@ -1,6 +1,6 @@
 import { createContext, use } from 'react'
 import type { ChannelId, CurvePoint, Curves } from './curves'
-import type { ImageState, ImageStatus } from './image'
+import type { CropRegion, ImageState, ImageStatus } from './image'
 
 /**
  * Shared editor state. For now it holds the live adjustment values; the canvas
@@ -27,6 +27,12 @@ export interface EditorState {
   resetCurves: () => void
   /** Resets all the adjustements */
   resetAdjustements: () => void
+  /** Current crop region in image pixels, or `null` for the full frame. */
+  cropRegion: CropRegion | null
+  /** Sets (or replaces) the crop region; `null` clears it. */
+  setCrop: (region: CropRegion | null) => void
+  /** Clears the crop, restoring the full frame. */
+  clearCrop: () => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

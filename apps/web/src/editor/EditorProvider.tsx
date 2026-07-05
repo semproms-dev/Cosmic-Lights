@@ -2,7 +2,7 @@ import { useReducer } from 'react'
 import type { ReactNode } from 'react'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint } from './curves'
-import { rgbToRgba } from './image'
+import { rgbToRgba, type CropRegion } from './image'
 import { decodeRaw } from './decodeRaw'
 import { EditorContext } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
@@ -23,6 +23,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
     image: null,
     imageStatus: 'idle' as const,
     imageDirty: false,
+    cropRegion: null,
   }))
 
   const setAdjustment = (key: string, value: number) => {
@@ -39,6 +40,14 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const resetAdjustements = () => {
     dispatch({ type: 'RESET_ADJUSTEMENTS' })
+  }
+
+  const setCrop = (region: CropRegion | null) => {
+    dispatch({ type: 'SET_CROP', cropRegion: region })
+  }
+
+  const clearCrop = () => {
+    dispatch({ type: 'CLEAR_CROP' })
   }
 
   /**
@@ -80,6 +89,9 @@ export function EditorProvider({ children }: EditorProviderProps) {
         resetCurves,
         resetAdjustements,
         loadImage,
+        cropRegion: state.cropRegion,
+        setCrop,
+        clearCrop
       }}
     >
       {children}

@@ -23,3 +23,5 @@ export const formatShutterSpeed = (shutter: number): string => {
 export const formatAperture = (apperture: number): string => {
   return `f/${apperture.toFixed(1)}`;
 }
+
+export const MIN_CROP_SIZE = 10;

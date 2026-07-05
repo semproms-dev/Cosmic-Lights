@@ -56,11 +56,16 @@ uniform sampler2D uBlurSmall;   // its small-radius blur (for texture)
 uniform float uClarity;         // -5..5
 uniform float uDehaze;          // -5..5
 uniform float uTexture;         // -5..5
+uniform vec2 uCropOffset;       // UV origin of the crop region (0,0 = no crop)
+uniform vec2 uCropScale;        // UV size of the crop region (1,1 = no crop)
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 void main() {
-  vec4 base = texture(uDeveloped, vUv);
+  // Non-destructive crop: remap the full quad onto the selected region. With no
+  // crop (offset 0, scale 1) this is the identity, so uv == vUv.
+  vec2 uv = uCropOffset + vUv * uCropScale;
+  vec4 base = texture(uDeveloped, uv);
   vec3 rgb = base.rgb;
   float clarityAmt = uClarity * 0.2;              // slider → strength (k, tunable)
   float textureAmt = uTexture * 0.2;              // slider → strength (k, tunable)
@@ -69,8 +74,8 @@ void main() {
   // Local contrast in two frequency bands: clarity/dehaze on the large blur,
   // texture on the small blur. One midtone-weighted rescale folds them together.
   float L = dot(rgb, LUMA);                        // developed luma
-  float B = dot(texture(uBlur, vUv).rgb, LUMA);    // large-blur luma
-  float Bs = dot(texture(uBlurSmall, vUv).rgb, LUMA); // small-blur luma
+  float B = dot(texture(uBlur, uv).rgb, LUMA);    // large-blur luma
+  float Bs = dot(texture(uBlurSmall, uv).rgb, LUMA); // small-blur luma
   float D = L - B;                                 // mid-frequency microcontrast
   float Ds = L - Bs;                               // fine-frequency detail
   float w = 1.0 - pow(2.0 * L - 1.0, 2.0);         // midtone mask: 0 at black/white, 1 at mid
