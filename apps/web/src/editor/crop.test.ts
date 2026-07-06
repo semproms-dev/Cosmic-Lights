@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { CropRegion } from './image'
 import {
+  canvasToImageCoords,
   clampCropRegion,
   constrainAspectRatio,
   cropToUvTransform,
+  getImageDisplayRect,
+  imageToCanvasCoords,
 } from './crop'
 import {MIN_CROP_SIZE} from '../utils'
 
@@ -72,6 +75,63 @@ describe('clampCropRegion', () => {
 
     expect(clamped.width).toBe(MIN_CROP_SIZE)
     expect(clamped.height).toBe(MIN_CROP_SIZE)
+  })
+})
+
+describe('getImageDisplayRect', () => {
+  it('fills the container exactly when the aspects match (no bars)', () => {
+    // 100x50 image (2:1) in a 200x100 container (2:1) → fills it, no offset.
+    expect(getImageDisplayRect(100, 50, 200, 100)).toEqual({ x: 0, y: 0, width: 200, height: 100 })
+  })
+
+  it('letterboxes a wide image (bars top and bottom)', () => {
+    // 2:1 image in a 1:1 container → fills width, shrinks height to 100, y bar = 50.
+    expect(getImageDisplayRect(200, 100, 100, 100)).toEqual({ x: 0, y: 25, width: 100, height: 50 })
+  })
+
+  it('pillarboxes a tall image (bars left and right)', () => {
+    // 1:2 image in a 1:1 container → fills height, shrinks width to 50, x bar = 25.
+    expect(getImageDisplayRect(100, 200, 100, 100)).toEqual({ x: 25, y: 0, width: 50, height: 100 })
+  })
+})
+
+describe('imageToCanvasCoords', () => {
+  it('maps the full frame onto the letterboxed display rect', () => {
+    // Full 200x100 region in a 100x100 container → the whole letterboxed rect.
+    const region: CropRegion = { x: 0, y: 0, width: 200, height: 100 }
+
+    expect(imageToCanvasCoords(region, 200, 100, 100, 100)).toEqual({ x: 0, y: 25, width: 100, height: 50 })
+  })
+
+  it('maps a sub-region within the letterbox, offset by the bars', () => {
+    // Right half of a 200x100 image in a 100x100 container.
+    const region: CropRegion = { x: 100, y: 0, width: 100, height: 100 }
+
+    // display rect = {x:0,y:25,w:100,h:50}; x = 0 + 0.5*100 = 50, w = 0.5*100 = 50.
+    expect(imageToCanvasCoords(region, 200, 100, 100, 100)).toEqual({ x: 50, y: 25, width: 50, height: 50 })
+  })
+})
+
+describe('canvasToImageCoords', () => {
+  it('inverts a point inside the letterboxed image', () => {
+    // Center of the display rect {x:0,y:25,w:100,h:50} → center of the image.
+    expect(canvasToImageCoords({ x: 50, y: 50 }, 200, 100, 100, 100)).toEqual({ x: 100, y: 50 })
+  })
+
+  it('round-trips with imageToCanvasCoords for an arbitrary corner', () => {
+    const region: CropRegion = { x: 37, y: 12, width: 90, height: 55 }
+    const rect = imageToCanvasCoords(region, 200, 100, 640, 480)
+
+    const topLeft = canvasToImageCoords({ x: rect.x, y: rect.y }, 200, 100, 640, 480)
+    const bottomRight = canvasToImageCoords(
+      { x: rect.x + rect.width, y: rect.y + rect.height },
+      200, 100, 640, 480,
+    )
+
+    expect(topLeft.x).toBeCloseTo(region.x)
+    expect(topLeft.y).toBeCloseTo(region.y)
+    expect(bottomRight.x).toBeCloseTo(region.x + region.width)
+    expect(bottomRight.y).toBeCloseTo(region.y + region.height)
   })
 })
 

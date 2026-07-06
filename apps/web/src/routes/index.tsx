@@ -11,6 +11,7 @@ import { Canvas } from '../components/canvas/Canvas'
 import classes from './index.module.css'
 import { LoadingOverlay } from '@mantine/core'
 import { useEditor } from '../editor/editorContext'
+import { CropOverlay } from '../editor/CropOverlay'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -50,6 +51,7 @@ function HomePage() {
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>
           <Canvas />
+          {activeTool === 'Crop' && <CropOverlay onDone={() => setActiveTool('')} />}
         </div>
         {ActivePanel && (
           <aside className={classes.panel} aria-label={`${activeTool} panel`}>

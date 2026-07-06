@@ -15,7 +15,7 @@ import { ConfirmDialog } from '../window/ConfirmDialog'
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas() {
-  const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage, cropRegion } = useEditor()
+  const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop } = useEditor()
   const [resetOpened, { open: openReset, close: closeReset }] = useDisclosure(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
@@ -132,9 +132,9 @@ export function Canvas() {
     <ConfirmDialog
       opened={resetOpened}
       onClose={closeReset}
-      onConfirm={() => { resetAdjustements(); resetCurves(); closeReset() }}
+      onConfirm={() => { resetAdjustements(); resetCurves(); clearCrop(); closeReset() }}
       title="Reset changes"
-      message="This will reset all adjustment sliders and tone curves to their default values."
+      message="This will reset all adjustment sliders, the crop area and tone curves to their default values."
       confirmLabel="Reset"
       confirmColor="red"
     />
