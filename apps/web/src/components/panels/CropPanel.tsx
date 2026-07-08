@@ -1,14 +1,14 @@
-import { useState } from 'react';
 import { SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { useEditor } from '../../editor/editorContext';
 
 const aspectRatios = ['Original', '1:1', '16:9', '4:3', '3:2', 'Free'];
 
 /**
- * Crop tool panel. Currently exposes the aspect-ratio selector only; the
- * draggable crop overlay arrives with the editor canvas.
+ * Crop tool panel. Exposes the aspect-ratio selector, wired to the shared editor
+ * store so the crop overlay can constrain the draft to the chosen ratio.
  */
 export function CropPanel() {
-  const [ratio, setRatio] = useState('Original');
+  const { cropRatio, setCropRatio } = useEditor();
 
   return (
     <Stack gap="sm">
@@ -19,8 +19,8 @@ export function CropPanel() {
       <SegmentedControl
         orientation="vertical"
         fullWidth
-        value={ratio}
-        onChange={setRatio}
+        value={cropRatio}
+        onChange={setCropRatio}
         data={aspectRatios}
       />
     </Stack>

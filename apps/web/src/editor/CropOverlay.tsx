@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react"
 import { useEditor } from "./editorContext"
 import type { CropRegion } from "./image"
-import { canvasToImageCoords, clampCropRegion, imageToCanvasCoords } from "./crop"
+import {
+  anchorForHandle,
+  canvasToImageCoords,
+  clampCropRegion,
+  constrainAspectRatio,
+  imageToCanvasCoords,
+  parseAspectRatio,
+} from "./crop"
 
 /**
  * What the pointer grabbed. `move` drags the whole box (remembering where the
@@ -37,7 +44,7 @@ interface CropOverlayProps {
  * store and calls `onDone`, `Escape` discards it.
  */
 export function CropOverlay({ onDone }: CropOverlayProps) {
-  const { image, cropRegion, setCrop } = useEditor()
+  const { image, cropRegion, setCrop, cropRatio } = useEditor()
   const ref = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -49,6 +56,23 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
   if (prevCrop !== cropRegion) {
     setPrevCrop(cropRegion)
     setDraft(cropRegion)
+  }
+
+  // Re-impose the aspect ratio on the current draft the moment a new ratio is
+  // selected (same "adjust state during render" pattern). Anchored center so the
+  // shrink is symmetric; 'Free' (null aspect) leaves the draft as-is.
+  const [prevRatio, setPrevRatio] = useState(cropRatio)
+  if (prevRatio !== cropRatio) {
+    setPrevRatio(cropRatio)
+    if (image !== null && draft !== null) {
+      const a = parseAspectRatio(cropRatio, image.width, image.height)
+      if (a !== null) {
+        setDraft(clampCropRegion(
+          constrainAspectRatio(draft, a, 'center'),
+          image.width, image.height,
+        ))
+      }
+    }
   }
 
   // Measure the container so our letterbox math matches the canvas underneath.
@@ -66,6 +90,9 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
   useEffect(() => { ref.current?.focus() }, [])
 
   if (image === null) return null
+
+  // Numeric aspect for the selected label, or null for a free crop.
+  const aspect = parseAspectRatio(cropRatio, image.width, image.height)
 
   // The draft, defaulting to the full frame when no crop is set yet.
   const region: CropRegion = draft ?? { x: 0, y: 0, width: image.width, height: image.height }
@@ -99,27 +126,35 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
     if (drag === null) return
     const p = toImage(e)
 
-    let next: CropRegion
     if (drag.kind === 'move') {
-      next = {
+      // A translation never changes the aspect, so no constrain is needed.
+      const next: CropRegion = {
         ...drag.origin,
         x: drag.origin.x + (p.x - drag.startX),
         y: drag.origin.y + (p.y - drag.startY),
       }
-    } else {
-      // Move only the edge(s) the grabbed handle controls; keep the rest fixed.
-      const left = drag.fx === 0 ? p.x : region.x
-      const right = drag.fx === 1 ? p.x : region.x + region.width
-      const top = drag.fy === 0 ? p.y : region.y
-      const bottom = drag.fy === 1 ? p.y : region.y + region.height
-      next = {
-        x: Math.min(left, right),
-        y: Math.min(top, bottom),
-        width: Math.abs(right - left),
-        height: Math.abs(bottom - top),
-      }
+      setDraft(clampCropRegion(next, image.width, image.height))
+      return
     }
-    setDraft(clampCropRegion(next, image.width, image.height))
+
+    // Resize: move only the edge(s) the grabbed handle controls; keep the rest fixed.
+    const left = drag.fx === 0 ? p.x : region.x
+    const right = drag.fx === 1 ? p.x : region.x + region.width
+    const top = drag.fy === 0 ? p.y : region.y
+    const bottom = drag.fy === 1 ? p.y : region.y + region.height
+    const next: CropRegion = {
+      x: Math.min(left, right),
+      y: Math.min(top, bottom),
+      width: Math.abs(right - left),
+      height: Math.abs(bottom - top),
+    }
+    // Clamp FIRST (may break the ratio by pinning one edge to the image bound),
+    // then constrain (re-imposes the ratio by shrinking inside the clamped box).
+    let result = clampCropRegion(next, image.width, image.height)
+    if (aspect !== null) {
+      result = constrainAspectRatio(result, aspect, anchorForHandle(drag.fx, drag.fy))
+    }
+    setDraft(result)
   }
 
   // Releasing the pointer ends the drag but does NOT commit: the draft stays
@@ -131,6 +166,9 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // While the overlay has focus it is modal: swallow every key so global
+    // shortcuts (tool switch, etc.) stay suspended during cropping.
+    e.stopPropagation()
     if (e.key === 'Enter') {
       setCrop(clampCropRegion(region, image.width, image.height))
       onDone()                                       // commit, then leave the tool
@@ -167,8 +205,9 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
             onPointerDown={startMove}
           />
 
-          {/* 8 handles. */}
-          {HANDLES.map(({ fx, fy }) => (
+          {/* Handles. With a locked ratio, only corners are shown: edge handles
+              feel wrong under fit-inside (shrink-only) constraining. */}
+          {HANDLES.filter(({ fx, fy }) => aspect === null || (fx !== 0.5 && fy !== 0.5)).map(({ fx, fy }) => (
             <rect
               key={`${fx}-${fy}`}
               x={rx + fx * rw - 4} y={ry + fy * rh - 4}

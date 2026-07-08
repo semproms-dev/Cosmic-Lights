@@ -15,6 +15,7 @@ const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreStat
   imageStatus: 'idle',
   imageDirty: false,
   cropRegion: null,
+  cropRatio: 'Original',
   ...overrides,
 })
 
@@ -117,5 +118,22 @@ describe('editorReducer — crop slice', () => {
     editorReducer(state, { type: 'SET_CROP', cropRegion: fakeRegion })
 
     expect(state.cropRegion).toBeNull()
+  })
+
+  it('SET_CROP_RATIO stores the label without marking the image dirty', () => {
+    const state = createState()
+
+    const next = editorReducer(state, { type: 'SET_CROP_RATIO', ratio: '16:9' })
+
+    expect(next.cropRatio).toBe('16:9')
+    expect(next.imageDirty).toBe(false)
+  })
+
+  it('SET_IMAGE resets the crop ratio to Original', () => {
+    const state = createState({ cropRatio: '3:2' })
+
+    const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
+
+    expect(next.cropRatio).toBe('Original')
   })
 })

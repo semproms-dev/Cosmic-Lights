@@ -24,6 +24,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
     imageStatus: 'idle' as const,
     imageDirty: false,
     cropRegion: null,
+    cropRatio: 'Original',
   }))
 
   const setAdjustment = (key: string, value: number) => {
@@ -48,6 +49,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const clearCrop = () => {
     dispatch({ type: 'CLEAR_CROP' })
+  }
+
+  const setCropRatio = (ratio: string) => {
+    dispatch({ type: 'SET_CROP_RATIO', ratio })
   }
 
   /**
@@ -91,7 +96,9 @@ export function EditorProvider({ children }: EditorProviderProps) {
         loadImage,
         cropRegion: state.cropRegion,
         setCrop,
-        clearCrop
+        clearCrop,
+        cropRatio: state.cropRatio,
+        setCropRatio,
       }}
     >
       {children}

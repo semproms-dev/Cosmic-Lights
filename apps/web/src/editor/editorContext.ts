@@ -33,6 +33,10 @@ export interface EditorState {
   setCrop: (region: CropRegion | null) => void
   /** Clears the crop, restoring the full frame. */
   clearCrop: () => void
+  /** Selected aspect-ratio label: 'Original' | '1:1' | ... | 'Free'. */
+  cropRatio: string
+  /** Updates the selected aspect-ratio label. */
+  setCropRatio: (ratio: string) => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

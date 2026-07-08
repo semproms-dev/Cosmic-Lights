@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { NavBar } from '../components/navigation/elements/TopNavBar'
@@ -7,10 +7,12 @@ import { AdjustmentsPanel } from '../components/sliders/elements/AdjustmentsPane
 import { InfoPanel } from '../components/panels/InfoPanel'
 import { CropPanel } from '../components/panels/CropPanel'
 import { ExportPanel } from '../components/panels/ExportPanel'
+import { ShortcutsPanel } from '../components/panels/ShortcutsPanel'
 import { Canvas } from '../components/canvas/Canvas'
 import classes from './index.module.css'
 import { LoadingOverlay } from '@mantine/core'
 import { useEditor } from '../editor/editorContext'
+import { useEditorShortcuts } from '../editor/useEditorShortcuts'
 import { CropOverlay } from '../editor/CropOverlay'
 
 export const Route = createFileRoute('/')({
@@ -24,6 +26,7 @@ const PANELS: Record<string, ComponentType> = {
   Info: InfoPanel,
   Adjustments: AdjustmentsPanel,
   Crop: CropPanel,
+  Shortcuts: ShortcutsPanel,
   Export: ExportPanel,
 }
 
@@ -33,6 +36,7 @@ const PANELS: Record<string, ComponentType> = {
 function HomePage() {
   const [activeTool, setActiveTool] = useState('Adjustments')
   const {imageStatus} = useEditor();
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   /**
    * Selecting a tool opens its panel; selecting the already-active tool toggles
@@ -42,11 +46,19 @@ function HomePage() {
     setActiveTool((current) => (current === label ? '' : label))
   }
 
+  // Global keyboard shortcuts. Tool keys set the tool directly (not toggle);
+  // opening an image clicks the picker owned by the NavBar's OpenImageButton.
+  useEditorShortcuts({
+    setActiveTool,
+    openImage: () => fileInputRef.current?.click(),
+    showShortcuts: () => setActiveTool('Shortcuts'),
+  })
+
   const ActivePanel = PANELS[activeTool]
 
   return (
     <main style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <NavBar />
+      <NavBar fileInputRef={fileInputRef} />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>

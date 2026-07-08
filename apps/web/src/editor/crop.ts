@@ -108,6 +108,44 @@ export const canvasToImageCoords = (
   }
 }
 
+/**
+ * Translates a panel aspect-ratio label to a numeric ratio (width / height), or
+ * `null` when there is no constraint ('Free'). 'Original' derives the ratio from
+ * the image dimensions; 'W:H' labels are parsed as `W / H`.
+ *
+ * @param label - The selected label ('Original', '1:1', '16:9', …, 'Free').
+ * @param imageWidth - Image width in pixels (used for 'Original').
+ * @param imageHeight - Image height in pixels (used for 'Original').
+ * @returns The numeric aspect ratio, or `null` for a free (unconstrained) crop.
+ */
+export const parseAspectRatio = (
+  label: string,
+  imageWidth: number,
+  imageHeight: number,
+): number | null => {
+  if (label === 'Free') return null
+  if (label === 'Original') return imageWidth / imageHeight
+  const [w, h] = label.split(':').map(Number) // '16:9' → [16, 9]
+  if (!w || !h) return null // unexpected label → no constraint
+  return w / h
+}
+
+/**
+ * The anchor (corner/edge that stays fixed) for the handle at `(fx, fy)`. It is
+ * the position opposite the grabbed handle, so `constrainAspectRatio` shrinks the
+ * box toward it. `fx`/`fy` are the handle's fractional position in `{0, 0.5, 1}`.
+ *
+ * @param fx - Handle horizontal fraction (0 = left, 0.5 = middle, 1 = right).
+ * @param fy - Handle vertical fraction (0 = top, 0.5 = middle, 1 = bottom).
+ * @returns The opposite anchor, e.g. `(0,0)` → `'bottom-right'`.
+ */
+export const anchorForHandle = (fx: number, fy: number): string => {
+  const v = fy === 0 ? 'bottom' : fy === 1 ? 'top' : '' // opposite Y edge
+  const h = fx === 0 ? 'right' : fx === 1 ? 'left' : '' // opposite X edge
+  if (v && h) return `${v}-${h}` // corner: 'bottom-right', 'top-left', …
+  return v || h || 'center' // edge: 'bottom' | 'top' | 'right' | 'left'
+}
+
 export const constrainAspectRatio = (region: CropRegion, aspect: number, anchor: string): CropRegion => {
   const { x, y, width, height } = region
   const currentAspect = width / height

@@ -25,6 +25,8 @@ export interface EditorStoreState {
   imageDirty: boolean
   /** Region recortada por el usuario  */
   cropRegion: CropRegion | null
+  /** Aspect ratio seleccionado en el panel: 'Original' | '1:1' | ... | 'Free'. */
+  cropRatio: string
 }
 
 export type EditorAction =
@@ -37,6 +39,7 @@ export type EditorAction =
   | { type: 'RESET_ADJUSTEMENTS'}
   | { type: 'SET_CROP', cropRegion: CropRegion | null}
   | { type: 'CLEAR_CROP'}
+  | { type: 'SET_CROP_RATIO'; ratio: string }
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -74,7 +77,7 @@ export function editorReducer(
     case 'RESET_CURVES':
       return { ...state, curves: buildDefaultCurves(), imageDirty: false }
     case 'SET_IMAGE':
-      return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false, cropRegion: null }
+      return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false, cropRegion: null, cropRatio: 'Original' }
     case 'SET_IMAGE_STATUS':
       return { ...state, imageStatus: action.status }
     case 'CLEAR_IMAGE':
@@ -85,6 +88,10 @@ export function editorReducer(
       return { ...state, cropRegion: action.cropRegion, imageDirty: true}
     case 'CLEAR_CROP':
       return { ...state, cropRegion: null, imageDirty: false }
+    case 'SET_CROP_RATIO':
+      // Choosing a ratio with no active crop isn't a destructive change; the
+      // dirty flag is owned by SET_CROP.
+      return { ...state, cropRatio: action.ratio }
     default:
       return state
   }

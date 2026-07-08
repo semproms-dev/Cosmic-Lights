@@ -191,6 +191,14 @@ export function Canvas() {
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
+  const resetSettings = () => {
+    resetAdjustements(); 
+    resetCurves(); 
+    clearCrop(); 
+    closeReset(); 
+    setView(DEFAULT_VIEW);
+  }
+
   return <>
     <canvas onContextMenu={showContextMenu([
       {
@@ -208,7 +216,7 @@ export function Canvas() {
     <ConfirmDialog
       opened={resetOpened}
       onClose={closeReset}
-      onConfirm={() => { resetAdjustements(); resetCurves(); clearCrop(); closeReset() }}
+      onConfirm={() => resetSettings()}
       title="Reset changes"
       message="This will reset all adjustment sliders, the crop area and tone curves to their default values."
       confirmLabel="Reset"

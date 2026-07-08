@@ -2,6 +2,7 @@ import {
   IconInfoCircle,
   IconAdjustments,
   IconCrop,
+  IconKeyboard,
   IconFileExport
 } from '@tabler/icons-react';
 import { Stack, Tooltip, UnstyledButton } from '@mantine/core';
@@ -21,6 +22,7 @@ const lateralNavBarButtons: ToolLink[] = [
   { icon: IconInfoCircle, label: 'Info' },
   { icon: IconAdjustments, label: 'Adjustments' },
   { icon: IconCrop, label: 'Crop' },
+  { icon: IconKeyboard, label: 'Shortcuts' },
   { icon: IconFileExport, label: 'Export' }
 ];
 

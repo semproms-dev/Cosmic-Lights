@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { CropRegion } from './image'
 import {
+  anchorForHandle,
   canvasToImageCoords,
   clampCropRegion,
   constrainAspectRatio,
   cropToUvTransform,
   getImageDisplayRect,
   imageToCanvasCoords,
+  parseAspectRatio,
 } from './crop'
 import {MIN_CROP_SIZE} from '../utils'
 
@@ -180,5 +182,43 @@ describe('constrainAspectRatio (fit-inside)', () => {
 
     // 30x30 centered inside 40x30 → x offset (40-30)/2 = 5, y offset 0.
     expect(constrainAspectRatio(region, 1, 'center')).toEqual({ x: 5, y: 0, width: 30, height: 30 })
+  })
+})
+
+describe('parseAspectRatio', () => {
+  it('returns null for a free crop', () => {
+    expect(parseAspectRatio('Free', 200, 100)).toBeNull()
+  })
+
+  it('derives the ratio from the image dimensions for Original', () => {
+    expect(parseAspectRatio('Original', 200, 100)).toBe(2)
+    expect(parseAspectRatio('Original', 300, 400)).toBe(0.75)
+  })
+
+  it('parses a W:H label as W / H', () => {
+    expect(parseAspectRatio('16:9', 200, 100)).toBeCloseTo(16 / 9)
+    expect(parseAspectRatio('1:1', 200, 100)).toBe(1)
+    expect(parseAspectRatio('3:2', 200, 100)).toBe(1.5)
+  })
+
+  it('returns null for an unexpected label', () => {
+    expect(parseAspectRatio('nonsense', 200, 100)).toBeNull()
+    expect(parseAspectRatio('16:', 200, 100)).toBeNull()
+  })
+})
+
+describe('anchorForHandle', () => {
+  it('maps each corner to the opposite corner', () => {
+    expect(anchorForHandle(0, 0)).toBe('bottom-right')
+    expect(anchorForHandle(1, 0)).toBe('bottom-left')
+    expect(anchorForHandle(0, 1)).toBe('top-right')
+    expect(anchorForHandle(1, 1)).toBe('top-left')
+  })
+
+  it('maps each edge to the opposite edge', () => {
+    expect(anchorForHandle(0.5, 0)).toBe('bottom')
+    expect(anchorForHandle(0.5, 1)).toBe('top')
+    expect(anchorForHandle(0, 0.5)).toBe('right')
+    expect(anchorForHandle(1, 0.5)).toBe('left')
   })
 })
