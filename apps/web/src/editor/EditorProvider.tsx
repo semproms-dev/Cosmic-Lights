@@ -25,6 +25,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
     imageDirty: false,
     cropRegion: null,
     cropRatio: 'Original',
+    resetDialogOpen: false,
   }))
 
   const setAdjustment = (key: string, value: number) => {
@@ -53,6 +54,14 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const setCropRatio = (ratio: string) => {
     dispatch({ type: 'SET_CROP_RATIO', ratio })
+  }
+
+  const openResetDialog = () => {
+    dispatch({ type: 'OPEN_RESET_DIALOG' })
+  }
+
+  const closeResetDialog = () => {
+    dispatch({ type: 'CLOSE_RESET_DIALOG' })
   }
 
   /**
@@ -99,6 +108,9 @@ export function EditorProvider({ children }: EditorProviderProps) {
         clearCrop,
         cropRatio: state.cropRatio,
         setCropRatio,
+        resetDialogOpen: state.resetDialogOpen,
+        openResetDialog,
+        closeResetDialog,
       }}
     >
       {children}

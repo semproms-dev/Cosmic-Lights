@@ -3,7 +3,6 @@ import { useEditor } from '../../editor/editorContext'
 import { compileCurveTexture } from '../../editor/curvesMath'
 import { WebGLRenderer } from '../../editor/gl/renderer'
 import { logger } from '../../logger'
-import { useDisclosure } from '@mantine/hooks'
 import { useContextMenu } from 'mantine-contextmenu'
 import { IconZoomReset } from '@tabler/icons-react'
 import { ConfirmDialog } from '../window/ConfirmDialog'
@@ -22,8 +21,7 @@ const DEFAULT_VIEW = { scale: 1, offsetX: 0, offsetY: 0 }
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas() {
-  const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop } = useEditor()
-  const [resetOpened, { open: openReset, close: closeReset }] = useDisclosure(false)
+  const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog } = useEditor()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
   const { showContextMenu } = useContextMenu()
@@ -192,10 +190,10 @@ export function Canvas() {
   }
 
   const resetSettings = () => {
-    resetAdjustements(); 
-    resetCurves(); 
-    clearCrop(); 
-    closeReset(); 
+    resetAdjustements();
+    resetCurves();
+    clearCrop();
+    closeResetDialog();
     setView(DEFAULT_VIEW);
   }
 
@@ -205,7 +203,7 @@ export function Canvas() {
         key: 'reset',
         icon: <IconZoomReset/>,
         title: 'Reset changes',
-        onClick: () => openReset()
+        onClick: () => openResetDialog()
       },
     ])}
       onPointerDown={handlePointerDown}
@@ -214,8 +212,8 @@ export function Canvas() {
       onDoubleClick={() => setView(DEFAULT_VIEW)}
       onDragOver={(e) => {e.preventDefault()}} onDrop={handleDrop} ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
     <ConfirmDialog
-      opened={resetOpened}
-      onClose={closeReset}
+      opened={resetDialogOpen}
+      onClose={closeResetDialog}
       onConfirm={() => resetSettings()}
       title="Reset changes"
       message="This will reset all adjustment sliders, the crop area and tone curves to their default values."

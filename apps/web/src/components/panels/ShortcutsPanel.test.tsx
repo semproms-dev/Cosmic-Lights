@@ -23,8 +23,8 @@ describe('ShortcutsPanel', () => {
   it('shows the formatted combo keys', () => {
     render(<ShortcutsPanel />);
 
-    // The tool shortcuts render their single key as a <kbd>.
-    expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    // Open image = mod+O; reset = mod+shift+R. Their distinctive keys render as <kbd>.
+    expect(screen.getByText('O')).toBeInTheDocument();
+    expect(screen.getByText('R')).toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import { InfoPanel } from '../components/panels/InfoPanel'
 import { CropPanel } from '../components/panels/CropPanel'
 import { ExportPanel } from '../components/panels/ExportPanel'
 import { ShortcutsPanel } from '../components/panels/ShortcutsPanel'
+import { OpenImageButton } from '../components/canvas/OpenImageButton'
 import { Canvas } from '../components/canvas/Canvas'
 import classes from './index.module.css'
 import { LoadingOverlay } from '@mantine/core'
@@ -46,10 +47,9 @@ function HomePage() {
     setActiveTool((current) => (current === label ? '' : label))
   }
 
-  // Global keyboard shortcuts. Tool keys set the tool directly (not toggle);
-  // opening an image clicks the picker owned by the NavBar's OpenImageButton.
+  // Global keyboard shortcuts. Opening an image clicks the picker owned by the
+  // NavBar's OpenImageButton; the reset shortcut opens the confirm dialog.
   useEditorShortcuts({
-    setActiveTool,
     openImage: () => fileInputRef.current?.click(),
     showShortcuts: () => setActiveTool('Shortcuts'),
   })
@@ -58,7 +58,8 @@ function HomePage() {
 
   return (
     <main style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <NavBar fileInputRef={fileInputRef} />
+      <NavBar onOpenImage={() => fileInputRef.current?.click()} />
+      <OpenImageButton fileInputRef={fileInputRef} />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>

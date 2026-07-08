@@ -27,6 +27,12 @@ export interface EditorStoreState {
   cropRegion: CropRegion | null
   /** Aspect ratio seleccionado en el panel: 'Original' | '1:1' | ... | 'Free'. */
   cropRatio: string
+  /**
+   * ¿Está abierto el diálogo de confirmación de reset? Vive en el store porque
+   * se dispara desde varios sitios (menú del Canvas y atajo global), no solo
+   * desde el Canvas.
+   */
+  resetDialogOpen: boolean
 }
 
 export type EditorAction =
@@ -40,6 +46,8 @@ export type EditorAction =
   | { type: 'SET_CROP', cropRegion: CropRegion | null}
   | { type: 'CLEAR_CROP'}
   | { type: 'SET_CROP_RATIO'; ratio: string }
+  | { type: 'OPEN_RESET_DIALOG' }
+  | { type: 'CLOSE_RESET_DIALOG' }
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -92,6 +100,10 @@ export function editorReducer(
       // Choosing a ratio with no active crop isn't a destructive change; the
       // dirty flag is owned by SET_CROP.
       return { ...state, cropRatio: action.ratio }
+    case 'OPEN_RESET_DIALOG':
+      return { ...state, resetDialogOpen: true }
+    case 'CLOSE_RESET_DIALOG':
+      return { ...state, resetDialogOpen: false }
     default:
       return state
   }

@@ -1,9 +1,6 @@
 import {
-  IconAdjustments,
   IconArrowBackUp,
   IconArrowForwardUp,
-  IconCrop,
-  IconFileExport,
   IconFolderOpen,
   IconInfoCircle,
   IconKeyboard,
@@ -16,10 +13,6 @@ export type ShortcutActionId =
   | 'resetAll'
   | 'undo'
   | 'redo'
-  | 'toolInfo'
-  | 'toolAdjustments'
-  | 'toolCrop'
-  | 'toolExport'
   | 'showShortcuts'
 
 /** Grouping used to lay out the reference panel. */

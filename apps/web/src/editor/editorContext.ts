@@ -37,6 +37,12 @@ export interface EditorState {
   cropRatio: string
   /** Updates the selected aspect-ratio label. */
   setCropRatio: (ratio: string) => void
+  /** Whether the reset-confirmation dialog is open. */
+  resetDialogOpen: boolean
+  /** Opens the reset-confirmation dialog (from the Canvas menu or a shortcut). */
+  openResetDialog: () => void
+  /** Closes the reset-confirmation dialog. */
+  closeResetDialog: () => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

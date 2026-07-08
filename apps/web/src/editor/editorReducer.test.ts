@@ -16,6 +16,7 @@ const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreStat
   imageDirty: false,
   cropRegion: null,
   cropRatio: 'Original',
+  resetDialogOpen: false,
   ...overrides,
 })
 
@@ -135,5 +136,23 @@ describe('editorReducer — crop slice', () => {
     const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
 
     expect(next.cropRatio).toBe('Original')
+  })
+})
+
+describe('editorReducer — reset dialog slice', () => {
+  it('OPEN_RESET_DIALOG marks the dialog open', () => {
+    const state = createState()
+
+    const next = editorReducer(state, { type: 'OPEN_RESET_DIALOG' })
+
+    expect(next.resetDialogOpen).toBe(true)
+  })
+
+  it('CLOSE_RESET_DIALOG marks the dialog closed', () => {
+    const state = createState({ resetDialogOpen: true })
+
+    const next = editorReducer(state, { type: 'CLOSE_RESET_DIALOG' })
+
+    expect(next.resetDialogOpen).toBe(false)
   })
 })

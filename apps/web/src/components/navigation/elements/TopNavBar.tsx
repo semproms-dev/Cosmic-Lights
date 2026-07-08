@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 import {
   IconGauge,
@@ -15,7 +15,6 @@ import {
 } from '@tabler/icons-react';
 import { Group, Tooltip, UnstyledButton, Menu } from '@mantine/core';
 import classes from '../styles/TopNavBar.module.css';
-import { OpenImageButton } from '../../canvas/OpenImageButton';
 
 interface MenuItem {
   label: string;
@@ -31,19 +30,17 @@ interface MainLink {
 
 
 interface NavBarProps {
-  /** Shared ref to the hidden file input, so shortcuts can trigger it too. */
-  fileInputRef?: React.RefObject<HTMLInputElement | null>;
+  /** Opens the image picker; wired to the shared file input by the host. */
+  onOpenImage?: () => void;
 }
 
-export function NavBar({ fileInputRef }: NavBarProps = {}) {
+export function NavBar({ onOpenImage }: NavBarProps = {}) {
   const [active, setActive] = useState('File');
   const [openedLabel, setOpenedLabel] = useState('');
-  const localFileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = fileInputRef ?? localFileInputRef;
 
   const mainLinksMockdata: MainLink[] = [
   { icon: IconFile, label: 'File', items: [
-    { icon: IconFolderOpen, label: 'Open...', onClick: () => {inputRef.current?.click()}},
+    { icon: IconFolderOpen, label: 'Open...', onClick: () => onOpenImage?.()},
     { icon: IconPhoto, label: 'Export JPG...', onClick: () => {} }
   ]},
   { icon: IconGauge, label: 'Edit', items: [
@@ -110,7 +107,6 @@ export function NavBar({ fileInputRef }: NavBarProps = {}) {
   return (
     <nav className={classes.navbar}>
       <Group gap="xs">{mainLinks}</Group>
-      <OpenImageButton fileInputRef={inputRef}/>
     </nav>
   );
 }

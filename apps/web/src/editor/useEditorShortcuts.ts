@@ -7,8 +7,6 @@ import { SHORTCUTS, type ShortcutActionId } from './shortcuts'
  * store — they live in the host component (`HomePage`).
  */
 export interface EditorShortcutHandlers {
-  /** Switches the active tool/panel by its rail label. */
-  setActiveTool: (label: string) => void
   /** Opens the file picker (clicks the hidden RAW `<input>`). */
   openImage: () => void
   /** Opens the shortcuts reference panel. */
@@ -22,24 +20,18 @@ export interface EditorShortcutHandlers {
  * photo are guarded to no-op while no image is loaded. Mantine's `useHotkeys`
  * already ignores events originating in inputs/textareas/contentEditable.
  *
- * @param handlers - Host-provided callbacks (tool switch, open image, show help).
+ * @param handlers - Host-provided callbacks (open image, show help).
  */
 export function useEditorShortcuts(handlers: EditorShortcutHandlers): void {
-  const { resetAdjustements, resetCurves, clearCrop, image } = useEditor()
+  const { openResetDialog, image } = useEditor()
 
   const actions: Record<ShortcutActionId, () => void> = {
     openImage: handlers.openImage,
-    resetAll: () => {
-      resetAdjustements()
-      resetCurves()
-      clearCrop()
-    },
+    // Reset confirms first: open the shared dialog rather than resetting here,
+    // since this fires from the global shortcut, not the Canvas.
+    resetAll: openResetDialog,
     undo: () => {}, // no-op until an edit history exists
     redo: () => {},
-    toolInfo: () => handlers.setActiveTool('Info'),
-    toolAdjustments: () => handlers.setActiveTool('Adjustments'),
-    toolCrop: () => handlers.setActiveTool('Crop'),
-    toolExport: () => handlers.setActiveTool('Export'),
     showShortcuts: handlers.showShortcuts,
   }
 
