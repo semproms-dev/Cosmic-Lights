@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { formatAperture, formatShutterSpeed } from './utils';
+import { clampZoom, formatAperture, formatShutterSpeed } from './utils';
+
+describe('clampZoom', () => {
+  it('leaves values within the zoom range untouched', () => {
+    expect(clampZoom(1)).toBe(1);
+    expect(clampZoom(2.5)).toBe(2.5);
+  });
+
+  it('clamps to the [0.1, 10] bounds', () => {
+    expect(clampZoom(0.01)).toBe(0.1); // below min
+    expect(clampZoom(50)).toBe(10); // above max
+  });
+});
 
 describe('formatShutterSpeed', () => {
   it('formats sub-second speeds as a 1/x fraction', () => {

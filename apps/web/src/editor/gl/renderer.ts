@@ -91,6 +91,7 @@ export class WebGLRenderer {
   private readonly uClarity: WebGLUniformLocation | null
   private readonly uCropOffset: WebGLUniformLocation | null
   private readonly uCropScale: WebGLUniformLocation | null
+  private readonly uClarityOffset: WebGLUniformLocation | null
   private readonly uDehaze: WebGLUniformLocation | null
   private readonly uTexture: WebGLUniformLocation | null
 
@@ -104,6 +105,12 @@ export class WebGLRenderer {
   private cropOffset: [number, number] = [0, 0]
   private cropScale: [number, number] = [1, 1]
   private cropAspect: number | null = null
+
+  // Interactive view (zoom/pan), applied to the final composite on top of the
+  // letterbox. viewScale multiplies the fit-to-canvas scale; viewOffset pans the
+  // result in clip space. Identity (1 / [0,0]) shows the whole image fitted.
+  private viewScale = 1
+  private viewOffset: [number, number] = [0, 0]
 
   // The developed image (tone/colour/details) rendered off-screen, so later
   // passes can sample it. Recreated whenever the image size changes.
@@ -210,6 +217,7 @@ export class WebGLRenderer {
     this.uTexture = gl.getUniformLocation(this.clarityProgram, 'uTexture')
     this.uCropOffset = gl.getUniformLocation(this.clarityProgram, 'uCropOffset')
     this.uCropScale = gl.getUniformLocation(this.clarityProgram, 'uCropScale')
+    this.uClarityOffset = gl.getUniformLocation(this.clarityProgram, 'uOffset')
 
     this.blurProgram = createProgram(gl, VERTEX_SHADER, BLUR_FRAGMENT_SHADER)
     this.uBlurScale = gl.getUniformLocation(this.blurProgram, 'uScale')
@@ -287,6 +295,20 @@ export class WebGLRenderer {
     this.cropOffset = [offsetX, offsetY];
     this.cropScale = [scaleX, scaleY];
     this.cropAspect = region.width / region.height;
+  }
+
+  /**
+   * Sets the interactive view transform (zoom/pan) for the next frame. Applied
+   * to the final composite on top of the letterbox: the fitted image is scaled
+   * by `scale` around the canvas centre and translated by the clip-space offset.
+   *
+   * @param scale - Zoom multiplier over the fit-to-canvas size (1 = fitted).
+   * @param offsetX - Horizontal pan in clip space (−1..1 spans the canvas width).
+   * @param offsetY - Vertical pan in clip space (−1..1 spans the canvas height).
+   */
+  setView(scale: number, offsetX: number, offsetY: number): void {
+    this.viewScale = scale;
+    this.viewOffset = [offsetX, offsetY];
   }
 
   /**
@@ -401,7 +423,10 @@ export class WebGLRenderer {
     gl.viewport(0, 0, canvasWidth, canvasHeight)
     gl.clear(gl.COLOR_BUFFER_BIT)
     gl.useProgram(this.clarityProgram)
-    gl.uniform2f(this.uClarityScale, scaleX, scaleY)
+    // Fold the interactive zoom into the letterbox scale and pan via uOffset, so
+    // the fitted image scales around the canvas centre before being translated.
+    gl.uniform2f(this.uClarityScale, scaleX * this.viewScale, scaleY * this.viewScale)
+    gl.uniform2f(this.uClarityOffset, this.viewOffset[0], this.viewOffset[1])
     gl.uniform1f(this.uClarityFlipV, 1) // samples FBO textures: flip to cancel their inversion
     // Non-destructive crop: the shader remaps the quad onto this UV region.
     // Defaults to identity ([0,0]/[1,1]) until setCrop is called, so passing

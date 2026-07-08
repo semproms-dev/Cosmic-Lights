@@ -16,6 +16,10 @@ export const VERTEX_SHADER = `#version 300 es
 // this vertex shader (the pipeline pass and the copy/composite pass).
 layout(location = 0) in vec2 aPos;
 uniform vec2 uScale;
+// Pan translation in clip space, applied after uScale. Only the composite pass
+// sets it (view zoom/pan); it defaults to (0,0) elsewhere so those passes still
+// fill their target exactly.
+uniform vec2 uOffset;
 // 1.0 when this pass samples an FBO texture, 0.0 when it samples the uploaded
 // RAW. Rendering into an FBO stores it inverted vs a texture uploaded with
 // UNPACK_FLIP_Y, so a pass reading an FBO flips V to cancel that inversion.
@@ -26,7 +30,7 @@ out vec2 vUv;
 void main() {
   vUv = aPos * 0.5 + 0.5;
   vUv.y = mix(vUv.y, 1.0 - vUv.y, uFlipV);
-  gl_Position = vec4(aPos * uScale, 0.0, 1.0);
+  gl_Position = vec4(aPos * uScale + uOffset, 0.0, 1.0);
 }
 `
 
