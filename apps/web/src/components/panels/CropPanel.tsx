@@ -1,7 +1,7 @@
 import { SegmentedControl, Stack, Text, Title } from '@mantine/core';
 import { useEditor } from '../../editor/editorContext';
 
-const aspectRatios = ['Original', '1:1', '16:9', '4:3', '3:2', 'Free'];
+const aspectRatios = ['Original', '1:1', '16:9', '4:3', '3:2', '5:4', 'Free'];
 
 /**
  * Crop tool panel. Exposes the aspect-ratio selector, wired to the shared editor
