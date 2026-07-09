@@ -63,7 +63,7 @@ function HomePage() {
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>
-          <Canvas />
+          <Canvas cropping={activeTool === 'Crop'} />
           {activeTool === 'Crop' && <CropOverlay onDone={() => setActiveTool('')} />}
         </div>
         {ActivePanel && (

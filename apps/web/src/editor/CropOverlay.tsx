@@ -50,6 +50,19 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [draft, setDraft] = useState<CropRegion | null>(cropRegion)
 
+  // Latest draft/image/setCrop, kept in refs so the unmount committer below can
+  // read them without re-subscribing (setCrop gets a fresh identity each render).
+  const draftRef = useRef(draft)
+  const imageRef = useRef(image)
+  const setCropRef = useRef(setCrop)
+  useEffect(() => {
+    draftRef.current = draft
+    imageRef.current = image
+    setCropRef.current = setCrop
+  })
+  // True once Enter has already committed, so the unmount committer doesn't re-apply.
+  const settledRef = useRef(false)
+
   // Re-sync the draft when the crop changes from outside (panel, reset, …).
   // React's "adjust state during render" pattern — no effect needed.
   const [prevCrop, setPrevCrop] = useState(cropRegion)
@@ -88,6 +101,21 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
 
   // Grab keyboard focus on mount so Enter/Escape reach onKeyDown right away.
   useEffect(() => { ref.current?.focus() }, [])
+
+  // Commit the pending draft when the overlay unmounts — i.e. when the user
+  // leaves the Crop tool. The draft is otherwise local and would be discarded on
+  // unmount, so without this the crop only applies via Enter (and never at all
+  // once the aspect panel has stolen keyboard focus). Enter sets `settledRef` so
+  // it isn't committed twice.
+  useEffect(() => {
+    return () => {
+      if (settledRef.current) return
+      const d = draftRef.current
+      const img = imageRef.current
+      if (d === null || img === null) return
+      setCropRef.current(clampCropRegion(d, img.width, img.height))
+    }
+  }, [])
 
   if (image === null) return null
 
@@ -170,6 +198,7 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
     // shortcuts (tool switch, etc.) stay suspended during cropping.
     e.stopPropagation()
     if (e.key === 'Enter') {
+      settledRef.current = true                       // don't re-commit on unmount
       setCrop(clampCropRegion(region, image.width, image.height))
       onDone()                                       // commit, then leave the tool
     }

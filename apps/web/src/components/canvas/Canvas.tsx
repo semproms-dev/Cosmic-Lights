@@ -14,13 +14,23 @@ const ZOOM_STEP = 1.1
 /** Identity view: the whole image fitted to the canvas, centred. */
 const DEFAULT_VIEW = { scale: 1, offsetX: 0, offsetY: 0 }
 
+interface CanvasProps {
+  /**
+   * True while the Crop tool is active. The image is then rendered UNcropped so
+   * the crop overlay — which maps its frame and handles against the full-image
+   * coordinates — stays aligned and lets an existing crop be re-adjusted. The
+   * committed crop is reapplied as soon as the tool is left.
+   */
+  cropping?: boolean
+}
+
 /**
  * Central editor canvas. Renders the decoded image through the WebGL pipeline,
  * applying the live adjustments from the shared editor store. Redraws on image
  * change, adjustment change or resize, batching each into a single animation
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
-export function Canvas() {
+export function Canvas({ cropping = false }: CanvasProps) {
   const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog } = useEditor()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
@@ -90,7 +100,8 @@ export function Canvas() {
       canvas.width = width
       canvas.height = height
       if(image != null) {
-        renderer.setCrop(cropRegion, image.width, image.height)
+        // While cropping, show the full frame so the overlay stays aligned.
+        renderer.setCrop(cropping ? null : cropRegion, image.width, image.height)
       }
       renderer.setView(view.scale, view.offsetX, view.offsetY)
       renderer.render({
@@ -127,7 +138,7 @@ export function Canvas() {
         cancelAnimationFrame(frame)
       }
     }
-  }, [image, adjustments, curves, cropRegion, view])
+  }, [image, adjustments, curves, cropRegion, view, cropping])
 
   // Zoom toward a point (in clip space, −1..1) by a scale factor, keeping the
   // content under that point fixed. Clip space matches the renderer's view
