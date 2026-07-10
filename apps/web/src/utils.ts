@@ -14,6 +14,13 @@ export const clamp = (value: number, min: number, max: number): number => {
 
 export const clampZoom = (value: number) => {return clamp(value, 0.1, 10);}
 
+export const formatShutterSpeedRational = (shutter: number): [number, number] => {
+  if(shutter < 1) {
+    return [1, Math.round(1/shutter)];
+  }
+  return [Math.round(shutter), 1];
+}
+
 export const formatShutterSpeed = (shutter: number): string => {
   if (shutter < 1) {
     const denominator = Math.round(1 / shutter);
