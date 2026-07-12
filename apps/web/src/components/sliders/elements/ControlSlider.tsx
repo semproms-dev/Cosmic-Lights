@@ -10,6 +10,7 @@ interface ControlSliderProps {
   max: number;
   step: number;
   onChange: (value: number) => void;
+  onChangeEnd: () => void;
 }
 
 /**
@@ -24,13 +25,21 @@ export function ControlSlider({
   max,
   step,
   onChange,
+  onChangeEnd,
 }: ControlSliderProps) {
   const { hovered, ref } = useHover();
-  const {setAdjustment} = useEditor();
+  const {setAdjustment, commit} = useEditor();
+
+  // Resetting via the label is a discrete edit outside the slider's onChangeEnd,
+  // so it needs its own checkpoint.
+  const handleReset = () => {
+    setAdjustment(label.toLocaleLowerCase(), 0);
+    commit();
+  };
   return (
     <Stack gap={4} className={classes.control}>
       <Group justify="space-between" gap="xs">
-        <Text size="sm" onClick={() => setAdjustment(label.toLocaleLowerCase(), 0)} style={{cursor: 'pointer'}} ref={ref}>{hovered ? 'Reset' : label}</Text>
+        <Text size="sm" onClick={handleReset} style={{cursor: 'pointer'}} ref={ref}>{hovered ? 'Reset' : label}</Text>
         <Text size="sm" c="dimmed">
           {value}
         </Text>
@@ -38,6 +47,7 @@ export function ControlSlider({
       <Slider
         value={value}
         onChange={onChange}
+        onChangeEnd={onChangeEnd}
         min={min}
         max={max}
         step={step}

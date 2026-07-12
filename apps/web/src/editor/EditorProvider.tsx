@@ -7,6 +7,14 @@ import { decodeRaw } from './decodeRaw'
 import { EditorContext } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
+import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
+
+/**
+ * Undo/redo wrapper around the editor reducer. Built once at module scope:
+ * `undoable(editorReducer)` returns a fresh function on every call, so building
+ * it inline in `useReducer` would recreate it on each render.
+ */
+const historyReducer = undoable(editorReducer)
 
 interface EditorProviderProps {
   children: ReactNode
@@ -17,16 +25,20 @@ interface EditorProviderProps {
  * values from every slider group and the curves from the identity line.
  */
 export function EditorProvider({ children }: EditorProviderProps) {
-  const [state, dispatch] = useReducer(editorReducer, null, () => ({
-    adjustments: buildInitialAdjustments(),
-    curves: buildDefaultCurves(),
-    image: null,
-    imageStatus: 'idle' as const,
-    imageDirty: false,
-    cropRegion: null,
-    cropRatio: 'Original',
-    resetDialogOpen: false,
-  }))
+  const [history, dispatch] = useReducer(historyReducer, null, () =>
+    initHistory({
+      adjustments: buildInitialAdjustments(),
+      curves: buildDefaultCurves(),
+      image: null,
+      imageStatus: 'idle' as const,
+      imageDirty: false,
+      cropRegion: null,
+      cropRatio: 'Original',
+      resetDialogOpen: false,
+    }),
+  )
+  // The full live state lives in `history.present`; everything below reads it.
+  const state = history.present
 
   const setAdjustment = (key: string, value: number) => {
     dispatch({ type: 'SET', key, value })
@@ -64,6 +76,18 @@ export function EditorProvider({ children }: EditorProviderProps) {
     dispatch({ type: 'CLOSE_RESET_DIALOG' })
   }
 
+  const undo = () => {
+    dispatch({type: 'UNDO'})
+  }
+
+  const redo = () => {
+    dispatch({type: 'REDO'})
+  }
+
+  const commit = () => {
+    dispatch({type: 'COMMIT'})
+  }
+
   /**
    * Decodes a RAW file and stores the result for the canvas to draw. Runs the
    * async decode off the reducer (which stays pure); reports failures through
@@ -82,8 +106,6 @@ export function EditorProvider({ children }: EditorProviderProps) {
         type: 'SET_IMAGE',
         image: { bitmap, width, height, fileName: file.name, metadata },
       })
-      resetAdjustements()
-      resetCurves()
     } catch (error) {
       logger.error('loadImage failed', error)
       dispatch({ type: 'SET_IMAGE_STATUS', status: 'error' })
@@ -111,6 +133,11 @@ export function EditorProvider({ children }: EditorProviderProps) {
         resetDialogOpen: state.resetDialogOpen,
         openResetDialog,
         closeResetDialog,
+        undo,
+        redo,
+        commit,
+        canUndo: canUndo(history),
+        canRedo: canRedo(history),
       }}
     >
       {children}

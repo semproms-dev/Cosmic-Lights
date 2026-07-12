@@ -44,21 +44,23 @@ interface CropOverlayProps {
  * store and calls `onDone`, `Escape` discards it.
  */
 export function CropOverlay({ onDone }: CropOverlayProps) {
-  const { image, cropRegion, setCrop, cropRatio } = useEditor()
+  const { image, cropRegion, setCrop, cropRatio, commit } = useEditor()
   const ref = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [draft, setDraft] = useState<CropRegion | null>(cropRegion)
 
-  // Latest draft/image/setCrop, kept in refs so the unmount committer below can
-  // read them without re-subscribing (setCrop gets a fresh identity each render).
+  // Latest draft/image/setCrop/commit, kept in refs so the unmount committer below
+  // can read them without re-subscribing (setCrop/commit get a fresh identity each render).
   const draftRef = useRef(draft)
   const imageRef = useRef(image)
   const setCropRef = useRef(setCrop)
+  const commitRef = useRef(commit)
   useEffect(() => {
     draftRef.current = draft
     imageRef.current = image
     setCropRef.current = setCrop
+    commitRef.current = commit
   })
   // True once Enter has already committed, so the unmount committer doesn't re-apply.
   const settledRef = useRef(false)
@@ -114,6 +116,8 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
       const img = imageRef.current
       if (d === null || img === null) return
       setCropRef.current(clampCropRegion(d, img.width, img.height))
+      // Checkpoint the applied crop as one undo step.
+      commitRef.current()
     }
   }, [])
 
@@ -200,6 +204,7 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
     if (e.key === 'Enter') {
       settledRef.current = true                       // don't re-commit on unmount
       setCrop(clampCropRegion(region, image.width, image.height))
+      commit()                                        // checkpoint the applied crop
       onDone()                                       // commit, then leave the tool
     }
     if (e.key === 'Escape') setDraft(cropRegion)

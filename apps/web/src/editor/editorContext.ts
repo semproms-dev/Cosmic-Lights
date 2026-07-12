@@ -43,6 +43,20 @@ export interface EditorState {
   openResetDialog: () => void
   /** Closes the reset-confirmation dialog. */
   closeResetDialog: () => void
+  /** Reverts to the previous committed checkpoint. No-op when `canUndo` is false. */
+  undo: () => void
+  /** Reapplies the next checkpoint after an undo. No-op when `canRedo` is false. */
+  redo: () => void
+  /**
+   * Checkpoints the current state as one undo step. Called on gesture end
+   * (slider release, curve pointer-up, crop apply). A commit with no change
+   * since the last checkpoint is a no-op, so over-calling it is safe.
+   */
+  commit: () => void
+  /** Whether there is a checkpoint to undo back to. */
+  canUndo: boolean
+  /** Whether there is an undone checkpoint to redo. */
+  canRedo: boolean
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

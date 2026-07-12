@@ -15,6 +15,8 @@ interface CurveEditorProps {
     points: CurvePoint[];
     size: number;
     onChange: (points: CurvePoint[]) => void;
+    /** Checkpoints the current curve as one undo step (called on gesture end). */
+    onCommit: () => void;
 }
 
 /** Quarter positions for the reference grid (¼, ½, ¾ of the canvas). */
@@ -26,7 +28,7 @@ const GRID_FRACTIONS = [0.25, 0.5, 0.75];
  * points. Clicking empty space adds a point that lands on the current curve.
  * Owns no state — every edit is reported through `onChange`.
  */
-export const CurveEditor = ({ points, size, onChange }: CurveEditorProps) => {
+export const CurveEditor = ({ points, size, onChange, onCommit }: CurveEditorProps) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const lut = useMemo(() => compileLut(points), [points]);
 
@@ -55,6 +57,8 @@ export const CurveEditor = ({ points, size, onChange }: CurveEditorProps) => {
         const { x } = clientToValue(event.clientX, event.clientY);
         const roundedX = Math.round(clamp(x, 0, 255));
         onChange(insertPoint(points, { x: roundedX, y: lut[roundedX] }));
+        // Adding a point is a discrete edit: one undo step.
+        onCommit();
     };
 
     return (
@@ -100,7 +104,7 @@ export const CurveEditor = ({ points, size, onChange }: CurveEditorProps) => {
                 vectorEffect="non-scaling-stroke"
             />
 
-            <ControlPoints points={points} size={size} onChange={onChange} clientToValue={clientToValue} />
+            <ControlPoints points={points} size={size} onChange={onChange} onCommit={onCommit} clientToValue={clientToValue} />
         </svg>
     );
 };

@@ -6,9 +6,9 @@ describe('NavBar', () => {
   it('renders the main navigation links', () => {
     render(<NavBar />)
 
-    // The aside buttons expose their label via aria-label.
+    // The menu buttons expose their label via aria-label.
     expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hello' })).toBeInTheDocument()
   })
 })

@@ -14,7 +14,7 @@ const EDITOR_SIZE = 256;
  * pushes edits back through `setCurve`. Its children stay presentational.
  */
 export const CurvesPanel = () => {
-    const { curves, setCurve } = useEditor();
+    const { curves, setCurve, commit } = useEditor();
     const [channel, setChannel] = useState<ChannelId>("rgb");
 
     const points = curves[channel];
@@ -23,6 +23,8 @@ export const CurvesPanel = () => {
         // Per-channel reset: deep-copy the identity so a later drag can't mutate
         // the shared IDENTITY_CURVE constant.
         setCurve(channel, IDENTITY_CURVE.map((p) => ({ ...p })));
+        // Checkpoint the reset as one undo step.
+        commit();
     };
 
     return (
@@ -32,6 +34,7 @@ export const CurvesPanel = () => {
                 points={points}
                 size={EDITOR_SIZE}
                 onChange={(next) => setCurve(channel, next)}
+                onCommit={commit}
             />
             <Button variant="subtle" onClick={handleReset}>
                 Reset channel

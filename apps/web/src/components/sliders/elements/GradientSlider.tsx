@@ -8,6 +8,7 @@ interface GradientSliderProps {
   max: number;
   step: number;
   onChange: (value: number) => void;
+  onChangeEnd: () => void;
   gradient: string;
 }
 
@@ -19,6 +20,7 @@ export function GradientSlider({
   step,
   onChange,
   gradient,
+  onChangeEnd,
 }: GradientSliderProps) {
   return (
     <Stack gap={4} className={classes.root} style={{ '--gradient': gradient } as React.CSSProperties}>
@@ -31,6 +33,7 @@ export function GradientSlider({
       <Slider
         value={value}
         onChange={onChange}
+        onChangeEnd={onChangeEnd}
         min={min}
         max={max}
         step={step}

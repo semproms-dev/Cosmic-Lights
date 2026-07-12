@@ -23,15 +23,15 @@ export interface EditorShortcutHandlers {
  * @param handlers - Host-provided callbacks (open image, show help).
  */
 export function useEditorShortcuts(handlers: EditorShortcutHandlers): void {
-  const { openResetDialog, image } = useEditor()
+  const { openResetDialog, image, undo, redo } = useEditor()
 
   const actions: Record<ShortcutActionId, () => void> = {
     openImage: handlers.openImage,
     // Reset confirms first: open the shared dialog rather than resetting here,
     // since this fires from the global shortcut, not the Canvas.
     resetAll: openResetDialog,
-    undo: () => {}, // no-op until an edit history exists
-    redo: () => {},
+    undo,
+    redo,
     showShortcuts: handlers.showShortcuts,
   }
 

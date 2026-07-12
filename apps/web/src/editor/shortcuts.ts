@@ -46,8 +46,8 @@ export interface ShortcutDef {
 export const SHORTCUTS: ShortcutDef[] = [
   { id: 'openImage', combo: 'mod+O', label: 'Open image', category: 'File', icon: IconFolderOpen },
   { id: 'resetAll', combo: 'mod+shift+R', label: 'Reset changes', category: 'Edit', icon: IconZoomReset },
-  { id: 'undo', combo: 'mod+Z', label: 'Undo', category: 'Edit', icon: IconArrowBackUp, enabled: false },
-  { id: 'redo', combo: 'mod+shift+Z', label: 'Redo', category: 'Edit', icon: IconArrowForwardUp, enabled: false },
+  { id: 'undo', combo: 'mod+Z', label: 'Undo', category: 'Edit', icon: IconArrowBackUp, enabled: true },
+  { id: 'redo', combo: 'mod+shift+Z', label: 'Redo', category: 'Edit', icon: IconArrowForwardUp, enabled: true },
   { id: 'showShortcuts', combo: '?', label: 'Show shortcuts', category: 'View', icon: IconKeyboard },
 ]
 

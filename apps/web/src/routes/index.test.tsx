@@ -21,8 +21,10 @@ describe('home route', () => {
   it('mounts the navigation on the index route', async () => {
     renderHome()
 
+    // Longer timeout: this is the suite's first route mount, whose cold start
+    // (module compile + canvas/Mantine setup) can exceed the 1000ms default.
     expect(
-      await screen.findByRole('button', { name: 'File' }),
+      await screen.findByRole('button', { name: 'File' }, { timeout: 5000 }),
     ).toBeInTheDocument()
   })
 

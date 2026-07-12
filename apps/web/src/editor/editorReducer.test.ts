@@ -77,13 +77,23 @@ describe('editorReducer — image slice', () => {
     expect(state.imageStatus).toBe('idle')
   })
 
-  it('leaves the adjustments and curves slices referentially untouched', () => {
-    const state = createState()
+  it('SET_IMAGE resets adjustments and curves to their defaults', () => {
+    const state = createState({
+      adjustments: { ...buildInitialAdjustments(), exposure: 5 },
+      curves: {
+        ...buildDefaultCurves(),
+        rgb: [
+          { x: 0, y: 0 },
+          { x: 128, y: 200 },
+          { x: 255, y: 255 },
+        ],
+      },
+    })
 
     const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
 
-    expect(next.adjustments).toBe(state.adjustments)
-    expect(next.curves).toBe(state.curves)
+    expect(next.adjustments).toEqual(buildInitialAdjustments())
+    expect(next.curves).toEqual(buildDefaultCurves())
   })
 })
 

@@ -6,6 +6,8 @@ interface ControlPointsProps {
     points: CurvePoint[];
     size: number;
     onChange: (points: CurvePoint[]) => void;
+    /** Checkpoints the current curve as one undo step (called on gesture end). */
+    onCommit: () => void;
     /** Maps a pointer position to a curve value (owned by `CurveEditor`, which holds the SVG). */
     clientToValue: (clientX: number, clientY: number) => CurvePoint;
 }
@@ -19,7 +21,7 @@ const POINT_RADIUS = 5;
  * reported through `onChange`. Endpoints are protected by the math helpers
  * (their x is locked and they cannot be removed), so no special-casing here.
  */
-export const ControlPoints = ({ points, size, onChange, clientToValue }: ControlPointsProps) => {
+export const ControlPoints = ({ points, size, onChange, onCommit, clientToValue }: ControlPointsProps) => {
     const dragIndex = useRef<number | null>(null);
 
     const handlePointerDown = (index: number) => (event: ReactPointerEvent<SVGCircleElement>) => {
@@ -40,11 +42,16 @@ export const ControlPoints = ({ points, size, onChange, clientToValue }: Control
     const handlePointerUp = (event: ReactPointerEvent<SVGCircleElement>) => {
         dragIndex.current = null;
         event.currentTarget.releasePointerCapture(event.pointerId);
+        // End of a drag: checkpoint it. A pointer-up with no move is a safe no-op
+        // (the slice is unchanged, so COMMIT does nothing).
+        onCommit();
     };
 
     const handleDoubleClick = (index: number) => (event: ReactMouseEvent<SVGCircleElement>) => {
         event.stopPropagation();
         onChange(removePoint(points, index));
+        // Removing a point is a discrete edit: one undo step.
+        onCommit();
     };
 
     return (

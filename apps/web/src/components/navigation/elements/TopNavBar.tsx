@@ -1,20 +1,19 @@
 import { useState } from 'react';
 
 import {
-  IconGauge,
   IconHome2,
   IconSettings,
   IconFile,
   IconFolderOpen,
   IconPhoto,
-  IconArrowBackUp,
-  IconArrowForwardUp,
   IconAdjustments,
   IconPalette,
   IconInfoCircle
 } from '@tabler/icons-react';
-import { Group, Tooltip, UnstyledButton, Menu } from '@mantine/core';
+import { Group, Tooltip, UnstyledButton, Menu, ActionIcon } from '@mantine/core';
 import classes from '../styles/TopNavBar.module.css';
+import { FaRedoAlt, FaUndoAlt } from "react-icons/fa";
+import { useEditor } from '../../../editor/editorContext';
 
 interface MenuItem {
   label: string;
@@ -37,15 +36,12 @@ interface NavBarProps {
 export function NavBar({ onOpenImage }: NavBarProps = {}) {
   const [active, setActive] = useState('File');
   const [openedLabel, setOpenedLabel] = useState('');
+  const {redo, undo, canRedo, canUndo} = useEditor();
 
   const mainLinksMockdata: MainLink[] = [
   { icon: IconFile, label: 'File', items: [
     { icon: IconFolderOpen, label: 'Open...', onClick: () => onOpenImage?.()},
     { icon: IconPhoto, label: 'Export JPG...', onClick: () => {} }
-  ]},
-  { icon: IconGauge, label: 'Edit', items: [
-    { icon: IconArrowBackUp, label: 'Undo', onClick: () => {} },
-    { icon: IconArrowForwardUp, label: 'Redo', onClick: () => {} }
   ]},
   { icon: IconSettings, label: 'Settings', items: [
     { icon: IconAdjustments, label: 'Adjustments', onClick: () => {} },
@@ -107,6 +103,16 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
   return (
     <nav className={classes.navbar}>
       <Group gap="xs">{mainLinks}</Group>
+      <Tooltip label='Undo'>
+        <ActionIcon variant='subtle' onClick={() => undo()} color='white' disabled={!canUndo}>
+          <FaUndoAlt cursor={'pointer'} />
+        </ActionIcon>
+      </Tooltip>
+      <Tooltip label='Redo'>
+        <ActionIcon variant='subtle'  onClick={() => redo()} color='white' disabled={!canRedo}>
+          <FaRedoAlt cursor={'pointer'}/>
+        </ActionIcon>
+      </Tooltip>
     </nav>
   );
 }

@@ -14,7 +14,7 @@ const TINT_GRADIENT = 'linear-gradient(to right, #00FF00, #ffffff, #8A2BE2)'
  * and writes the live adjustment values through the shared editor store.
  */
 export function AdjustmentsPanel() {
-  const { adjustments, setAdjustment } = useEditor();
+  const { adjustments, setAdjustment, commit } = useEditor();
   const colorsByGroup = Object.entries(groupBy(colorAdjustement, i => i.group))
 
   return (
@@ -31,6 +31,7 @@ export function AdjustmentsPanel() {
                 min={option.min}
                 max={option.max}
                 step={option.step}
+                onChangeEnd={() => commit()}
                 onChange={(value) => setAdjustment(option.key, value)}
               />
             ))}
@@ -54,6 +55,7 @@ export function AdjustmentsPanel() {
                       max={option.max}
                       step={option.step}
                       onChange={(value) => setAdjustment(option.key, value)}
+                      onChangeEnd={() => commit()}
                       gradient={option.key === 'temperature' ? TEMPERATURE_GRADIENT : TINT_GRADIENT}
                     />
                   ) : (
@@ -64,6 +66,7 @@ export function AdjustmentsPanel() {
                       min={option.min}
                       max={option.max}
                       step={option.step}
+                      onChangeEnd={() => commit()}
                       onChange={(value) => setAdjustment(option.key, value)}
                     />
                   ),
@@ -85,6 +88,7 @@ export function AdjustmentsPanel() {
                 min={option.min}
                 max={option.max}
                 step={option.step}
+                onChangeEnd={() => commit()}
                 onChange={(value) => setAdjustment(option.key, value)}
               />
             ))}

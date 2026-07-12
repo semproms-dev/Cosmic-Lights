@@ -48,6 +48,9 @@ export type EditorAction =
   | { type: 'SET_CROP_RATIO'; ratio: string }
   | { type: 'OPEN_RESET_DIALOG' }
   | { type: 'CLOSE_RESET_DIALOG' }
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
+  | { type: 'COMMIT' }
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -85,7 +88,9 @@ export function editorReducer(
     case 'RESET_CURVES':
       return { ...state, curves: buildDefaultCurves(), imageDirty: false }
     case 'SET_IMAGE':
-      return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false, cropRegion: null, cropRatio: 'Original' }
+      return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false,
+           cropRegion: null, cropRatio: 'Original',
+           adjustments: buildInitialAdjustments(), curves: buildDefaultCurves() }
     case 'SET_IMAGE_STATUS':
       return { ...state, imageStatus: action.status }
     case 'CLEAR_IMAGE':

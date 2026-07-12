@@ -12,12 +12,13 @@ describe('ShortcutsPanel', () => {
     }
   });
 
-  it('marks disabled shortcuts as "soon"', () => {
+  it('does not mark any shortcut as "soon" now they are all enabled', () => {
     render(<ShortcutsPanel />);
 
-    // Undo/Redo ship disabled until an edit history exists.
-    expect(screen.getByText(/Undo \(soon\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Redo \(soon\)/)).toBeInTheDocument();
+    // Undo/Redo are now wired to the edit history, so nothing ships "(soon)".
+    expect(screen.queryByText(/\(soon\)/)).not.toBeInTheDocument();
+    expect(screen.getByText('Undo')).toBeInTheDocument();
+    expect(screen.getByText('Redo')).toBeInTheDocument();
   });
 
   it('shows the formatted combo keys', () => {
