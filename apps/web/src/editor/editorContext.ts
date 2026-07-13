@@ -1,6 +1,7 @@
 import { createContext, use } from 'react'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
+import type { BrushStroke, Mask, MaskType } from './masks'
 
 /**
  * Shared editor state. For now it holds the live adjustment values; the canvas
@@ -57,6 +58,35 @@ export interface EditorState {
   canUndo: boolean
   /** Whether there is an undone checkpoint to redo. */
   canRedo: boolean
+  /** Local-adjustment masks, oldest first. */
+  masks: Mask[]
+  /** Id of the selected mask, or `null` if none is selected. */
+  activeMaskId: string | null
+  /**
+   * Creates a mask of the given type (with a unique default name), appends it
+   * and selects it. No-op once {@link MAX_MASKS} is reached. Returns the new
+   * mask's id, or `null` if the cap blocked it.
+   */
+  addMask: (type: MaskType) => string | null
+  /** Removes a mask by id; clears the selection if it was the active one. */
+  removeMask: (id: string) => void
+  /** Selects a mask (or clears the selection with `null`). */
+  setActiveMask: (id: string | null) => void
+  /** Updates a single adjustment value of one mask. */
+  setMaskAdjustment: (id: string, key: string, value: number) => void
+  /** Toggles whether a mask affects the area outside its selection. */
+  setMaskInvert: (id: string, invert: boolean) => void
+  /** Renames a mask. */
+  renameMask: (id: string, name: string) => void
+  /** Appends a freehand brush stroke to a brush mask. */
+  addBrushStroke: (id: string, stroke: BrushStroke) => void
+  /**
+   * Whether the red mask overlay is temporarily hidden — set while a mask slider
+   * is being dragged so the adjustment is visible, cleared on release.
+   */
+  maskOverlayHidden: boolean
+  /** Shows/hides the mask editing overlay (transient UI state, not undoable). */
+  setMaskOverlayHidden: (hidden: boolean) => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

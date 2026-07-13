@@ -7,6 +7,7 @@ import {
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
+import { MAX_MASKS, type BrushStroke, type Mask } from './masks'
 
 /**
  * Estado completo del editor: los valores de los sliders y las curvas de tono,
@@ -33,6 +34,10 @@ export interface EditorStoreState {
    * desde el Canvas.
    */
   resetDialogOpen: boolean
+  /** Máscaras de ajuste local, en orden de creación (viejo → nuevo). */
+  masks: Mask[]
+  /** Id de la máscara seleccionada en el panel, o `null` si ninguna. */
+  activeMaskId: string | null
 }
 
 export type EditorAction =
@@ -48,6 +53,13 @@ export type EditorAction =
   | { type: 'SET_CROP_RATIO'; ratio: string }
   | { type: 'OPEN_RESET_DIALOG' }
   | { type: 'CLOSE_RESET_DIALOG' }
+  | { type: 'ADD_MASK'; mask: Mask }
+  | { type: 'REMOVE_MASK'; id: string }
+  | { type: 'SET_ACTIVE_MASK'; id: string | null }
+  | { type: 'SET_MASK_ADJUSTMENT'; id: string; key: string; value: number }
+  | { type: 'SET_MASK_INVERT'; id: string; invert: boolean }
+  | { type: 'RENAME_MASK'; id: string; name: string }
+  | { type: 'ADD_BRUSH_STROKE'; id: string; stroke: BrushStroke }
   | { type: 'UNDO' }
   | { type: 'REDO' }
   | { type: 'COMMIT' }
@@ -62,6 +74,18 @@ export function buildInitialAdjustments(): Record<string, number> {
     ...buildDefaults(colorAdjustement),
     ...buildDefaults(detailsAdjustement),
   }
+}
+
+/**
+ * Aplica `update` a la máscara con `id` y devuelve un array nuevo; el resto de
+ * máscaras conservan su referencia. Si no existe, devuelve el mismo array.
+ */
+function updateMask(
+  masks: Mask[],
+  id: string,
+  update: (mask: Mask) => Mask,
+): Mask[] {
+  return masks.map((mask) => (mask.id === id ? update(mask) : mask))
 }
 
 /**
@@ -90,7 +114,8 @@ export function editorReducer(
     case 'SET_IMAGE':
       return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false,
            cropRegion: null, cropRatio: 'Original',
-           adjustments: buildInitialAdjustments(), curves: buildDefaultCurves() }
+           adjustments: buildInitialAdjustments(), curves: buildDefaultCurves(),
+           masks: [], activeMaskId: null }
     case 'SET_IMAGE_STATUS':
       return { ...state, imageStatus: action.status }
     case 'CLEAR_IMAGE':
@@ -109,6 +134,65 @@ export function editorReducer(
       return { ...state, resetDialogOpen: true }
     case 'CLOSE_RESET_DIALOG':
       return { ...state, resetDialogOpen: false }
+    case 'ADD_MASK':
+      // Silently ignore once the cap is reached (the UI disables the control).
+      if (state.masks.length >= MAX_MASKS) return state
+      return {
+        ...state,
+        masks: [...state.masks, action.mask],
+        activeMaskId: action.mask.id,
+        imageDirty: true,
+      }
+    case 'REMOVE_MASK': {
+      const masks = state.masks.filter((mask) => mask.id !== action.id)
+      if (masks.length === state.masks.length) return state
+      return {
+        ...state,
+        masks,
+        // Clear the selection if the removed mask was the active one.
+        activeMaskId: state.activeMaskId === action.id ? null : state.activeMaskId,
+        imageDirty: true,
+      }
+    }
+    case 'SET_ACTIVE_MASK':
+      return { ...state, activeMaskId: action.id }
+    case 'SET_MASK_ADJUSTMENT':
+      return {
+        ...state,
+        masks: updateMask(state.masks, action.id, (mask) => ({
+          ...mask,
+          adjustments: { ...mask.adjustments, [action.key]: action.value },
+        })),
+        imageDirty: true,
+      }
+    case 'SET_MASK_INVERT':
+      return {
+        ...state,
+        masks: updateMask(state.masks, action.id, (mask) => ({
+          ...mask,
+          invert: action.invert,
+        })),
+        imageDirty: true,
+      }
+    case 'RENAME_MASK':
+      return {
+        ...state,
+        masks: updateMask(state.masks, action.id, (mask) => ({
+          ...mask,
+          name: action.name,
+        })),
+      }
+    case 'ADD_BRUSH_STROKE':
+      return {
+        ...state,
+        masks: updateMask(state.masks, action.id, (mask) => ({
+          ...mask,
+          strokes: [...mask.strokes, action.stroke],
+          // Bump the pixel-data revision so the cached alpha is rebuilt.
+          version: mask.version + 1,
+        })),
+        imageDirty: true,
+      }
     default:
       return state
   }

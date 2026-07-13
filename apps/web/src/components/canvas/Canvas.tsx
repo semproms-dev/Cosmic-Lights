@@ -7,6 +7,12 @@ import { useContextMenu } from 'mantine-contextmenu'
 import { IconZoomReset } from '@tabler/icons-react'
 import { ConfirmDialog } from '../window/ConfirmDialog'
 import { clampZoom } from '../../utils'
+import { canvasToImageCoords } from '../../editor/crop'
+import type { MaskPoint } from '../../editor/masks'
+
+/** Default brush geometry (radius as a fraction of the image's short side). */
+const BRUSH_RADIUS_FRACTION = 0.04
+const BRUSH_HARDNESS = 0.5
 
 /** Per wheel notch, the fitted image grows/shrinks by this factor. */
 const ZOOM_STEP = 1.1
@@ -22,6 +28,17 @@ interface CanvasProps {
    * committed crop is reapplied as soon as the tool is left.
    */
   cropping?: boolean
+  /**
+   * Id of the brush mask to paint into, or `null`/absent when not painting. When
+   * set, a pointer drag paints the mask instead of panning the view. Coordinates
+   * assume the fitted (non-zoomed) view, matching the crop overlay.
+   */
+  brushMaskId?: string | null
+  /**
+   * Id of the mask to show as a red editing overlay (the selected mask while the
+   * Masks tool is open), or `null` to render normally.
+   */
+  overlayMaskId?: string | null
 }
 
 /**
@@ -30,14 +47,23 @@ interface CanvasProps {
  * change, adjustment change or resize, batching each into a single animation
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
-export function Canvas({ cropping = false }: CanvasProps) {
-  const { image, adjustments, curves, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog } = useEditor()
+export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = null }: CanvasProps) {
+  const { image, adjustments, curves, masks, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog, addBrushStroke, commit } = useEditor()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
   const { showContextMenu } = useContextMenu()
   const [view, setView] = useState(DEFAULT_VIEW)
   // Holds the last pointer position while panning; null when not dragging.
   const panRef = useRef<{ x: number; y: number } | null>(null)
+  // Redraws the scene on demand (set by the render effect). Live brush painting
+  // calls this after each stamp, since it changes no React state to react to.
+  const drawRef = useRef<() => void>(() => {})
+  // Active brush stroke while painting: the accumulated points (image px) and
+  // the last one, or null when not painting.
+  const strokeRef = useRef<{ points: MaskPoint[]; last: MaskPoint } | null>(null)
+  // Brush cursor ring position/size in CSS px, or null when the pointer is off
+  // the canvas or not in brush mode.
+  const [brushCursor, setBrushCursor] = useState<{ x: number; y: number; d: number } | null>(null)
 
   const handleDrop = (e: React.DragEvent<HTMLCanvasElement>) => {
     e.preventDefault()
@@ -120,8 +146,11 @@ export function Canvas({ cropping = false }: CanvasProps) {
         clarity: adjustments.clarity ?? 0,
         dehaze: adjustments.dehaze ?? 0,
         texture: adjustments.texture ?? 0,
-      }, width, height)
+      }, masks, overlayMaskId, width, height)
     }
+    // Expose the latest draw so live brush painting can force a redraw (painting
+    // changes no React state, so the effect alone wouldn't re-run).
+    drawRef.current = draw
 
     const schedule = () => {
       if (frame === 0) {
@@ -138,7 +167,7 @@ export function Canvas({ cropping = false }: CanvasProps) {
         cancelAnimationFrame(frame)
       }
     }
-  }, [image, adjustments, curves, cropRegion, view, cropping])
+  }, [image, adjustments, curves, masks, cropRegion, view, cropping, overlayMaskId])
 
   // Zoom toward a point (in clip space, −1..1) by a scale factor, keeping the
   // content under that point fixed. Clip space matches the renderer's view
@@ -177,13 +206,64 @@ export function Canvas({ cropping = false }: CanvasProps) {
     return () => canvas.removeEventListener('wheel', handleWheel)
   }, [zoomAtPoint])
 
-  // Drag-to-pan: translate the view by the cursor delta, converted to clip space.
+  // Pointer position → image pixels, through the fitted-letterbox mapping (same
+  // helper the crop overlay uses; assumes the non-zoomed view).
+  const toImagePoint = (e: React.PointerEvent<HTMLCanvasElement>): MaskPoint | null => {
+    if (image === null) return null
+    const rect = e.currentTarget.getBoundingClientRect()
+    return canvasToImageCoords(
+      { x: e.clientX - rect.left, y: e.clientY - rect.top },
+      image.width, image.height, rect.width, rect.height,
+    )
+  }
+
+  /** Brush radius in image pixels, scaled to the image's short side. */
+  const brushRadius = (): number =>
+    image === null ? 0 : BRUSH_RADIUS_FRACTION * Math.min(image.width, image.height)
+
+  // Updates the brush cursor ring: converts the image-space radius to CSS px via
+  // the fit-to-canvas scale (matching how painting maps coordinates).
+  const updateBrushCursor = (e: React.PointerEvent<HTMLCanvasElement>): void => {
+    if (image === null) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const fit = Math.min(rect.width / image.width, rect.height / image.height)
+    setBrushCursor({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      d: brushRadius() * 2 * fit,
+    })
+  }
+
+  // Drag either paints the active brush mask (when brushMaskId is set) or pans.
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (brushMaskId !== null && image !== null) {
+      const p = toImagePoint(e)
+      if (p === null) return
+      strokeRef.current = { points: [p], last: p }
+      updateBrushCursor(e)
+      // Stamp a dot on press so a plain click still marks the mask.
+      rendererRef.current?.paintSegment(brushMaskId, p, p, brushRadius(), BRUSH_HARDNESS, 'add')
+      drawRef.current()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      return
+    }
     panRef.current = { x: e.clientX, y: e.clientY }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Keep the brush cursor ring under the pointer whenever painting is armed.
+    if (brushMaskId !== null) updateBrushCursor(e)
+    const stroke = strokeRef.current
+    if (stroke !== null && brushMaskId !== null) {
+      const p = toImagePoint(e)
+      if (p === null) return
+      rendererRef.current?.paintSegment(brushMaskId, stroke.last, p, brushRadius(), BRUSH_HARDNESS, 'add')
+      stroke.points.push(p)
+      stroke.last = p
+      drawRef.current()
+      return
+    }
     const start = panRef.current
     if (start === null) {
       return
@@ -196,6 +276,21 @@ export function Canvas({ cropping = false }: CanvasProps) {
   }
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const stroke = strokeRef.current
+    if (stroke !== null && brushMaskId !== null) {
+      // Commit the whole stroke as one undo step; the renderer rebuilds the mask
+      // from it on the next frame (reproducing exactly what was live-painted).
+      addBrushStroke(brushMaskId, {
+        points: stroke.points,
+        radius: brushRadius(),
+        hardness: BRUSH_HARDNESS,
+        mode: 'add',
+      })
+      commit()
+      strokeRef.current = null
+      e.currentTarget.releasePointerCapture(e.pointerId)
+      return
+    }
     panRef.current = null
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
@@ -220,8 +315,26 @@ export function Canvas({ cropping = false }: CanvasProps) {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerLeave={() => setBrushCursor(null)}
       onDoubleClick={() => setView(DEFAULT_VIEW)}
-      onDragOver={(e) => {e.preventDefault()}} onDrop={handleDrop} ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+      onDragOver={(e) => {e.preventDefault()}} onDrop={handleDrop} ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : 'default' }} />
+    {brushMaskId !== null && brushCursor !== null && (
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: brushCursor.x,
+          top: brushCursor.y,
+          width: brushCursor.d,
+          height: brushCursor.d,
+          transform: 'translate(-50%, -50%)',
+          borderRadius: '50%',
+          border: '1px solid rgba(255,255,255,0.9)',
+          boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+        }}
+      />
+    )}
     <ConfirmDialog
       opened={resetDialogOpen}
       onClose={closeResetDialog}

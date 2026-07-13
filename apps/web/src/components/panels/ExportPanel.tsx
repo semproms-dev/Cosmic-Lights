@@ -52,7 +52,7 @@ const embedExif = async (
 };
 
 export function ExportPanel() {
-  const { image, adjustments, curves, cropRegion } = useEditor();
+  const { image, adjustments, curves, cropRegion, masks } = useEditor();
   const [format, setFormat] = useState('JPEG');
   const [quality, setQuality] = useState(90);
   const [loading, setLoading] = useState(false);
@@ -114,6 +114,8 @@ export function ExportPanel() {
         dehaze: adjustments.dehaze ?? 0,
         texture: adjustments.texture ?? 0,
       },
+      masks,
+      null, // no editing overlay in the exported image
       outWidth,
       outHeight,
     );

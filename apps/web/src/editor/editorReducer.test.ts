@@ -6,6 +6,7 @@ import {
   editorReducer,
   type EditorStoreState,
 } from './editorReducer'
+import { createMask, MAX_MASKS, type BrushStroke, type Mask } from './masks'
 
 /** Builds a fresh store state, letting a test override individual slices. */
 const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreState => ({
@@ -17,6 +18,8 @@ const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreStat
   cropRegion: null,
   cropRatio: 'Original',
   resetDialogOpen: false,
+  masks: [],
+  activeMaskId: null,
   ...overrides,
 })
 
@@ -164,5 +167,119 @@ describe('editorReducer — reset dialog slice', () => {
     const next = editorReducer(state, { type: 'CLOSE_RESET_DIALOG' })
 
     expect(next.resetDialogOpen).toBe(false)
+  })
+})
+
+describe('editorReducer — masks', () => {
+  const stroke: BrushStroke = {
+    points: [{ x: 1, y: 2 }, { x: 3, y: 4 }],
+    radius: 20,
+    hardness: 0.5,
+    mode: 'add',
+  }
+
+  it('ADD_MASK appends the mask and selects it', () => {
+    const mask = createMask('brush', 'Brush 1')
+
+    const next = editorReducer(createState(), { type: 'ADD_MASK', mask })
+
+    expect(next.masks).toEqual([mask])
+    expect(next.activeMaskId).toBe(mask.id)
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('ADD_MASK is a no-op once the cap is reached', () => {
+    const masks: Mask[] = Array.from({ length: MAX_MASKS }, (_, i) =>
+      createMask('brush', `Brush ${i + 1}`),
+    )
+    const state = createState({ masks })
+
+    const next = editorReducer(state, { type: 'ADD_MASK', mask: createMask('sky', 'Sky 1') })
+
+    expect(next).toBe(state)
+  })
+
+  it('REMOVE_MASK drops the mask and clears a dangling selection', () => {
+    const mask = createMask('brush', 'Brush 1')
+    const state = createState({ masks: [mask], activeMaskId: mask.id })
+
+    const next = editorReducer(state, { type: 'REMOVE_MASK', id: mask.id })
+
+    expect(next.masks).toEqual([])
+    expect(next.activeMaskId).toBeNull()
+  })
+
+  it('REMOVE_MASK keeps the selection when another mask was active', () => {
+    const a = createMask('brush', 'Brush 1')
+    const b = createMask('sky', 'Sky 1')
+    const state = createState({ masks: [a, b], activeMaskId: b.id })
+
+    const next = editorReducer(state, { type: 'REMOVE_MASK', id: a.id })
+
+    expect(next.masks).toEqual([b])
+    expect(next.activeMaskId).toBe(b.id)
+  })
+
+  it('SET_MASK_ADJUSTMENT updates only the targeted mask', () => {
+    const a = createMask('brush', 'Brush 1')
+    const b = createMask('brush', 'Brush 2')
+    const state = createState({ masks: [a, b] })
+
+    const next = editorReducer(state, {
+      type: 'SET_MASK_ADJUSTMENT',
+      id: a.id,
+      key: 'exposure',
+      value: 1.5,
+    })
+
+    expect(next.masks[0].adjustments.exposure).toBe(1.5)
+    expect(next.masks[1]).toBe(b) // untouched mask keeps its reference
+  })
+
+  it('SET_MASK_INVERT toggles the flag', () => {
+    const mask = createMask('sky', 'Sky 1')
+    const state = createState({ masks: [mask] })
+
+    const next = editorReducer(state, { type: 'SET_MASK_INVERT', id: mask.id, invert: true })
+
+    expect(next.masks[0].invert).toBe(true)
+  })
+
+  it('RENAME_MASK renames without marking the image dirty', () => {
+    const mask = createMask('brush', 'Brush 1')
+    const state = createState({ masks: [mask] })
+
+    const next = editorReducer(state, { type: 'RENAME_MASK', id: mask.id, name: 'Sky' })
+
+    expect(next.masks[0].name).toBe('Sky')
+    expect(next.imageDirty).toBe(false)
+  })
+
+  it('ADD_BRUSH_STROKE appends the stroke and bumps the version', () => {
+    const mask = createMask('brush', 'Brush 1')
+    const state = createState({ masks: [mask] })
+
+    const next = editorReducer(state, { type: 'ADD_BRUSH_STROKE', id: mask.id, stroke })
+
+    expect(next.masks[0].strokes).toEqual([stroke])
+    expect(next.masks[0].version).toBe(1)
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('SET_ACTIVE_MASK selects and clears', () => {
+    const mask = createMask('brush', 'Brush 1')
+    const state = createState({ masks: [mask] })
+
+    expect(editorReducer(state, { type: 'SET_ACTIVE_MASK', id: mask.id }).activeMaskId).toBe(mask.id)
+    expect(editorReducer(state, { type: 'SET_ACTIVE_MASK', id: null }).activeMaskId).toBeNull()
+  })
+
+  it('SET_IMAGE clears any existing masks', () => {
+    const state = createState({ masks: [createMask('brush', 'Brush 1')], activeMaskId: 'x' })
+
+    const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
+
+    expect(next.masks).toEqual([])
+    expect(next.activeMaskId).toBeNull()
   })
 })

@@ -1,8 +1,17 @@
 import { createProgram, createRenderTarget, deleteRenderTarget } from './glContext'
 import type { RenderTarget } from './glContext'
-import { BLUR_FRAGMENT_SHADER, CLARITY_FRAGMENT_SHADER, FRAGMENT_SHADER, VERTEX_SHADER } from './shaders'
+import {
+  BLUR_FRAGMENT_SHADER,
+  BRUSH_FRAGMENT_SHADER,
+  BRUSH_VERTEX_SHADER,
+  CLARITY_FRAGMENT_SHADER,
+  FRAGMENT_SHADER,
+  MASK_FRAGMENT_SHADER,
+  VERTEX_SHADER,
+} from './shaders'
 import { cropToUvTransform } from '../crop'
 import type { CropRegion } from '../image'
+import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type Mask, type MaskPoint } from '../masks'
 
 /**
  * The per-frame adjustment values the shader needs, already defaulted (no
@@ -94,6 +103,8 @@ export class WebGLRenderer {
   private readonly uClarityOffset: WebGLUniformLocation | null
   private readonly uDehaze: WebGLUniformLocation | null
   private readonly uTexture: WebGLUniformLocation | null
+  private readonly uOverlayMask: WebGLUniformLocation | null
+  private readonly uOverlay: WebGLUniformLocation | null
 
   // Third program: one 1D Gaussian pass, run twice (H then V) for a separable blur.
   private readonly blurProgram: WebGLProgram
@@ -102,6 +113,31 @@ export class WebGLRenderer {
   private readonly uBlurSource: WebGLUniformLocation | null
   private readonly uBlurDirection: WebGLUniformLocation | null
   private readonly uBlurRadius: WebGLUniformLocation | null
+
+  // Fourth program: the per-mask local-adjustment pass. Reads the current
+  // developed image + a mask's alpha and blends the mask's tone/colour delta
+  // over it. Shares the pipeline VAO (full-screen quad) and vertex shader.
+  private readonly maskProgram: WebGLProgram
+  private readonly uMaskScale: WebGLUniformLocation | null
+  private readonly uMaskOffset: WebGLUniformLocation | null
+  private readonly uMaskFlipV: WebGLUniformLocation | null
+  private readonly uMaskImage: WebGLUniformLocation | null
+  private readonly uMaskTex: WebGLUniformLocation | null
+  private readonly uMaskInvert: WebGLUniformLocation | null
+  private readonly maskAdjLoc: Record<string, WebGLUniformLocation | null>
+
+  // Fifth program: the brush stamp. Draws soft discs into a mask's alpha target,
+  // union-blended to paint or reverse-blended to erase.
+  private readonly brushProgram: WebGLProgram
+  private readonly uBrushCenter: WebGLUniformLocation | null
+  private readonly uBrushRadius: WebGLUniformLocation | null
+  private readonly uBrushHardness: WebGLUniformLocation | null
+
+  // Per-mask alpha targets, keyed by mask id, with the mask version they were
+  // last rebuilt from (so `syncMasks` only re-rasterises when strokes change).
+  private readonly maskTargets = new Map<string, { target: RenderTarget; version: number }>()
+  // Second developed target: the mask stacking passes ping-pong between the two.
+  private developed2: RenderTarget | null = null
   private cropOffset: [number, number] = [0, 0]
   private cropScale: [number, number] = [1, 1]
   private cropAspect: number | null = null
@@ -218,6 +254,8 @@ export class WebGLRenderer {
     this.uCropOffset = gl.getUniformLocation(this.clarityProgram, 'uCropOffset')
     this.uCropScale = gl.getUniformLocation(this.clarityProgram, 'uCropScale')
     this.uClarityOffset = gl.getUniformLocation(this.clarityProgram, 'uOffset')
+    this.uOverlayMask = gl.getUniformLocation(this.clarityProgram, 'uOverlayMask')
+    this.uOverlay = gl.getUniformLocation(this.clarityProgram, 'uOverlay')
 
     this.blurProgram = createProgram(gl, VERTEX_SHADER, BLUR_FRAGMENT_SHADER)
     this.uBlurScale = gl.getUniformLocation(this.blurProgram, 'uScale')
@@ -225,6 +263,26 @@ export class WebGLRenderer {
     this.uBlurSource = gl.getUniformLocation(this.blurProgram, 'uSource')
     this.uBlurDirection = gl.getUniformLocation(this.blurProgram, 'uDirection')
     this.uBlurRadius = gl.getUniformLocation(this.blurProgram, 'uRadius')
+
+    this.maskProgram = createProgram(gl, VERTEX_SHADER, MASK_FRAGMENT_SHADER)
+    this.uMaskScale = gl.getUniformLocation(this.maskProgram, 'uScale')
+    this.uMaskOffset = gl.getUniformLocation(this.maskProgram, 'uOffset')
+    this.uMaskFlipV = gl.getUniformLocation(this.maskProgram, 'uFlipV')
+    this.uMaskImage = gl.getUniformLocation(this.maskProgram, 'uImage')
+    this.uMaskTex = gl.getUniformLocation(this.maskProgram, 'uMask')
+    this.uMaskInvert = gl.getUniformLocation(this.maskProgram, 'uInvert')
+    // One uniform per mask-adjustment key: store key → shader uniform.
+    this.maskAdjLoc = Object.fromEntries(
+      MASK_ADJUSTMENT_KEYS.map((key) => [
+        key,
+        gl.getUniformLocation(this.maskProgram, `u${key[0].toUpperCase()}${key.slice(1)}`),
+      ]),
+    )
+
+    this.brushProgram = createProgram(gl, BRUSH_VERTEX_SHADER, BRUSH_FRAGMENT_SHADER)
+    this.uBrushCenter = gl.getUniformLocation(this.brushProgram, 'uCenter')
+    this.uBrushRadius = gl.getUniformLocation(this.brushProgram, 'uRadius')
+    this.uBrushHardness = gl.getUniformLocation(this.brushProgram, 'uHardness')
 
     gl.clearColor(0, 0, 0, 0)
   }
@@ -260,10 +318,17 @@ export class WebGLRenderer {
     if (this.blurC !== null) {
       deleteRenderTarget(gl, this.blurC)
     }
+    if (this.developed2 !== null) {
+      deleteRenderTarget(gl, this.developed2)
+    }
     this.developed = createRenderTarget(gl, bitmap.width, bitmap.height)
+    this.developed2 = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurA = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurB = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurC = createRenderTarget(gl, bitmap.width, bitmap.height)
+    // Mask alpha targets are image-sized too; drop them so they rebuild fresh
+    // against the new image (the store clears masks on load in any case).
+    this.disposeMaskTargets()
   }
 
   /**
@@ -344,9 +409,150 @@ export class WebGLRenderer {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
   }
 
-  render(adjustments: RenderAdjustments, canvasWidth: number, canvasHeight: number): void {
+  /** Frees every per-mask alpha target and empties the map. */
+  private disposeMaskTargets(): void {
+    for (const entry of this.maskTargets.values()) {
+      deleteRenderTarget(this.gl, entry.target)
+    }
+    this.maskTargets.clear()
+  }
+
+  /**
+   * Sets the GPU blend state for a brush stamp. `add` unions coverage into the
+   * mask (`dst = max(src, dst)`); `erase` carves it out (`dst *= 1 - srcA`).
+   */
+  private setBrushBlend(mode: BrushMode): void {
     const gl = this.gl
-    if (!this.hasImage || this.developed === null || this.blurA === null || this.blurB === null || this.blurC === null || canvasWidth === 0 || canvasHeight === 0) {
+    gl.enable(gl.BLEND)
+    if (mode === 'erase') {
+      gl.blendEquation(gl.FUNC_ADD)
+      gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA)
+    } else {
+      gl.blendEquation(gl.MAX)
+      gl.blendFunc(gl.ONE, gl.ONE)
+    }
+  }
+
+  /**
+   * Stamps soft discs along a polyline into the currently-bound mask target.
+   * Points are in image pixels; discs are spaced ≈ a quarter radius so a fast
+   * drag still lays a continuous line. Assumes the target framebuffer/viewport
+   * are already bound.
+   */
+  private stampDiscsAlong(points: MaskPoint[], radius: number, hardness: number, mode: BrushMode): void {
+    const gl = this.gl
+    if (points.length === 0) return
+    gl.useProgram(this.brushProgram)
+    gl.bindVertexArray(this.vao)
+    gl.uniform1f(this.uBrushHardness, hardness)
+    gl.uniform2f(this.uBrushRadius, (radius / this.imageWidth) * 2, (radius / this.imageHeight) * 2)
+    this.setBrushBlend(mode)
+
+    const stampAt = (px: number, py: number): void => {
+      // Image px → clip. Y matches `developed`'s stored orientation (v=0 = image
+      // top), so a painted point lands at the same place the composite shows it.
+      gl.uniform2f(this.uBrushCenter, (px / this.imageWidth) * 2 - 1, (py / this.imageHeight) * 2 - 1)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    }
+
+    const spacing = Math.max(1, radius * 0.25)
+    if (points.length === 1) {
+      stampAt(points[0].x, points[0].y)
+    }
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1]
+      const b = points[i]
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / spacing))
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps
+        stampAt(a.x + dx * t, a.y + dy * t)
+      }
+    }
+
+    gl.disable(gl.BLEND)
+    gl.blendEquation(gl.FUNC_ADD) // restore the default for any later blended pass
+    gl.bindVertexArray(null)
+  }
+
+  /** Clears a mask target and re-stamps every stroke from scratch. */
+  private rebuildMaskTarget(target: RenderTarget, strokes: BrushStroke[]): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    gl.clearColor(0, 0, 0, 0)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    for (const stroke of strokes) {
+      this.stampDiscsAlong(stroke.points, stroke.radius, stroke.hardness, stroke.mode)
+    }
+  }
+
+  /**
+   * Reconciles the per-mask alpha targets with the store's masks: creates a
+   * target for each new mask, re-rasterises brush masks whose `version` changed,
+   * and frees targets for removed masks. Call once per frame before the mask
+   * passes. AI masks (no strokes yet) keep an empty target until their bitmap is
+   * uploaded, so they simply have no effect for now.
+   *
+   * @param masks - The store's current masks.
+   */
+  syncMasks(masks: Mask[]): void {
+    const gl = this.gl
+    if (!this.hasImage) return
+    const live = new Set(masks.map((mask) => mask.id))
+    for (const [id, entry] of this.maskTargets) {
+      if (!live.has(id)) {
+        deleteRenderTarget(gl, entry.target)
+        this.maskTargets.delete(id)
+      }
+    }
+    for (const mask of masks) {
+      let entry = this.maskTargets.get(mask.id)
+      if (entry === undefined) {
+        entry = { target: createRenderTarget(gl, this.imageWidth, this.imageHeight), version: -1 }
+        this.maskTargets.set(mask.id, entry)
+      }
+      // Only re-rasterise when the strokes actually changed (version bump). Live
+      // painting stamps straight into the target without a bump, so it survives.
+      if (entry.version !== mask.version) {
+        this.rebuildMaskTarget(entry.target, mask.strokes)
+        entry.version = mask.version
+      }
+    }
+  }
+
+  /**
+   * Live-paints one brush segment straight into a mask's alpha target, without
+   * touching the store. Used during a drag for immediate feedback; the stroke is
+   * committed (and the target authoritatively rebuilt) on pointer-up.
+   *
+   * @param maskId - The mask being painted.
+   * @param from - Segment start in image pixels.
+   * @param to - Segment end in image pixels.
+   * @param radius - Brush radius in image pixels.
+   * @param hardness - Edge softness, 0..1.
+   * @param mode - Paint (`add`) or erase.
+   */
+  paintSegment(
+    maskId: string,
+    from: MaskPoint,
+    to: MaskPoint,
+    radius: number,
+    hardness: number,
+    mode: BrushMode,
+  ): void {
+    const entry = this.maskTargets.get(maskId)
+    if (entry === undefined) return
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, entry.target.framebuffer)
+    gl.viewport(0, 0, entry.target.width, entry.target.height)
+    this.stampDiscsAlong([from, to], radius, hardness, mode)
+  }
+
+  render(adjustments: RenderAdjustments, masks: Mask[], overlayMaskId: string | null, canvasWidth: number, canvasHeight: number): void {
+    const gl = this.gl
+    if (!this.hasImage || this.developed === null || this.developed2 === null || this.blurA === null || this.blurB === null || this.blurC === null || canvasWidth === 0 || canvasHeight === 0) {
       // Nothing to draw: just clear the canvas.
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
       gl.viewport(0, 0, canvasWidth, canvasHeight)
@@ -388,6 +594,47 @@ export class WebGLRenderer {
     gl.uniform1i(this.uCurveLut, 1)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
+    // ── Mask stacking: re-develop the image once per mask with that mask's own
+    // adjustments and blend by its alpha, ping-ponging between the two developed
+    // targets. `finalDeveloped` ends up holding the fully-masked result; with no
+    // masks it stays the base develop, so the passes below are unchanged. ──
+    this.syncMasks(masks)
+    let finalDeveloped = developed
+    if (masks.length > 0) {
+      let src = developed
+      let dst: RenderTarget = this.developed2
+      gl.useProgram(this.maskProgram)
+      gl.bindVertexArray(this.vao)
+      gl.uniform2f(this.uMaskScale, 1, 1)
+      gl.uniform2f(this.uMaskOffset, 0, 0)
+      // No flip: this pass samples `developed` and its mask at the same vUv and
+      // writes developed2 as a straight in-place copy, so with an empty mask it
+      // is a no-op (developed2[v] == developed[v]) and the image never flips.
+      gl.uniform1f(this.uMaskFlipV, 0)
+      for (const mask of masks) {
+        const entry = this.maskTargets.get(mask.id)
+        if (entry === undefined) continue
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer)
+        gl.viewport(0, 0, dst.width, dst.height)
+        gl.uniform1f(this.uMaskInvert, mask.invert ? 1 : 0)
+        for (const key of MASK_ADJUSTMENT_KEYS) {
+          gl.uniform1f(this.maskAdjLoc[key], mask.adjustments[key] ?? 0)
+        }
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, src.texture)
+        gl.uniform1i(this.uMaskImage, 0)
+        gl.activeTexture(gl.TEXTURE1)
+        gl.bindTexture(gl.TEXTURE_2D, entry.target.texture)
+        gl.uniform1i(this.uMaskTex, 1)
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+        // The result becomes the source for the next mask (ping-pong).
+        const tmp = src
+        src = dst
+        dst = tmp
+      }
+      finalDeveloped = src
+    }
+
     // ── Passes 2-5: two separable Gaussian blurs of the developed image. ──
     // Large (clarity/dehaze) → blurB; small (texture) → blurC. blurA is the
     // shared H-pass scratch, reused once the large blur has consumed it.
@@ -398,9 +645,9 @@ export class WebGLRenderer {
       const texelY = 1 / this.imageHeight
       const largeRadius = 40 // mid-sized structures (clarity/dehaze)
       const smallRadius = 8 // fine detail (texture)
-      this.blur1D(developed.texture, blurA, texelX, 0, largeRadius)
+      this.blur1D(finalDeveloped.texture, blurA, texelX, 0, largeRadius)
       this.blur1D(blurA.texture, blurB, 0, texelY, largeRadius)
-      this.blur1D(developed.texture, blurA, texelX, 0, smallRadius)
+      this.blur1D(finalDeveloped.texture, blurA, texelX, 0, smallRadius)
       this.blur1D(blurA.texture, blurC, 0, texelY, smallRadius)
     }
 
@@ -438,7 +685,7 @@ export class WebGLRenderer {
     gl.uniform1f(this.uDehaze, adjustments.dehaze)
     gl.uniform1f(this.uTexture, adjustments.texture)
     gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, developed.texture)
+    gl.bindTexture(gl.TEXTURE_2D, finalDeveloped.texture)
     gl.uniform1i(this.uClarityDeveloped, 0)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, blurB.texture)
@@ -446,6 +693,14 @@ export class WebGLRenderer {
     gl.activeTexture(gl.TEXTURE2)
     gl.bindTexture(gl.TEXTURE_2D, blurC.texture)
     gl.uniform1i(this.uClarityBlurSmall, 2)
+    // Mask-editing overlay: tint the active mask's painted area so it's visible
+    // regardless of its adjustments. Bind its alpha (or the image as a harmless
+    // stand-in when there's no overlay) and gate with uOverlay.
+    const overlayEntry = overlayMaskId === null ? undefined : this.maskTargets.get(overlayMaskId)
+    gl.activeTexture(gl.TEXTURE3)
+    gl.bindTexture(gl.TEXTURE_2D, overlayEntry?.target.texture ?? this.texture)
+    gl.uniform1i(this.uOverlayMask, 3)
+    gl.uniform1f(this.uOverlay, overlayEntry === undefined ? 0 : 1)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     gl.bindVertexArray(null)
   }
@@ -465,6 +720,10 @@ export class WebGLRenderer {
     if (this.blurC !== null) {
       deleteRenderTarget(gl, this.blurC)
     }
+    if (this.developed2 !== null) {
+      deleteRenderTarget(gl, this.developed2)
+    }
+    this.disposeMaskTargets()
     gl.deleteTexture(this.texture)
     gl.deleteTexture(this.curveLut)
     gl.deleteBuffer(this.buffer)
@@ -472,5 +731,7 @@ export class WebGLRenderer {
     gl.deleteProgram(this.program)
     gl.deleteProgram(this.clarityProgram)
     gl.deleteProgram(this.blurProgram)
+    gl.deleteProgram(this.maskProgram)
+    gl.deleteProgram(this.brushProgram)
   }
 }
