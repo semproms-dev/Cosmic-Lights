@@ -1,6 +1,7 @@
 import { CHANNELS, type Curves } from "./curves";
 import type { EditorAction, editorReducer, EditorStoreState } from "./editorReducer";
 import type { CropRegion } from "./image";
+import type { BrushStroke, Mask } from "./masks";
 
 
 
@@ -8,7 +9,8 @@ interface HistorySlice {
     adjustements: Record<string, number>,
     cropRatio: string,
     curves: Curves,
-    cropRegion: CropRegion | null
+    cropRegion: CropRegion | null,
+    masks: Mask[]
 }
 
 interface HistoryState {
@@ -29,7 +31,8 @@ const sliceOf = (s: EditorStoreState): HistorySlice => ({
     adjustements: s.adjustments,
     cropRatio: s.cropRatio,
     cropRegion: s.cropRegion,
-    curves: s.curves
+    curves: s.curves,
+    masks: s.masks
 });
 
 const regionEquals = (a: CropRegion | null, b: CropRegion | null): boolean =>
@@ -48,11 +51,37 @@ const curvesEqual = (a: Curves, b: Curves): boolean =>
     a[ch].every((p, i) => p.x === b[ch][i].x && p.y === b[ch][i].y),
   )
 
+const strokesEqual = (a: BrushStroke[], b: BrushStroke[]): boolean =>
+  a.length === b.length &&
+  a.every((s, i) => {
+    const o = b[i]
+    return (
+      s.radius === o.radius &&
+      s.hardness === o.hardness &&
+      s.mode === o.mode &&
+      s.points.length === o.points.length &&
+      s.points.every((p, j) => p.x === o.points[j].x && p.y === o.points[j].y)
+    )
+  })
+
+const maskEquals = (a: Mask, b: Mask): boolean =>
+  a.id === b.id &&
+  a.type === b.type &&
+  a.name === b.name &&
+  a.invert === b.invert &&
+  a.version === b.version &&
+  recordEquals(a.adjustments, b.adjustments) &&
+  strokesEqual(a.strokes, b.strokes)
+
+const masksEqual = (a: Mask[], b: Mask[]): boolean =>
+  a.length === b.length && a.every((m, i) => maskEquals(m, b[i]))
+
 const sliceEquals = (a: HistorySlice, b: HistorySlice): boolean =>
   a.cropRatio === b.cropRatio &&
   regionEquals(a.cropRegion, b.cropRegion) &&
   recordEquals(a.adjustements, b.adjustements) &&
-  curvesEqual(a.curves, b.curves)
+  curvesEqual(a.curves, b.curves) &&
+  masksEqual(a.masks, b.masks)
 
 export const initHistory = (present: EditorStoreState): HistoryState => ({
   past: [], present, future: [], checkpoint: sliceOf(present),
@@ -66,6 +95,12 @@ const mergeSlice = (s: EditorStoreState, slice: HistorySlice): EditorStoreState 
   curves: slice.curves,
   cropRegion: slice.cropRegion,
   cropRatio: slice.cropRatio,
+  masks: slice.masks,
+  // The restored mask set may not contain the currently-selected mask; drop a
+  // dangling selection so the panel doesn't point at a mask that's gone.
+  activeMaskId: slice.masks.some((m) => m.id === s.activeMaskId)
+    ? s.activeMaskId
+    : null,
 })
 
 export const undoable = (reducer: typeof editorReducer) => {

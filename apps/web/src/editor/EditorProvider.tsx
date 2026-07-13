@@ -1,4 +1,4 @@
-import { useReducer } from 'react'
+import { useReducer, useState } from 'react'
 import type { ReactNode } from 'react'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint } from './curves'
@@ -8,6 +8,7 @@ import { EditorContext } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
+import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type MaskType } from './masks'
 
 /**
  * Undo/redo wrapper around the editor reducer. Built once at module scope:
@@ -35,10 +36,16 @@ export function EditorProvider({ children }: EditorProviderProps) {
       cropRegion: null,
       cropRatio: 'Original',
       resetDialogOpen: false,
+      masks: [],
+      activeMaskId: null,
     }),
   )
   // The full live state lives in `history.present`; everything below reads it.
   const state = history.present
+
+  // Transient UI: hide the red mask overlay while a mask slider is being dragged
+  // so the change is visible. Not part of the editor store (never undoable).
+  const [maskOverlayHidden, setMaskOverlayHidden] = useState(false)
 
   const setAdjustment = (key: string, value: number) => {
     dispatch({ type: 'SET', key, value })
@@ -86,6 +93,43 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const commit = () => {
     dispatch({type: 'COMMIT'})
+  }
+
+  /**
+   * Creates a mask of `type` with a unique default name ("Brush 1", "Sky 1", …),
+   * appends it and selects it. Returns the new id, or `null` if the cap blocked
+   * it (checked here so the caller gets an accurate result before dispatch).
+   */
+  const addMask = (type: MaskType): string | null => {
+    if (state.masks.length >= MAX_MASKS) return null
+    const sameType = state.masks.filter((mask) => mask.type === type).length
+    const mask = createMask(type, `${MASK_TYPE_LABEL[type]} ${sameType + 1}`)
+    dispatch({ type: 'ADD_MASK', mask })
+    return mask.id
+  }
+
+  const removeMask = (id: string) => {
+    dispatch({ type: 'REMOVE_MASK', id })
+  }
+
+  const setActiveMask = (id: string | null) => {
+    dispatch({ type: 'SET_ACTIVE_MASK', id })
+  }
+
+  const setMaskAdjustment = (id: string, key: string, value: number) => {
+    dispatch({ type: 'SET_MASK_ADJUSTMENT', id, key, value })
+  }
+
+  const setMaskInvert = (id: string, invert: boolean) => {
+    dispatch({ type: 'SET_MASK_INVERT', id, invert })
+  }
+
+  const renameMask = (id: string, name: string) => {
+    dispatch({ type: 'RENAME_MASK', id, name })
+  }
+
+  const addBrushStroke = (id: string, stroke: BrushStroke) => {
+    dispatch({ type: 'ADD_BRUSH_STROKE', id, stroke })
   }
 
   /**
@@ -138,6 +182,17 @@ export function EditorProvider({ children }: EditorProviderProps) {
         commit,
         canUndo: canUndo(history),
         canRedo: canRedo(history),
+        masks: state.masks,
+        activeMaskId: state.activeMaskId,
+        addMask,
+        removeMask,
+        setActiveMask,
+        setMaskAdjustment,
+        setMaskInvert,
+        renameMask,
+        addBrushStroke,
+        maskOverlayHidden,
+        setMaskOverlayHidden,
       }}
     >
       {children}

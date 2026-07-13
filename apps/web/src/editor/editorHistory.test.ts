@@ -4,6 +4,7 @@ import type { EditorStoreState } from './editorReducer'
 import { buildDefaultCurves } from './curves'
 import type { LoadedImage } from './image'
 import { undoable, initHistory, canUndo, canRedo } from './editorHistory'
+import { createMask } from './masks'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TDD contract for `editor/editorHistory.ts` — a snapshot history wrapper around
@@ -43,6 +44,8 @@ const makeState = (): EditorStoreState => ({
   cropRegion: null,
   cropRatio: 'Original',
   resetDialogOpen: false,
+  masks: [],
+  activeMaskId: null,
 })
 
 const wrapped = undoable(editorReducer)
@@ -189,6 +192,57 @@ describe('scope of undo', () => {
     // Redo reapplies the edited curve.
     h = wrapped(h, { type: 'REDO' })
     expect(h.present.curves.rgb).toEqual(edited)
+  })
+
+  it('includes masks in history and restores them on undo/redo', () => {
+    let h = initHistory(makeState())
+    const mask = createMask('brush', 'Brush 1')
+
+    h = wrapped(h, { type: 'ADD_MASK', mask })
+    h = wrapped(h, { type: 'COMMIT' })
+    expect(h.present.masks).toHaveLength(1)
+
+    // Undo removes the mask and clears the (now dangling) selection.
+    h = wrapped(h, { type: 'UNDO' })
+    expect(h.present.masks).toHaveLength(0)
+    expect(h.present.activeMaskId).toBeNull()
+
+    // Redo brings the mask back.
+    h = wrapped(h, { type: 'REDO' })
+    expect(h.present.masks).toHaveLength(1)
+    expect(h.present.masks[0].id).toBe(mask.id)
+  })
+
+  it('checkpoints a brush stroke as one undo step', () => {
+    let h = initHistory(makeState())
+    const mask = createMask('brush', 'Brush 1')
+    h = wrapped(h, { type: 'ADD_MASK', mask })
+    h = wrapped(h, { type: 'COMMIT' })
+
+    h = wrapped(h, {
+      type: 'ADD_BRUSH_STROKE',
+      id: mask.id,
+      stroke: { points: [{ x: 0, y: 0 }], radius: 10, hardness: 1, mode: 'add' },
+    })
+    h = wrapped(h, { type: 'COMMIT' })
+    expect(h.present.masks[0].strokes).toHaveLength(1)
+    expect(h.present.masks[0].version).toBe(1)
+
+    // Undo drops the stroke but keeps the mask.
+    h = wrapped(h, { type: 'UNDO' })
+    expect(h.present.masks[0].strokes).toHaveLength(0)
+    expect(h.present.masks[0].version).toBe(0)
+  })
+
+  it('COMMIT is a no-op when nothing changed after a mask edit', () => {
+    let h = initHistory(makeState())
+    h = wrapped(h, { type: 'ADD_MASK', mask: createMask('sky', 'Sky 1') })
+    h = wrapped(h, { type: 'COMMIT' })
+    const committed = h
+
+    // A second commit with no intervening change must not grow the past stack.
+    h = wrapped(h, { type: 'COMMIT' })
+    expect(h).toBe(committed)
   })
 })
 

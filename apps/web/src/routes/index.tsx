@@ -8,6 +8,7 @@ import { InfoPanel } from '../components/panels/InfoPanel'
 import { CropPanel } from '../components/panels/CropPanel'
 import { ExportPanel } from '../components/panels/ExportPanel'
 import { ShortcutsPanel } from '../components/panels/ShortcutsPanel'
+import { MasksPanel } from '../components/panels/MasksPanel'
 import { OpenImageButton } from '../components/canvas/OpenImageButton'
 import { Canvas } from '../components/canvas/Canvas'
 import classes from './index.module.css'
@@ -27,6 +28,7 @@ export const Route = createFileRoute('/')({
 const PANELS: Record<string, ComponentType> = {
   Info: InfoPanel,
   Adjustments: AdjustmentsPanel,
+  Masks: MasksPanel,
   Crop: CropPanel,
   Shortcuts: ShortcutsPanel,
   Export: ExportPanel,
@@ -37,9 +39,19 @@ const PANELS: Record<string, ComponentType> = {
  */
 function HomePage() {
   const [activeTool, setActiveTool] = useState('Adjustments')
-  const {imageStatus} = useEditor();
+  const {imageStatus, masks, activeMaskId, maskOverlayHidden} = useEditor();
   const { preferences } = usePreferences();
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // When the Masks tool is open and a brush mask is selected, the canvas paints
+  // that mask on drag instead of panning. Any other case → no painting (null).
+  const activeMask = masks.find((m) => m.id === activeMaskId) ?? null
+  const brushMaskId =
+    activeTool === 'Masks' && activeMask?.type === 'brush' ? activeMask.id : null
+  // Show the selected mask as a red overlay whenever the Masks tool is open,
+  // except while a mask slider is being dragged (so the change stays visible).
+  const overlayMaskId =
+    activeTool === 'Masks' && !maskOverlayHidden ? activeMaskId : null
 
   /**
    * Selecting a tool opens its panel; selecting the already-active tool toggles
@@ -76,7 +88,7 @@ function HomePage() {
       <div style={{ display: 'flex', flexDirection: rowDirection, flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>
-          <Canvas cropping={activeTool === 'Crop'} />
+          <Canvas cropping={activeTool === 'Crop'} brushMaskId={brushMaskId} overlayMaskId={overlayMaskId} />
           {activeTool === 'Crop' && <CropOverlay onDone={() => setActiveTool('')} />}
         </div>
         {ActivePanel && (
