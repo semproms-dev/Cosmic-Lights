@@ -1,0 +1,101 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--mantine-spacing-sm);
+  padding-bottom: var(--mantine-spacing-lg);
+  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
+}
+
+.logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg,
+    var(--mantine-color-blue-6),
+    var(--mantine-color-violet-6)
+  );
+  color: var(--mantine-color-white);
+}
+
+.tagline {
+  color: light-dark(var(--mantine-color-gray-6), var(--mantine-color-dark-2));
+  font-size: var(--mantine-font-size-sm);
+}
+
+.versionBadge {
+  composes: tagline;
+  background: none;
+  padding: 0;
+  font-family: var(--mantine-font-family-monospace);
+}
+
+.features {
+  padding: var(--mantine-spacing-lg) 0;
+  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
+}
+
+.featureCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  padding: var(--mantine-spacing-md);
+  border-radius: var(--mantine-radius-md);
+  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-5));
+  text-align: center;
+}
+
+.featureIcon {
+  color: light-dark(var(--mantine-color-blue-6), var(--mantine-color-blue-4));
+}
+
+.featureLabel {
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+  color: light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-0));
+}
+
+.featureDescription {
+  font-size: var(--mantine-font-size-xs);
+  color: light-dark(var(--mantine-color-gray-5), var(--mantine-color-dark-2));
+}
+
+.links {
+  display: flex;
+  justify-content: center;
+  gap: var(--mantine-spacing-lg);
+  padding: var(--mantine-spacing-lg) 0;
+  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  font-size: var(--mantine-font-size-sm);
+  color: light-dark(var(--mantine-color-blue-6), var(--mantine-color-blue-4));
+  text-decoration: none;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: light-dark(var(--mantine-color-blue-7), var(--mantine-color-blue-3));
+  }
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-top: var(--mantine-spacing-lg);
+}
+
+.footerText {
+  font-size: var(--mantine-font-size-xs);
+  color: light-dark(var(--mantine-color-gray-5), var(--mantine-color-dark-2));
+}

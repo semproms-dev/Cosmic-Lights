@@ -1,12 +1,11 @@
 import { useState } from 'react';
 
 import {
-  IconHome2,
   IconSettings,
   IconFile,
   IconFolderOpen,
   IconPhoto,
-  IconInfoCircle
+  IconInfoCircle,
 } from '@tabler/icons-react';
 import { Group, Tooltip, UnstyledButton, Menu, ActionIcon } from '@mantine/core';
 import classes from '../styles/TopNavBar.module.css';
@@ -14,6 +13,7 @@ import { FaRedoAlt, FaUndoAlt } from "react-icons/fa";
 import { useEditor } from '../../../editor/editorContext';
 import { useModals } from '@mantine/modals';
 import { AdjustementsModal } from '../../modals/Adjustments.modal';
+import { AboutModal } from '../../modals/About.modal';
 
 interface MenuItem {
   label: string;
@@ -48,13 +48,18 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
     });
   };
 
+  const openAbout = () => {
+    modals.openModal({
+      title: 'About',
+      size: 'md',
+      children: <AboutModal />
+    })
+  }
+
   const mainLinksMockdata: MainLink[] = [
   { icon: IconFile, label: 'File', items: [
     { icon: IconFolderOpen, label: 'Open...', onClick: () => onOpenImage?.()},
     { icon: IconPhoto, label: 'Export JPG...', onClick: () => {} }
-  ], onClick: () => {}},
-  { icon: IconHome2, label: 'Hello', items: [
-    { icon: IconInfoCircle, label: 'About CosmicLights', onClick: () => {} }
   ], onClick: () => {}}
 ];
 
@@ -125,6 +130,11 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
           <ActionIcon variant='subtle' size="lg" onClick={openSettings} aria-label="Settings">
             <IconSettings size={22} stroke={1.5} />
           </ActionIcon>
+        </Tooltip>
+        <Tooltip label='About' withArrow>
+          <ActionIcon variant='subtle' size="lg" onClick={openAbout} aria-label="Settings">
+            <IconInfoCircle size={22} stroke={1.5} />
+        </ActionIcon>
         </Tooltip>
       </Group>
     </nav>
