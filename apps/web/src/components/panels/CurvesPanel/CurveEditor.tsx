@@ -17,6 +17,8 @@ interface CurveEditorProps {
     onChange: (points: CurvePoint[]) => void;
     /** Checkpoints the current curve as one undo step (called on gesture end). */
     onCommit: () => void;
+    /** Greys out the canvas and blocks all edits when no image is open. */
+    disabled?: boolean;
 }
 
 /** Quarter positions for the reference grid (¼, ½, ¾ of the canvas). */
@@ -28,7 +30,7 @@ const GRID_FRACTIONS = [0.25, 0.5, 0.75];
  * points. Clicking empty space adds a point that lands on the current curve.
  * Owns no state — every edit is reported through `onChange`.
  */
-export const CurveEditor = ({ points, size, onChange, onCommit }: CurveEditorProps) => {
+export const CurveEditor = ({ points, size, onChange, onCommit, disabled = false }: CurveEditorProps) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const lut = useMemo(() => compileLut(points), [points]);
 
@@ -65,7 +67,7 @@ export const CurveEditor = ({ points, size, onChange, onCommit }: CurveEditorPro
         <svg
             ref={svgRef}
             viewBox={`0 0 ${size} ${size}`}
-            onPointerDown={handleAddPoint}
+            onPointerDown={disabled ? undefined : handleAddPoint}
             style={{
                 width: "100%",
                 aspectRatio: "1 / 1",
@@ -73,6 +75,8 @@ export const CurveEditor = ({ points, size, onChange, onCommit }: CurveEditorPro
                 border: "1px solid var(--mantine-color-default-border)",
                 background: "var(--mantine-color-body)",
                 touchAction: "none",
+                opacity: disabled ? 0.5 : 1,
+                pointerEvents: disabled ? "none" : "auto",
             }}
         >
             {/* Reference grid */}

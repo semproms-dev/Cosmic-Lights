@@ -28,7 +28,7 @@ export function ControlSlider({
   onChangeEnd,
 }: ControlSliderProps) {
   const { hovered, ref } = useHover();
-  const {setAdjustment, commit} = useEditor();
+  const {setAdjustment, commit, image} = useEditor();
 
   // Resetting via the label is a discrete edit outside the slider's onChangeEnd,
   // so it needs its own checkpoint.
@@ -47,6 +47,7 @@ export function ControlSlider({
       <Slider
         value={value}
         onChange={onChange}
+        disabled={image === null}
         onChangeEnd={onChangeEnd}
         min={min}
         max={max}

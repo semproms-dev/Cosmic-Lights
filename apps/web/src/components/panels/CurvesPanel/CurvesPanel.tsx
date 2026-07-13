@@ -14,10 +14,11 @@ const EDITOR_SIZE = 256;
  * pushes edits back through `setCurve`. Its children stay presentational.
  */
 export const CurvesPanel = () => {
-    const { curves, setCurve, commit } = useEditor();
+    const { curves, setCurve, commit, image } = useEditor();
     const [channel, setChannel] = useState<ChannelId>("rgb");
 
     const points = curves[channel];
+    const disabled = image === null;
 
     const handleReset = () => {
         // Per-channel reset: deep-copy the identity so a later drag can't mutate
@@ -29,14 +30,15 @@ export const CurvesPanel = () => {
 
     return (
         <Stack gap={"sm"}>
-            <ChannelTabs value={channel} onChange={setChannel} />
+            <ChannelTabs value={channel} onChange={setChannel} disabled={disabled} />
             <CurveEditor
                 points={points}
                 size={EDITOR_SIZE}
                 onChange={(next) => setCurve(channel, next)}
                 onCommit={commit}
+                disabled={disabled}
             />
-            <Button variant="subtle" onClick={handleReset}>
+            <Button variant="subtle" onClick={handleReset} disabled={disabled}>
                 Reset channel
             </Button>
         </Stack>

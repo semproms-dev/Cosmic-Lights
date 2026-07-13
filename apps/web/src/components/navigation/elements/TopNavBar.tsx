@@ -6,14 +6,14 @@ import {
   IconFile,
   IconFolderOpen,
   IconPhoto,
-  IconAdjustments,
-  IconPalette,
   IconInfoCircle
 } from '@tabler/icons-react';
 import { Group, Tooltip, UnstyledButton, Menu, ActionIcon } from '@mantine/core';
 import classes from '../styles/TopNavBar.module.css';
 import { FaRedoAlt, FaUndoAlt } from "react-icons/fa";
 import { useEditor } from '../../../editor/editorContext';
+import { useModals } from '@mantine/modals';
+import { AdjustementsModal } from '../../modals/Adjustments.modal';
 
 interface MenuItem {
   label: string;
@@ -24,7 +24,8 @@ interface MenuItem {
 interface MainLink {
   label: string;
   icon: typeof IconFile,
-  items: MenuItem[]
+  items: MenuItem[],
+  onClick: () => void
 }
 
 
@@ -37,19 +38,24 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
   const [active, setActive] = useState('File');
   const [openedLabel, setOpenedLabel] = useState('');
   const {redo, undo, canRedo, canUndo} = useEditor();
+  const modals = useModals();
+
+  const openSettings = () => {
+    modals.openModal({
+      title: 'Settings',
+      size: 'lg',
+      children: <AdjustementsModal />,
+    });
+  };
 
   const mainLinksMockdata: MainLink[] = [
   { icon: IconFile, label: 'File', items: [
     { icon: IconFolderOpen, label: 'Open...', onClick: () => onOpenImage?.()},
     { icon: IconPhoto, label: 'Export JPG...', onClick: () => {} }
-  ]},
-  { icon: IconSettings, label: 'Settings', items: [
-    { icon: IconAdjustments, label: 'Adjustments', onClick: () => {} },
-    { icon: IconPalette, label: 'Color profile', onClick: () => {} }
-  ]},
+  ], onClick: () => {}},
   { icon: IconHome2, label: 'Hello', items: [
     { icon: IconInfoCircle, label: 'About CosmicLights', onClick: () => {} }
-  ]}
+  ], onClick: () => {}}
 ];
 
   const mainLinks = mainLinksMockdata.map((link) => (
@@ -97,22 +103,30 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
           ))}
         </Menu.Dropdown>
     </Menu>
-
+    
   ));
 
   return (
     <nav className={classes.navbar}>
       <Group gap="xs">{mainLinks}</Group>
-      <Tooltip label='Undo'>
-        <ActionIcon variant='subtle' onClick={() => undo()} color='white' disabled={!canUndo}>
-          <FaUndoAlt cursor={'pointer'} />
-        </ActionIcon>
-      </Tooltip>
-      <Tooltip label='Redo'>
-        <ActionIcon variant='subtle'  onClick={() => redo()} color='white' disabled={!canRedo}>
-          <FaRedoAlt cursor={'pointer'}/>
-        </ActionIcon>
-      </Tooltip>
+
+      <Group gap="xs" ml="auto">
+        <Tooltip label='Undo' withArrow>
+          <ActionIcon variant='subtle' size="lg" onClick={() => undo()} disabled={!canUndo}>
+            <FaUndoAlt />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label='Redo' withArrow>
+          <ActionIcon variant='subtle' size="lg" onClick={() => redo()} disabled={!canRedo}>
+            <FaRedoAlt />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label='Settings' withArrow>
+          <ActionIcon variant='subtle' size="lg" onClick={openSettings} aria-label="Settings">
+            <IconSettings size={22} stroke={1.5} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
     </nav>
   );
 }

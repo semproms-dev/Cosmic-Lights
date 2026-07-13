@@ -13,6 +13,7 @@ import { Canvas } from '../components/canvas/Canvas'
 import classes from './index.module.css'
 import { LoadingOverlay } from '@mantine/core'
 import { useEditor } from '../editor/editorContext'
+import { usePreferences } from '../preferences/preferences'
 import { useEditorShortcuts } from '../editor/useEditorShortcuts'
 import { CropOverlay } from '../editor/CropOverlay'
 
@@ -37,6 +38,7 @@ const PANELS: Record<string, ComponentType> = {
 function HomePage() {
   const [activeTool, setActiveTool] = useState('Adjustments')
   const {imageStatus} = useEditor();
+  const { preferences } = usePreferences();
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   /**
@@ -56,11 +58,22 @@ function HomePage() {
 
   const ActivePanel = PANELS[activeTool]
 
+  // The tool rail and its panel default to the right; 'left' just reverses the
+  // editor row so the rail (last child) ends up first, on the left.
+  const rowDirection = preferences.panelPosition === 'left' ? 'row-reverse' : 'row'
+
   return (
-    <main style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <main
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        fontSize: `${preferences.fontSize}px`,
+      }}
+    >
       <NavBar onOpenImage={() => fileInputRef.current?.click()} />
       <OpenImageButton fileInputRef={fileInputRef} />
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: rowDirection, flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>
           <Canvas cropping={activeTool === 'Crop'} />

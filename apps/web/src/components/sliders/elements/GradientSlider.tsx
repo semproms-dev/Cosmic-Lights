@@ -1,5 +1,6 @@
 import { Group, Slider, Stack, Text } from '@mantine/core';
 import classes from '../styles/GradientSlider.module.css';
+import { useEditor } from '../../../editor/editorContext';
 
 interface GradientSliderProps {
   label: string;
@@ -22,6 +23,7 @@ export function GradientSlider({
   gradient,
   onChangeEnd,
 }: GradientSliderProps) {
+  const {image} = useEditor()
   return (
     <Stack gap={4} className={classes.root} style={{ '--gradient': gradient } as React.CSSProperties}>
       <Group justify="space-between" gap="xs">
@@ -33,6 +35,7 @@ export function GradientSlider({
       <Slider
         value={value}
         onChange={onChange}
+        disabled={image === null}
         onChangeEnd={onChangeEnd}
         min={min}
         max={max}
