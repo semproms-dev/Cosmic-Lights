@@ -8,7 +8,7 @@ const aspectRatios = ['Original', '1:1', '16:9', '4:3', '3:2', '5:4', 'Free'];
  * store so the crop overlay can constrain the draft to the chosen ratio.
  */
 export function CropPanel() {
-  const { cropRatio, setCropRatio, commit } = useEditor();
+  const { cropRatio, setCropRatio, commit, image } = useEditor();
 
   // Picking a ratio is a discrete edit: apply it, then checkpoint it as one undo step.
   const handleRatioChange = (value: string) => {
@@ -24,6 +24,7 @@ export function CropPanel() {
       </Text>
       <SegmentedControl
         orientation="vertical"
+        disabled={image === null}
         fullWidth
         value={cropRatio}
         onChange={handleRatioChange}
