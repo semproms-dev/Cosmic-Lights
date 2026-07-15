@@ -119,6 +119,10 @@
     "discardTitle": "Ignorer les modifications ?",
     "discardMessage": "Ouvrir une nouvelle image ignorera tous les ajustements non enregistrés. Continuer ?"
   },
+  "dropzone": {
+    "title": "Glissez une photo RAW ici ou cliquez pour ouvrir",
+    "hint": "Pris en charge : ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2"
+  },
   "about": {
     "tagline": "Traitement professionnel de photos RAW dans votre navigateur",
     "sourceCode": "Code source",

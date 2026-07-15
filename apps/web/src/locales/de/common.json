@@ -119,6 +119,10 @@
     "discardTitle": "Änderungen verwerfen?",
     "discardMessage": "Das Öffnen eines neuen Bildes verwirft alle nicht gespeicherten Anpassungen. Fortfahren?"
   },
+  "dropzone": {
+    "title": "Ziehe ein RAW-Foto hierher oder klicke zum Öffnen",
+    "hint": "Unterstützt: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2"
+  },
   "about": {
     "tagline": "Professionelle RAW-Fotobearbeitung in Ihrem Browser",
     "sourceCode": "Quellcode",

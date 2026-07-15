@@ -9,6 +9,8 @@ import { ConfirmDialog } from '../window/ConfirmDialog'
 import { clampZoom } from '../../utils'
 import { canvasToImageCoords } from '../../editor/crop'
 import type { MaskPoint } from '../../editor/masks'
+import { DropOverlay } from './DropOverlay'
+import { isRawFile } from './rawFormats'
 
 /** Default brush geometry (radius as a fraction of the image's short side). */
 const BRUSH_RADIUS_FRACTION = 0.04
@@ -65,11 +67,11 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
   // the canvas or not in brush mode.
   const [brushCursor, setBrushCursor] = useState<{ x: number; y: number; d: number } | null>(null)
 
-  const handleDrop = (e: React.DragEvent<HTMLCanvasElement>) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0];
-    if(!file) return;
-    loadImage(file)
+  // A file dropped or picked via the DropOverlay; ignore anything that is not a
+  // recognised RAW photo.
+  const handleDropFile = (file: File) => {
+    if (!isRawFile(file)) return
+    void loadImage(file)
   }
 
   // Create the renderer once, bound to the canvas's WebGL2 context.
@@ -211,8 +213,18 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
   const toImagePoint = (e: React.PointerEvent<HTMLCanvasElement>): MaskPoint | null => {
     if (image === null) return null
     const rect = e.currentTarget.getBoundingClientRect()
+    const px = e.clientX - rect.left
+    const py = e.clientY - rect.top
+    // Undo the interactive view transform (zoom/pan), applied by the renderer in
+    // clip space, before the fit-to-canvas mapping (which assumes identity view).
+    const clipX = (px / rect.width) * 2 - 1
+    const clipY = 1 - (py / rect.height) * 2
+    const baseX = (clipX - view.offsetX) / view.scale
+    const baseY = (clipY - view.offsetY) / view.scale
+    const basePx = ((baseX + 1) / 2) * rect.width
+    const basePy = ((1 - baseY) / 2) * rect.height
     return canvasToImageCoords(
-      { x: e.clientX - rect.left, y: e.clientY - rect.top },
+      { x: basePx, y: basePy },
       image.width, image.height, rect.width, rect.height,
     )
   }
@@ -230,7 +242,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     setBrushCursor({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
-      d: brushRadius() * 2 * fit,
+      d: brushRadius() * 2 * fit * view.scale,
     })
   }
 
@@ -317,7 +329,11 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       onPointerUp={handlePointerUp}
       onPointerLeave={() => setBrushCursor(null)}
       onDoubleClick={() => setView(DEFAULT_VIEW)}
-      onDragOver={(e) => {e.preventDefault()}} onDrop={handleDrop} ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : 'default' }} />
+      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : 'default' }} />
+
+    <DropOverlay imageLoaded={image !== null} onDropFile={handleDropFile} />
+
+
     {brushMaskId !== null && brushCursor !== null && (
       <div
         aria-hidden

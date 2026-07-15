@@ -3,9 +3,7 @@ import type { ChangeEvent } from 'react'
 import { useDisclosure } from '@mantine/hooks'
 import { useEditor } from '../../editor/editorContext'
 import { ConfirmDialog } from '../window/ConfirmDialog'
-
-/** RAW extensions the file picker accepts. */
-const RAW_ACCEPT = '.arw,.cr2,.cr3,.nef,.dng,.raf,.orf,.rw2'
+import { RAW_ACCEPT } from './rawFormats'
 
 interface OpenImageButtonProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
