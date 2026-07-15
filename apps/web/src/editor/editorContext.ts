@@ -1,7 +1,8 @@
-import { createContext, use } from 'react'
+import { createContext, use, type RefObject } from 'react'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
 import type { BrushStroke, Mask, MaskType } from './masks'
+import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
 
 /**
  * Shared editor state. For now it holds the live adjustment values; the canvas
@@ -87,6 +88,31 @@ export interface EditorState {
   maskOverlayHidden: boolean
   /** Shows/hides the mask editing overlay (transient UI state, not undoable). */
   setMaskOverlayHidden: (hidden: boolean) => void
+  /**
+   * Alphas generated for AI masks, keyed by mask id.
+   *
+   * A ref, not state: the pixels are heavy and stay out of the undo history.
+   * **Mutating it re-renders nothing** — bump the owning mask's `version` to
+   * produce the frame that uploads the new alpha. Read `.current` from an effect
+   * or a handler, never during render.
+   */
+  maskAlphas: RefObject<MaskAlphaCache>
+  /**
+   * Segmentation progress per AI mask, keyed by mask id. Masks with no entry
+   * are either hand-painted or have not started.
+   */
+  maskStatus: Map<string, MaskStatus>
+  /**
+   * Download progress of the segmentation model, 0..100, or `null` when it is
+   * not downloading (already cached, or done). Global: there is one model.
+   *
+   * A mask that is `loading` while this is `null` is *inferring*, which is the
+   * distinction the user needs — the download is slow but happens once, while
+   * inference is slow on every request and has no progress to report.
+   */
+  modelProgress: number | null
+  /** Re-runs the segmentation of a failed AI mask. */
+  retryMask: (id: string) => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

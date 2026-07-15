@@ -100,7 +100,11 @@
     "radialGradient": "Gradiente radiale",
     "colorRange": "Intervallo di colore",
     "luminanceRange": "Intervallo di luminanza",
-    "depthRange": "Intervallo di profondità"
+    "depthRange": "Intervallo di profondità",
+    "segmenting": "Segmentazione in corso…",
+    "downloadingModel": "Download del modello… {{progress}}%",
+    "retry": "Riprova",
+    "segmentFailed": "Segmentazione non riuscita"
   },
   "curves": {
     "resetChannel": "Reimposta canale",

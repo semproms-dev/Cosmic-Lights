@@ -100,7 +100,11 @@
     "radialGradient": "Radial Gradient",
     "colorRange": "Color Range",
     "luminanceRange": "Luminance Range",
-    "depthRange": "Depth Range"
+    "depthRange": "Depth Range",
+    "segmenting": "Segmenting…",
+    "downloadingModel": "Downloading model… {{progress}}%",
+    "retry": "Retry",
+    "segmentFailed": "Segmentation failed"
   },
   "curves": {
     "resetChannel": "Reset channel",

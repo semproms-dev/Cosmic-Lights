@@ -12,6 +12,7 @@ import {
 import { cropToUvTransform } from '../crop'
 import type { CropRegion } from '../image'
 import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type Mask, type MaskPoint } from '../masks'
+import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
 
 /**
  * The per-frame adjustment values the shader needs, already defaulted (no
@@ -332,6 +333,37 @@ export class WebGLRenderer {
   }
 
   /**
+   * Uploads a generated alpha into a mask's target, replacing whatever it held.
+   *
+   * The target is reallocated at the alpha's own resolution, which need not be
+   * the image's: the mask pass samples it with normalised UVs and LINEAR
+   * filtering, so a smaller alpha is stretched by the GPU for free.
+   *
+   * Does **not** touch `entry.version` — {@link syncMasks} owns that bookkeeping.
+   *
+   * @param maskId - The mask to fill. Unknown ids are ignored (no target yet).
+   * @param maskAlpha - The weight map, one byte per pixel.
+   */
+  uploadMaskAlpha(maskId: string, maskAlpha: MaskAlpha): void {
+    const entry = this.maskTargets.get(maskId)
+    if (entry === undefined) return
+    const gl = this.gl
+    const { width, height, data } = maskAlpha
+
+    // The target is RGBA8 and the mask shader reads the weight from `.r`, so the
+    // single channel is expanded into R and the rest left at zero.
+    const rgba = new Uint8Array(width * height * 4)
+    for (let index = 0; index < width * height; index++) {
+      rgba[index * 4] = data[index]
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, entry.target.texture)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba)
+    entry.target.width = width
+    entry.target.height = height
+  }
+
+  /**
    * Uploads the compiled tone-curve LUTs to the GPU. Call only when the curves
    * change, not on every adjustment. The buffer is the flat 256×4 R8 layout from
    * `compileCurveTexture` (row 0 = master rgb, rows 1–3 = red/green/blue).
@@ -492,12 +524,15 @@ export class WebGLRenderer {
    * Reconciles the per-mask alpha targets with the store's masks: creates a
    * target for each new mask, re-rasterises brush masks whose `version` changed,
    * and frees targets for removed masks. Call once per frame before the mask
-   * passes. AI masks (no strokes yet) keep an empty target until their bitmap is
-   * uploaded, so they simply have no effect for now.
+   * passes. An AI mask whose alpha has not arrived yet keeps an empty target —
+   * and a stale version, so it is retried on the next frame.
    *
    * @param masks - The store's current masks.
+   * @param maskAlphas - Generated alphas for AI masks, keyed by mask id. An
+   * entry appears only once its segmentation resolves, and is only fresh while
+   * its `version` matches the mask's.
    */
-  syncMasks(masks: Mask[]): void {
+  syncMasks(masks: Mask[], maskAlphas: MaskAlphaCache): void {
     const gl = this.gl
     if (!this.hasImage) return
     const live = new Set(masks.map((mask) => mask.id))
@@ -509,15 +544,28 @@ export class WebGLRenderer {
     }
     for (const mask of masks) {
       let entry = this.maskTargets.get(mask.id)
+
       if (entry === undefined) {
         entry = { target: createRenderTarget(gl, this.imageWidth, this.imageHeight), version: -1 }
         this.maskTargets.set(mask.id, entry)
       }
-      // Only re-rasterise when the strokes actually changed (version bump). Live
+      // Only reconcile when something actually changed (version bump). Live
       // painting stamps straight into the target without a bump, so it survives.
+      // Each branch marks its own work done, so a mask still waiting on its alpha
+      // keeps a stale version and gets retried next frame.
       if (entry.version !== mask.version) {
-        this.rebuildMaskTarget(entry.target, mask.strokes)
-        entry.version = mask.version
+        if (mask.type === 'brush') {
+          this.rebuildMaskTarget(entry.target, mask.strokes)
+          entry.version = mask.version
+        } else {
+          const alpha = maskAlphas.get(mask.id)
+          if (alpha !== undefined && alpha.version === mask.version) {
+            this.uploadMaskAlpha(mask.id, alpha)
+            entry.version = mask.version
+          }
+          // No alpha yet (still inferring): leave the target empty and the
+          // version stale so the next frame tries again.
+        }
       }
     }
   }
@@ -550,7 +598,7 @@ export class WebGLRenderer {
     this.stampDiscsAlong([from, to], radius, hardness, mode)
   }
 
-  render(adjustments: RenderAdjustments, masks: Mask[], overlayMaskId: string | null, canvasWidth: number, canvasHeight: number): void {
+  render(adjustments: RenderAdjustments, masks: Mask[], maskAlphas: MaskAlphaCache, overlayMaskId: string | null, canvasWidth: number, canvasHeight: number): void {
     const gl = this.gl
     if (!this.hasImage || this.developed === null || this.developed2 === null || this.blurA === null || this.blurB === null || this.blurC === null || canvasWidth === 0 || canvasHeight === 0) {
       // Nothing to draw: just clear the canvas.
@@ -598,7 +646,7 @@ export class WebGLRenderer {
     // adjustments and blend by its alpha, ping-ponging between the two developed
     // targets. `finalDeveloped` ends up holding the fully-masked result; with no
     // masks it stays the base develop, so the passes below are unchanged. ──
-    this.syncMasks(masks)
+    this.syncMasks(masks, maskAlphas)
     let finalDeveloped = developed
     if (masks.length > 0) {
       let src = developed

@@ -100,7 +100,11 @@
     "radialGradient": "Dégradé radial",
     "colorRange": "Plage de couleurs",
     "luminanceRange": "Plage de luminance",
-    "depthRange": "Plage de profondeur"
+    "depthRange": "Plage de profondeur",
+    "segmenting": "Segmentation en cours…",
+    "downloadingModel": "Téléchargement du modèle… {{progress}} %",
+    "retry": "Réessayer",
+    "segmentFailed": "Échec de la segmentation"
   },
   "curves": {
     "resetChannel": "Réinitialiser le canal",

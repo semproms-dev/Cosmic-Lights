@@ -6,6 +6,7 @@ import {
   IconContrast,
   IconLine,
   IconMountain,
+  IconRefresh,
   IconTrash,
   IconUser,
 } from '@tabler/icons-react'
@@ -13,12 +14,15 @@ import {
   ActionIcon,
   Divider,
   Group,
+  Loader,
   Slider,
   Stack,
   Switch,
   Text,
+  Tooltip,
   UnstyledButton,
 } from '@mantine/core'
+import { useTranslation } from 'react-i18next'
 import { useEditor } from '../../editor/editorContext'
 import { basicAdjustments, colorAdjustement } from '../../editor/adjustments'
 import { MASK_ADJUSTMENT_KEYS, MAX_MASKS, type MaskType } from '../../editor/masks'
@@ -31,20 +35,21 @@ const ADJ_META = new Map(
 /** One "Add New Mask" entry. Disabled entries are the not-yet-built tools. */
 interface AddOption {
   type: MaskType | null
-  label: string
+  /** Key under the `masks` i18n namespace. */
+  labelKey: string
   icon: typeof IconBrush
   disabled?: boolean
 }
 
 const ADD_OPTIONS: AddOption[] = [
-  { type: 'subject', label: 'Select Subject', icon: IconUser },
-  { type: 'sky', label: 'Select Sky', icon: IconCloud },
-  { type: 'brush', label: 'Brush', icon: IconBrush },
-  { type: null, label: 'Linear Gradient', icon: IconLine, disabled: true },
-  { type: null, label: 'Radial Gradient', icon: IconCircleDot, disabled: true },
-  { type: null, label: 'Color Range', icon: IconColorSwatch, disabled: true },
-  { type: null, label: 'Luminance Range', icon: IconContrast, disabled: true },
-  { type: null, label: 'Depth Range', icon: IconMountain, disabled: true },
+  { type: 'subject', labelKey: 'selectSubject', icon: IconUser },
+  { type: 'sky', labelKey: 'selectSky', icon: IconCloud },
+  { type: 'brush', labelKey: 'brush', icon: IconBrush },
+  { type: null, labelKey: 'linearGradient', icon: IconLine, disabled: true },
+  { type: null, labelKey: 'radialGradient', icon: IconCircleDot, disabled: true },
+  { type: null, labelKey: 'colorRange', icon: IconColorSwatch, disabled: true },
+  { type: null, labelKey: 'luminanceRange', icon: IconContrast, disabled: true },
+  { type: null, labelKey: 'depthRange', icon: IconMountain, disabled: true },
 ]
 
 /**
@@ -54,6 +59,7 @@ const ADD_OPTIONS: AddOption[] = [
  * are shown disabled until they are built.
  */
 export function MasksPanel() {
+  const { t } = useTranslation()
   const {
     image,
     masks,
@@ -65,19 +71,26 @@ export function MasksPanel() {
     setMaskInvert,
     commit,
     setMaskOverlayHidden,
+    maskStatus,
+    modelProgress,
+    retryMask,
   } = useEditor()
 
   const disabled = image === null
   const atCap = masks.length >= MAX_MASKS
   const active = masks.find((m) => m.id === activeMaskId) ?? null
+  // A mask with no alpha yet has nothing to adjust: its sliders would silently
+  // do nothing, which reads as a broken control rather than as "not ready".
+  const activeBusy = active !== null && maskStatus.get(active.id) !== undefined
+    && maskStatus.get(active.id) !== 'ready'
 
   return (
     <Stack gap="sm" p="xs">
-      <Text fw={700} size="sm">Add New Mask</Text>
+      <Text fw={700} size="sm">{t('masks.addNew')}</Text>
       <Stack gap={2}>
         {ADD_OPTIONS.map((opt) => (
           <UnstyledButton
-            key={opt.label}
+            key={opt.labelKey}
             disabled={disabled || opt.disabled || opt.type === null || atCap}
             onClick={() => opt.type !== null && addMask(opt.type)}
             style={{
@@ -91,29 +104,58 @@ export function MasksPanel() {
             }}
           >
             <opt.icon size={18} stroke={1.5} />
-            <Text size="sm">{opt.label}</Text>
+            <Text size="sm">{t(`masks.${opt.labelKey}`)}</Text>
           </UnstyledButton>
         ))}
       </Stack>
 
       {masks.length > 0 && (
         <>
-          <Divider label="Masks" labelPosition="left" />
+          <Divider label={t('masks.title')} labelPosition="left" />
           <Stack gap={2}>
-            {masks.map((mask) => (
-              <Group key={mask.id} justify="space-between" gap="xs" wrap="nowrap">
-                <UnstyledButton
-                  onClick={() => setActiveMask(mask.id)}
-                  style={{ flex: 1, padding: '4px 8px', borderRadius: 'var(--mantine-radius-sm)' }}
-                  data-active={mask.id === activeMaskId || undefined}
-                >
-                  <Text size="sm" fw={mask.id === activeMaskId ? 700 : 400}>{mask.name}</Text>
-                </UnstyledButton>
-                <ActionIcon variant="subtle" color="red" aria-label={`Delete ${mask.name}`} onClick={() => { removeMask(mask.id); commit() }}>
-                  <IconTrash size={16} />
-                </ActionIcon>
-              </Group>
-            ))}
+            {masks.map((mask) => {
+              const status = maskStatus.get(mask.id)
+              return (
+                <Group key={mask.id} justify="space-between" gap="xs" wrap="nowrap">
+                  <UnstyledButton
+                    onClick={() => setActiveMask(mask.id)}
+                    style={{ flex: 1, padding: '4px 8px', borderRadius: 'var(--mantine-radius-sm)', minWidth: 0 }}
+                    data-active={mask.id === activeMaskId || undefined}
+                  >
+                    <Text size="sm" fw={mask.id === activeMaskId ? 700 : 400} truncate>{mask.name}</Text>
+                    {status === 'loading' && (
+                      // The two waits look identical to the user but are not: the
+                      // download is slow once and has a real percentage, while
+                      // inference is slow every time and has nothing to report.
+                      <Text size="xs" c="dimmed">
+                        {modelProgress === null
+                          ? t('masks.segmenting')
+                          : t('masks.downloadingModel', { progress: Math.round(modelProgress) })}
+                      </Text>
+                    )}
+                    {status === 'error' && (
+                      <Text size="xs" c="red">{t('masks.segmentFailed')}</Text>
+                    )}
+                  </UnstyledButton>
+                  {status === 'loading' && <Loader size="xs" />}
+                  {status === 'error' && (
+                    <Tooltip label={t('masks.retry')}>
+                      <ActionIcon
+                        variant="subtle"
+                        color="yellow"
+                        aria-label={t('masks.retry')}
+                        onClick={() => retryMask(mask.id)}
+                      >
+                        <IconRefresh size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  <ActionIcon variant="subtle" color="red" aria-label={`Delete ${mask.name}`} onClick={() => { removeMask(mask.id); commit() }}>
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Group>
+              )
+            })}
           </Stack>
         </>
       )}
@@ -122,8 +164,9 @@ export function MasksPanel() {
         <>
           <Divider label={active.name} labelPosition="left" />
           <Switch
-            label="Invert"
+            label={t('masks.invert')}
             checked={active.invert}
+            disabled={activeBusy}
             onChange={(e) => { setMaskInvert(active.id, e.currentTarget.checked); commit() }}
           />
           <Stack gap="md">
@@ -138,6 +181,7 @@ export function MasksPanel() {
                   </Group>
                   <Slider
                     value={active.adjustments[key]}
+                    disabled={activeBusy}
                     onChange={(v) => {
                       // Hide the red overlay while dragging so the change shows.
                       setMaskOverlayHidden(true)

@@ -1,4 +1,4 @@
-import { useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint } from './curves'
@@ -9,6 +9,11 @@ import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
 import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type MaskType } from './masks'
+import {
+  TransformersSegmentationProvider,
+  type SegmentationProvider,
+} from './segmentation/TransformersSegmentationProvider'
+import type { MaskAlphaCache, MaskStatus, SegmentationKind } from './segmentation/types'
 
 /**
  * Undo/redo wrapper around the editor reducer. Built once at module scope:
@@ -46,6 +51,31 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // Transient UI: hide the red mask overlay while a mask slider is being dragged
   // so the change is visible. Not part of the editor store (never undoable).
   const [maskOverlayHidden, setMaskOverlayHidden] = useState(false)
+
+  // Generated alphas for AI masks. A ref, not state: the pixels are heavy and
+  // must stay out of the undo history, which only tracks each mask's `version`.
+  // Consequence: filling it redraws nothing on its own — bump the mask's
+  // `version` to produce the frame that uploads the alpha to the GPU.
+  const maskAlphas = useRef<MaskAlphaCache>(new Map())
+
+  // Per-mask segmentation progress. Transient UI, like `maskOverlayHidden`:
+  // re-deriving it on undo/redo would mean re-running the model.
+  const [maskStatus, setMaskStatus] = useState<Map<string, MaskStatus>>(new Map())
+
+  // 0..100 while the model downloads, `null` otherwise. Global on purpose: one
+  // model, fetched once, shared by every mask waiting at that moment.
+  const [modelProgress, setModelProgress] = useState<number | null>(null)
+
+  // The segmentation engine, built on first use. See `runSegmentation`.
+  const providerRef = useRef<SegmentationProvider | null>(null)
+
+  // Tear the worker (and its ONNX session) down with the app.
+  useEffect(() => {
+    return () => {
+      providerRef.current?.dispose()
+      providerRef.current = null
+    }
+  }, [])
 
   const setAdjustment = (key: string, value: number) => {
     dispatch({ type: 'SET', key, value })
@@ -96,16 +126,78 @@ export function EditorProvider({ children }: EditorProviderProps) {
   }
 
   /**
+   * Generates the alpha of an AI mask and hands it to the renderer.
+   *
+   * The target `version` is chosen by the caller rather than read from state:
+   * this runs asynchronously, so `state` in this closure is a snapshot that may
+   * already be stale by the time the alpha lands. Tagging the cache entry and
+   * the mask with the same caller-supplied number means they cannot disagree.
+   *
+   * @param id - The mask to fill.
+   * @param kind - Which segmentation to run.
+   * @param version - The revision to publish the alpha under. Must differ from
+   * the mask's current version, or the renderer will not notice it.
+   */
+  const runSegmentation = async (id: string, kind: SegmentationKind, version: number): Promise<void> => {
+    try {
+      const image = state.image
+      if (image === null) return
+      setMaskStatus((current) => new Map(current).set(id, 'loading'))
+      // One provider for the whole app: each one owns a worker, and each worker
+      // downloads the model again. Built on first use so a session that never
+      // asks for an AI mask never fetches the inference runtime.
+      const provider = (providerRef.current ??= new TransformersSegmentationProvider({
+        onModelProgress: (progress) => {
+          setModelProgress(progress.phase === 'downloading' ? progress.progress : null)
+        },
+      }))
+      // The provider consumes the bitmap (it is transferred to its worker), so
+      // it gets a clone — the store's own bitmap must stay drawable.
+      const alpha = await provider.segment(await createImageBitmap(image.bitmap), kind)
+      maskAlphas.current.set(id, { ...alpha, version })
+      // The cache is a ref, so this dispatch is what actually causes the redraw
+      // that uploads the alpha.
+      dispatch({ type: 'SET_MASK_VERSION', id, version })
+      setMaskStatus((current) => new Map(current).set(id, 'ready'))
+    } catch (error) {
+      logger.error(`Segmentation failed for mask ${id} (${kind})`, error)
+      setMaskStatus((current) => new Map(current).set(id, 'error'))
+    } finally {
+      // Whatever happened, the download is over by now. Belt and braces: if the
+      // 'ready' event ever stops arriving, the bar must not stick at 99%.
+      setModelProgress(null)
+    }
+  }
+
+  /**
    * Creates a mask of `type` with a unique default name ("Brush 1", "Sky 1", …),
-   * appends it and selects it. Returns the new id, or `null` if the cap blocked
-   * it (checked here so the caller gets an accurate result before dispatch).
+   * appends it and selects it. AI masks additionally kick off their
+   * segmentation. Returns the new id, or `null` if the cap blocked it (checked
+   * here so the caller gets an accurate result before dispatch).
    */
   const addMask = (type: MaskType): string | null => {
     if (state.masks.length >= MAX_MASKS) return null
     const sameType = state.masks.filter((mask) => mask.type === type).length
     const mask = createMask(type, `${MASK_TYPE_LABEL[type]} ${sameType + 1}`)
     dispatch({ type: 'ADD_MASK', mask })
+    if (type !== 'brush') {
+      // `mask` is brand new, so its version is known here without reading state.
+      void runSegmentation(mask.id, type, mask.version + 1)
+    }
     return mask.id
+  }
+
+  /**
+   * Runs a mask's segmentation again after a failure. Reads the mask's current
+   * version from state — safe here, because this is called from an event
+   * handler, where `state` is the freshly rendered snapshot.
+   *
+   * @param id - The mask to retry. Ignored if it is gone or is a brush.
+   */
+  const retryMask = (id: string): void => {
+    const mask = state.masks.find((candidate) => candidate.id === id)
+    if (mask === undefined || mask.type === 'brush') return
+    void runSegmentation(id, mask.type, mask.version + 1)
   }
 
   const removeMask = (id: string) => {
@@ -193,6 +285,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
         addBrushStroke,
         maskOverlayHidden,
         setMaskOverlayHidden,
+        maskAlphas,
+        maskStatus,
+        modelProgress,
+        retryMask,
       }}
     >
       {children}

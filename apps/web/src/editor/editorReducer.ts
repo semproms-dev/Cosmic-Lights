@@ -60,6 +60,7 @@ export type EditorAction =
   | { type: 'SET_MASK_INVERT'; id: string; invert: boolean }
   | { type: 'RENAME_MASK'; id: string; name: string }
   | { type: 'ADD_BRUSH_STROKE'; id: string; stroke: BrushStroke }
+  | { type: 'SET_MASK_VERSION'; id: string; version: number }
   | { type: 'UNDO' }
   | { type: 'REDO' }
   | { type: 'COMMIT' }
@@ -190,6 +191,18 @@ export function editorReducer(
           strokes: [...mask.strokes, action.stroke],
           // Bump the pixel-data revision so the cached alpha is rebuilt.
           version: mask.version + 1,
+        })),
+        imageDirty: true,
+      }
+    case 'SET_MASK_VERSION':
+      // Announces that a generated alpha is ready in the alpha cache under this
+      // exact version. The caller picks the number so the cache entry and the
+      // mask cannot disagree; the renderer only uploads when the two match.
+      return {
+        ...state,
+        masks: updateMask(state.masks, action.id, (mask) => ({
+          ...mask,
+          version: action.version,
         })),
         imageDirty: true,
       }

@@ -266,6 +266,35 @@ describe('editorReducer — masks', () => {
     expect(next.imageDirty).toBe(true)
   })
 
+  it('SET_MASK_VERSION publishes the exact version it is given', () => {
+    const mask = createMask('subject', 'Subject 1')
+    const state = createState({ masks: [mask] })
+
+    const next = editorReducer(state, { type: 'SET_MASK_VERSION', id: mask.id, version: 7 })
+
+    expect(next.masks[0].version).toBe(7)
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('SET_MASK_VERSION leaves other masks alone', () => {
+    const target = createMask('subject', 'Subject 1')
+    const other = createMask('brush', 'Brush 1')
+    const state = createState({ masks: [target, other] })
+
+    const next = editorReducer(state, { type: 'SET_MASK_VERSION', id: target.id, version: 3 })
+
+    expect(next.masks[1].version).toBe(other.version)
+  })
+
+  it('SET_MASK_VERSION ignores an unknown mask id', () => {
+    const mask = createMask('subject', 'Subject 1')
+    const state = createState({ masks: [mask] })
+
+    const next = editorReducer(state, { type: 'SET_MASK_VERSION', id: 'nope', version: 5 })
+
+    expect(next.masks[0].version).toBe(mask.version)
+  })
+
   it('SET_ACTIVE_MASK selects and clears', () => {
     const mask = createMask('brush', 'Brush 1')
     const state = createState({ masks: [mask] })

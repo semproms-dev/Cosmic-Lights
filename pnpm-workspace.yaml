@@ -1,0 +1,13 @@
+packages:
+  - 'apps/*'
+
+# Pulled in by @huggingface/transformers, but only used when it runs under Node.
+# CosmicLights runs it in the browser (WebGPU/WASM), so none of these need to build.
+allowBuilds:
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false
+
+onlyBuiltDependencies:
+  - '@swc/core'
+  - unrs-resolver

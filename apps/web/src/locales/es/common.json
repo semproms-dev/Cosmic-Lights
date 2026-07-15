@@ -100,7 +100,11 @@
     "radialGradient": "Degradado radial",
     "colorRange": "Rango de color",
     "luminanceRange": "Rango de luminancia",
-    "depthRange": "Rango de profundidad"
+    "depthRange": "Rango de profundidad",
+    "segmenting": "Segmentando…",
+    "downloadingModel": "Descargando modelo… {{progress}} %",
+    "retry": "Reintentar",
+    "segmentFailed": "La segmentación ha fallado"
   },
   "curves": {
     "resetChannel": "Restablecer canal",

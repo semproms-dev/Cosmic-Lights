@@ -100,7 +100,11 @@
     "radialGradient": "Radialer Verlauf",
     "colorRange": "Farbbereich",
     "luminanceRange": "Luminanzbereich",
-    "depthRange": "Tiefenbereich"
+    "depthRange": "Tiefenbereich",
+    "segmenting": "Segmentierung läuft…",
+    "downloadingModel": "Modell wird geladen… {{progress}} %",
+    "retry": "Erneut versuchen",
+    "segmentFailed": "Segmentierung fehlgeschlagen"
   },
   "curves": {
     "resetChannel": "Kanal zurücksetzen",

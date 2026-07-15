@@ -50,7 +50,7 @@ interface CanvasProps {
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = null }: CanvasProps) {
-  const { image, adjustments, curves, masks, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog, addBrushStroke, commit } = useEditor()
+  const { image, adjustments, curves, masks, maskAlphas, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog, addBrushStroke, commit } = useEditor()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
   const { showContextMenu } = useContextMenu()
@@ -148,7 +148,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
         clarity: adjustments.clarity ?? 0,
         dehaze: adjustments.dehaze ?? 0,
         texture: adjustments.texture ?? 0,
-      }, masks, overlayMaskId, width, height)
+      }, masks, maskAlphas.current, overlayMaskId, width, height)
     }
     // Expose the latest draw so live brush painting can force a redraw (painting
     // changes no React state, so the effect alone wouldn't re-run).
@@ -169,7 +169,9 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
         cancelAnimationFrame(frame)
       }
     }
-  }, [image, adjustments, curves, masks, cropRegion, view, cropping, overlayMaskId])
+    // `maskAlphas` is a stable ref-backed Map, so it never fires this effect on
+    // its own: `masks` (via each mask's `version`) is what signals a new alpha.
+  }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId])
 
   // Zoom toward a point (in clip space, −1..1) by a scale factor, keeping the
   // content under that point fixed. Clip space matches the renderer's view
