@@ -1,4 +1,5 @@
-import { createContext, use, type RefObject } from 'react'
+import { createContext, use, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import type { CanvasView } from './crop'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
 import type { BrushStroke, Mask, MaskType } from './masks'
@@ -113,6 +114,16 @@ export interface EditorState {
   modelProgress: number | null
   /** Re-runs the segmentation of a failed AI mask. */
   retryMask: (id: string) => void
+  /**
+   * The canvas' interactive zoom/pan. Transient view state, never undoable.
+   *
+   * It lives here rather than inside `Canvas` because anything drawn *over* the
+   * canvas (the crop overlay) has to undo the same transform to know which image
+   * pixel is under the pointer.
+   */
+  view: CanvasView
+  /** Replaces the zoom/pan. Accepts an updater, like `useState`. */
+  setView: Dispatch<SetStateAction<CanvasView>>
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

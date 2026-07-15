@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint } from './curves'
 import { rgbToRgba, type CropRegion } from './image'
+import { IDENTITY_VIEW, type CanvasView } from './crop'
 import { decodeRaw } from './decodeRaw'
 import { EditorContext } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
@@ -51,6 +52,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // Transient UI: hide the red mask overlay while a mask slider is being dragged
   // so the change is visible. Not part of the editor store (never undoable).
   const [maskOverlayHidden, setMaskOverlayHidden] = useState(false)
+
+  // Canvas zoom/pan. Transient (never undoable), but shared: the crop overlay
+  // draws on top of the canvas and must undo the very same transform.
+  const [view, setView] = useState<CanvasView>(IDENTITY_VIEW)
 
   // Generated alphas for AI masks. A ref, not state: the pixels are heavy and
   // must stay out of the undo history, which only tracks each mask's `version`.
@@ -289,6 +294,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         maskStatus,
         modelProgress,
         retryMask,
+        view,
+        setView,
       }}
     >
       {children}

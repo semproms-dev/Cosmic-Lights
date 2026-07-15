@@ -31,6 +31,88 @@ export interface DisplayRect {
 }
 
 /**
+ * The interactive zoom/pan the renderer folds into its letterbox, in clip space:
+ * a point at `p` is drawn at `p * scale + offset`.
+ */
+export interface CanvasView {
+  scale: number
+  offsetX: number
+  offsetY: number
+}
+
+/** Fit-to-canvas, no zoom, no pan. */
+export const IDENTITY_VIEW: CanvasView = { scale: 1, offsetX: 0, offsetY: 0 }
+
+/**
+ * Undoes the zoom/pan: turns a point where the user actually clicked into the
+ * point it would occupy in the fitted, un-zoomed layout.
+ *
+ * Everything else in this module (the letterbox, {@link canvasToImageCoords})
+ * assumes that fitted layout, so any pointer position must come through here
+ * first or the mapping is off by exactly the zoom factor.
+ *
+ * @param point - Position in container/CSS pixels, as the pointer reports it.
+ * @param containerWidth - Container width in CSS pixels.
+ * @param containerHeight - Container height in CSS pixels.
+ * @param view - The active zoom/pan.
+ * @returns The same position in the fitted layout's pixels.
+ */
+export const viewToBasePoint = (
+  point: { x: number; y: number },
+  containerWidth: number,
+  containerHeight: number,
+  view: CanvasView,
+): { x: number; y: number } => {
+  const clipX = (point.x / containerWidth) * 2 - 1
+  const clipY = 1 - (point.y / containerHeight) * 2
+  const baseX = (clipX - view.offsetX) / view.scale
+  const baseY = (clipY - view.offsetY) / view.scale
+  return {
+    x: ((baseX + 1) / 2) * containerWidth,
+    y: ((1 - baseY) / 2) * containerHeight,
+  }
+}
+
+/**
+ * Applies the zoom/pan: the inverse of {@link viewToBasePoint}. Use it to draw
+ * something computed in the fitted layout where the user can actually see it.
+ */
+export const baseToViewPoint = (
+  point: { x: number; y: number },
+  containerWidth: number,
+  containerHeight: number,
+  view: CanvasView,
+): { x: number; y: number } => {
+  const baseX = (point.x / containerWidth) * 2 - 1
+  const baseY = 1 - (point.y / containerHeight) * 2
+  const clipX = baseX * view.scale + view.offsetX
+  const clipY = baseY * view.scale + view.offsetY
+  return {
+    x: ((clipX + 1) / 2) * containerWidth,
+    y: ((1 - clipY) / 2) * containerHeight,
+  }
+}
+
+/**
+ * Applies the zoom/pan to a whole rectangle. The zoom is uniform on both axes,
+ * so the size just scales.
+ */
+export const baseToViewRect = (
+  rect: DisplayRect,
+  containerWidth: number,
+  containerHeight: number,
+  view: CanvasView,
+): DisplayRect => {
+  const origin = baseToViewPoint(rect, containerWidth, containerHeight, view)
+  return {
+    x: origin.x,
+    y: origin.y,
+    width: rect.width * view.scale,
+    height: rect.height * view.scale,
+  }
+}
+
+/**
  * The rectangle (in container/CSS pixels) that a letterboxed image occupies
  * inside a container of the given size. Mirrors the renderer's Pass 4 letterbox
  * math (`renderer.ts` ~lines 387-398): the image is centered and scaled to fit
@@ -106,6 +188,67 @@ export const canvasToImageCoords = (
     x: ((point.x - disp.x) / disp.width) * imageWidth,
     y: ((point.y - disp.y) / disp.height) * imageHeight,
   }
+}
+
+/**
+ * Maps a pointer position to image pixels, honouring everything the renderer
+ * does to get the image on screen — in the same order, inverted.
+ *
+ * There are two transforms between a click and a pixel, and missing either one
+ * fails silently (the mark simply lands somewhere else):
+ *
+ * 1. the interactive zoom/pan ({@link viewToBasePoint}), and
+ * 2. the letterbox — which fits the **crop region** when one is applied, not the
+ *    full frame, so a cropped image maps through the crop's own box.
+ *
+ * Anything that turns a pointer into an image pixel must come through here, or
+ * it will quietly disagree with what the user sees.
+ *
+ * @param point - Pointer position in container/CSS pixels.
+ * @param containerWidth - Container width in CSS pixels.
+ * @param containerHeight - Container height in CSS pixels.
+ * @param imageWidth - Full image width in pixels.
+ * @param imageHeight - Full image height in pixels.
+ * @param crop - The crop the canvas is *currently displaying*, or `null` for the
+ * full frame. Pass `null` while the crop tool is open: it shows the full frame.
+ * @param view - The active zoom/pan.
+ * @returns The position in full-image pixels.
+ */
+export const pointerToImagePoint = (
+  point: { x: number; y: number },
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+  crop: CropRegion | null,
+  view: CanvasView,
+): { x: number; y: number } => {
+  const base = viewToBasePoint(point, containerWidth, containerHeight, view)
+  if (crop === null) {
+    return canvasToImageCoords(base, imageWidth, imageHeight, containerWidth, containerHeight)
+  }
+  // The canvas shows the crop letterboxed by its own aspect, so map into the
+  // crop's box and then shift by where that box sits in the image.
+  const inCrop = canvasToImageCoords(base, crop.width, crop.height, containerWidth, containerHeight)
+  return { x: crop.x + inCrop.x, y: crop.y + inCrop.y }
+}
+
+/**
+ * The scale from image pixels to CSS pixels on screen — what the canvas is
+ * showing, so the crop region when one is applied. Use it to size anything drawn
+ * in screen space from an image-space measurement (e.g. the brush cursor).
+ */
+export const displayScale = (
+  imageWidth: number,
+  imageHeight: number,
+  containerWidth: number,
+  containerHeight: number,
+  crop: CropRegion | null,
+  view: CanvasView,
+): number => {
+  const width = crop?.width ?? imageWidth
+  const height = crop?.height ?? imageHeight
+  return Math.min(containerWidth / width, containerHeight / height) * view.scale
 }
 
 /**

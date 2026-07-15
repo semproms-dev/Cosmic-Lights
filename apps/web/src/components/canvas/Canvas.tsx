@@ -7,7 +7,7 @@ import { useContextMenu } from 'mantine-contextmenu'
 import { IconZoomReset } from '@tabler/icons-react'
 import { ConfirmDialog } from '../window/ConfirmDialog'
 import { clampZoom } from '../../utils'
-import { canvasToImageCoords } from '../../editor/crop'
+import { displayScale, IDENTITY_VIEW, pointerToImagePoint } from '../../editor/crop'
 import type { MaskPoint } from '../../editor/masks'
 import { DropOverlay } from './DropOverlay'
 import { isRawFile } from './rawFormats'
@@ -18,9 +18,6 @@ const BRUSH_HARDNESS = 0.5
 
 /** Per wheel notch, the fitted image grows/shrinks by this factor. */
 const ZOOM_STEP = 1.1
-
-/** Identity view: the whole image fitted to the canvas, centred. */
-const DEFAULT_VIEW = { scale: 1, offsetX: 0, offsetY: 0 }
 
 interface CanvasProps {
   /**
@@ -50,11 +47,10 @@ interface CanvasProps {
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = null }: CanvasProps) {
-  const { image, adjustments, curves, masks, maskAlphas, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog, addBrushStroke, commit } = useEditor()
+  const { image, adjustments, curves, masks, maskAlphas, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog, addBrushStroke, commit, view, setView } = useEditor()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
   const { showContextMenu } = useContextMenu()
-  const [view, setView] = useState(DEFAULT_VIEW)
   // Holds the last pointer position while panning; null when not dragging.
   const panRef = useRef<{ x: number; y: number } | null>(null)
   // Redraws the scene on demand (set by the render effect). Live brush painting
@@ -188,7 +184,9 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
         offsetY: cursorY - worldY * newScale,
       }
     })
-  }, [])
+    // `setView` is a `useState` setter reached through the context, so its
+    // identity is stable; it is declared only to satisfy the exhaustive-deps rule.
+  }, [setView])
 
   // Wheel-to-zoom. Registered natively (not via onWheel) so the listener can be
   // non-passive and preventDefault the page scroll while zooming.
@@ -210,24 +208,23 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     return () => canvas.removeEventListener('wheel', handleWheel)
   }, [zoomAtPoint])
 
-  // Pointer position → image pixels, through the fitted-letterbox mapping (same
-  // helper the crop overlay uses; assumes the non-zoomed view).
+  /**
+   * What the canvas is currently showing: the full frame while the crop tool is
+   * open (the overlay needs it), the committed crop otherwise. Mirrors the
+   * `setCrop` call in the draw effect — the two must agree or the pointer maps
+   * to a different pixel than the one under it.
+   */
+  const shownCrop = cropping ? null : cropRegion
+
+  // Pointer position → image pixels, undoing the zoom/pan and the crop letterbox.
   const toImagePoint = (e: React.PointerEvent<HTMLCanvasElement>): MaskPoint | null => {
     if (image === null) return null
     const rect = e.currentTarget.getBoundingClientRect()
-    const px = e.clientX - rect.left
-    const py = e.clientY - rect.top
-    // Undo the interactive view transform (zoom/pan), applied by the renderer in
-    // clip space, before the fit-to-canvas mapping (which assumes identity view).
-    const clipX = (px / rect.width) * 2 - 1
-    const clipY = 1 - (py / rect.height) * 2
-    const baseX = (clipX - view.offsetX) / view.scale
-    const baseY = (clipY - view.offsetY) / view.scale
-    const basePx = ((baseX + 1) / 2) * rect.width
-    const basePy = ((1 - baseY) / 2) * rect.height
-    return canvasToImageCoords(
-      { x: basePx, y: basePy },
-      image.width, image.height, rect.width, rect.height,
+    return pointerToImagePoint(
+      { x: e.clientX - rect.left, y: e.clientY - rect.top },
+      rect.width, rect.height,
+      image.width, image.height,
+      shownCrop, view,
     )
   }
 
@@ -236,15 +233,15 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     image === null ? 0 : BRUSH_RADIUS_FRACTION * Math.min(image.width, image.height)
 
   // Updates the brush cursor ring: converts the image-space radius to CSS px via
-  // the fit-to-canvas scale (matching how painting maps coordinates).
+  // the same display scale the painting uses, so the ring matches what it paints.
   const updateBrushCursor = (e: React.PointerEvent<HTMLCanvasElement>): void => {
     if (image === null) return
     const rect = e.currentTarget.getBoundingClientRect()
-    const fit = Math.min(rect.width / image.width, rect.height / image.height)
+    const scale = displayScale(image.width, image.height, rect.width, rect.height, shownCrop, view)
     setBrushCursor({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
-      d: brushRadius() * 2 * fit * view.scale,
+      d: brushRadius() * 2 * scale,
     })
   }
 
@@ -314,7 +311,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     resetCurves();
     clearCrop();
     closeResetDialog();
-    setView(DEFAULT_VIEW);
+    setView(IDENTITY_VIEW);
   }
 
   return <>
@@ -330,7 +327,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={() => setBrushCursor(null)}
-      onDoubleClick={() => setView(DEFAULT_VIEW)}
+      onDoubleClick={() => setView(IDENTITY_VIEW)}
       ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : 'default' }} />
 
     <DropOverlay imageLoaded={image !== null} onDropFile={handleDropFile} />

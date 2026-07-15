@@ -7,6 +7,9 @@ import {
   clampCropRegion,
   constrainAspectRatio,
   imageToCanvasCoords,
+  baseToViewRect,
+  viewToBasePoint,
+  IDENTITY_VIEW,
   parseAspectRatio,
 } from "./crop"
 
@@ -44,7 +47,7 @@ interface CropOverlayProps {
  * store and calls `onDone`, `Escape` discards it.
  */
 export function CropOverlay({ onDone }: CropOverlayProps) {
-  const { image, cropRegion, setCrop, cropRatio, commit } = useEditor()
+  const { image, cropRegion, setCrop, cropRatio, commit, view, setView } = useEditor()
   const ref = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -104,6 +107,13 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
   // Grab keyboard focus on mount so Enter/Escape reach onKeyDown right away.
   useEffect(() => { ref.current?.focus() }, [])
 
+  // Fit the image on entering the tool. The crop frame spans the whole image, so
+  // under any zoom its edges sit outside the viewport and the overlay is simply
+  // not there to grab — and it cannot be recovered, because this overlay covers
+  // the canvas that listens for wheel/drag, freezing the view while it is up.
+  // Lightroom fits on entering Crop for the same reason.
+  useEffect(() => { setView(IDENTITY_VIEW) }, [setView])
+
   // Commit the pending draft when the overlay unmounts — i.e. when the user
   // leaves the Crop tool. The draft is otherwise local and would be discarded on
   // unmount, so without this the crop only applies via Enter (and never at all
@@ -132,10 +142,13 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
   /** Current pointer position in image px. */
   const toImage = (e: React.PointerEvent) => {
     const box = ref.current!.getBoundingClientRect()
-    return canvasToImageCoords(
+    // Undo the canvas' zoom/pan first: everything below assumes the fitted
+    // layout, so without this the mapping is off by exactly the zoom factor.
+    const base = viewToBasePoint(
       { x: e.clientX - box.left, y: e.clientY - box.top },
-      image.width, image.height, size.w, size.h,
+      size.w, size.h, view,
     )
+    return canvasToImageCoords(base, image.width, image.height, size.w, size.h)
   }
 
   const startMove = (e: React.PointerEvent) => {
@@ -210,7 +223,12 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
     if (e.key === 'Escape') setDraft(cropRegion)
   }
 
-  const rect = imageToCanvasCoords(region, image.width, image.height, size.w, size.h)
+  // Where the crop sits in the fitted layout, then where that actually lands on
+  // screen once the canvas' zoom/pan is applied — the frame must track the image.
+  const rect = baseToViewRect(
+    imageToCanvasCoords(region, image.width, image.height, size.w, size.h),
+    size.w, size.h, view,
+  )
   const { x: rx, y: ry, width: rw, height: rh } = rect
   const ready = size.w > 0 && size.h > 0
 
@@ -225,11 +243,14 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
     >
       {ready && (
         <svg width="100%" height="100%" style={{ display: 'block' }}>
-          {/* Dark mask outside the crop — 4 rects (simplest to reason about). */}
-          <rect x={0}       y={0}       width={size.w}            height={ry}                fill="black" opacity={0.5} />
-          <rect x={0}       y={ry + rh} width={size.w}            height={size.h - ry - rh}  fill="black" opacity={0.5} />
-          <rect x={0}       y={ry}      width={rx}                height={rh}                fill="black" opacity={0.5} />
-          <rect x={rx + rw} y={ry}      width={size.w - rx - rw}  height={rh}                fill="black" opacity={0.5} />
+          {/* Dark mask outside the crop — 4 rects (simplest to reason about).
+              Sizes are clamped at 0: when the frame overflows the container a
+              band can compute negative, and SVG silently drops such a rect —
+              i.e. the dimming would vanish rather than degrade. */}
+          <rect x={0}       y={0}       width={size.w}                        height={Math.max(0, ry)}               fill="black" opacity={0.5} />
+          <rect x={0}       y={ry + rh} width={size.w}                        height={Math.max(0, size.h - ry - rh)} fill="black" opacity={0.5} />
+          <rect x={0}       y={ry}      width={Math.max(0, rx)}               height={rh}                            fill="black" opacity={0.5} />
+          <rect x={rx + rw} y={ry}      width={Math.max(0, size.w - rx - rw)} height={rh}                            fill="black" opacity={0.5} />
 
           {/* Frame body — transparent fill so the interior is draggable to move. */}
           <rect

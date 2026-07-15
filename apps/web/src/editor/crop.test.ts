@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest'
 import type { CropRegion } from './image'
 import {
   anchorForHandle,
+  baseToViewPoint,
+  baseToViewRect,
   canvasToImageCoords,
   clampCropRegion,
   constrainAspectRatio,
   cropToUvTransform,
+  displayScale,
+  IDENTITY_VIEW,
+  pointerToImagePoint,
+  viewToBasePoint,
   getImageDisplayRect,
   imageToCanvasCoords,
   parseAspectRatio,
@@ -220,5 +226,139 @@ describe('anchorForHandle', () => {
     expect(anchorForHandle(0.5, 1)).toBe('top')
     expect(anchorForHandle(0, 0.5)).toBe('right')
     expect(anchorForHandle(1, 0.5)).toBe('left')
+  })
+})
+
+describe('view transforms', () => {
+  const zoomedIn = { scale: 2, offsetX: 0, offsetY: 0 }
+
+  it('changes nothing at the identity view', () => {
+    expect(viewToBasePoint({ x: 750, y: 250 }, 1000, 1000, IDENTITY_VIEW)).toEqual({ x: 750, y: 250 })
+  })
+
+  it('halves the distance from the centre at 2x zoom', () => {
+    // The centre is fixed: it is the one point the zoom does not move.
+    expect(viewToBasePoint({ x: 500, y: 500 }, 1000, 1000, zoomedIn)).toEqual({ x: 500, y: 500 })
+    // 750 is 250 right of centre on screen; at 2x that is 125 in the image.
+    expect(viewToBasePoint({ x: 750, y: 500 }, 1000, 1000, zoomedIn)).toEqual({ x: 625, y: 500 })
+  })
+
+  it('accounts for a pan', () => {
+    // offsetX 0.5 shifts the content a quarter of the width to the right, so
+    // the content under screen-centre is a quarter-width left of the middle.
+    const panned = { scale: 1, offsetX: 0.5, offsetY: 0 }
+    expect(viewToBasePoint({ x: 500, y: 500 }, 1000, 1000, panned)).toEqual({ x: 250, y: 500 })
+  })
+
+  it('round-trips back to the screen point it came from', () => {
+    const view = { scale: 3.7, offsetX: -0.4, offsetY: 0.25 }
+    const screen = { x: 321, y: 654 }
+    const base = viewToBasePoint(screen, 800, 1000, view)
+    const back = baseToViewPoint(base, 800, 1000, view)
+    expect(back.x).toBeCloseTo(screen.x, 6)
+    expect(back.y).toBeCloseTo(screen.y, 6)
+  })
+
+  it('scales a rectangle uniformly and moves its origin', () => {
+    const rect = baseToViewRect({ x: 500, y: 500, width: 100, height: 50 }, 1000, 1000, zoomedIn)
+    expect(rect.width).toBe(200)
+    expect(rect.height).toBe(100)
+    // The origin was at the centre, the one point the zoom leaves alone.
+    expect(rect.x).toBeCloseTo(500, 6)
+    expect(rect.y).toBeCloseTo(500, 6)
+  })
+
+  it('regression: a zoomed crop selects what is under the box, not more', () => {
+    // The bug: the overlay mapped the pointer straight through the fitted
+    // letterbox, ignoring the zoom, so the region came out `scale` times too
+    // big and the crop kept more of the image than the box showed.
+    const image = { width: 1000, height: 1000 }
+    const withoutView = canvasToImageCoords({ x: 750, y: 500 }, image.width, image.height, 1000, 1000)
+    const withView = canvasToImageCoords(
+      viewToBasePoint({ x: 750, y: 500 }, 1000, 1000, zoomedIn),
+      image.width, image.height, 1000, 1000,
+    )
+    expect(withoutView.x).toBe(750) // what the old code selected
+    expect(withView.x).toBe(625)    // the pixel actually under the pointer
+  })
+})
+
+describe('pointerToImagePoint', () => {
+  // 4000x3000 image in a 1000x750 container: same aspect, so no letterbox bars.
+  const image = { width: 4000, height: 3000 }
+  const container = { w: 1000, h: 750 }
+  const centredCrop = { x: 1000, y: 750, width: 2000, height: 1500 }
+
+  it('matches the plain letterbox mapping when nothing is cropped or zoomed', () => {
+    const p = pointerToImagePoint(
+      { x: 500, y: 375 }, container.w, container.h,
+      image.width, image.height, null, IDENTITY_VIEW,
+    )
+    expect(p).toEqual({ x: 2000, y: 1500 })
+  })
+
+  it('regression: honours the crop the canvas is actually showing', () => {
+    // The bug: the brush mapped through the FULL image while the renderer was
+    // displaying only the crop, so every mark landed off by the crop's origin.
+    const p = pointerToImagePoint(
+      { x: 0, y: 0 }, container.w, container.h,
+      image.width, image.height, centredCrop, IDENTITY_VIEW,
+    )
+    // The canvas' top-left corner shows the crop's top-left corner.
+    expect(p).toEqual({ x: 1000, y: 750 })
+  })
+
+  it('maps the far corner of a crop to the crop far corner', () => {
+    const p = pointerToImagePoint(
+      { x: 1000, y: 750 }, container.w, container.h,
+      image.width, image.height, centredCrop, IDENTITY_VIEW,
+    )
+    expect(p.x).toBeCloseTo(3000, 6)
+    expect(p.y).toBeCloseTo(2250, 6)
+  })
+
+  it('composes the crop with the zoom', () => {
+    const zoomed = { scale: 2, offsetX: 0, offsetY: 0 }
+    // Screen centre is fixed by the zoom, and is the crop centre.
+    const centre = pointerToImagePoint(
+      { x: 500, y: 375 }, container.w, container.h,
+      image.width, image.height, centredCrop, zoomed,
+    )
+    expect(centre.x).toBeCloseTo(2000, 6)
+    expect(centre.y).toBeCloseTo(1500, 6)
+    // A quarter-width right of centre on screen is an eighth of the crop at 2x.
+    const off = pointerToImagePoint(
+      { x: 750, y: 375 }, container.w, container.h,
+      image.width, image.height, centredCrop, zoomed,
+    )
+    expect(off.x).toBeCloseTo(2000 + centredCrop.width / 8, 6)
+  })
+
+  it('letterboxes a crop whose aspect differs from the container', () => {
+    // A square crop in a 4:3 container gets bars left and right.
+    const square = { x: 0, y: 0, width: 1500, height: 1500 }
+    const p = pointerToImagePoint(
+      { x: 500, y: 375 }, container.w, container.h,
+      image.width, image.height, square, IDENTITY_VIEW,
+    )
+    expect(p.x).toBeCloseTo(750, 6)
+    expect(p.y).toBeCloseTo(750, 6)
+  })
+})
+
+describe('displayScale', () => {
+  it('is the fit-to-container scale with no crop and no zoom', () => {
+    expect(displayScale(4000, 3000, 1000, 750, null, IDENTITY_VIEW)).toBeCloseTo(0.25, 6)
+  })
+
+  it('grows when a crop fills the container', () => {
+    // Half-size crop => it is displayed twice as large as the full frame was.
+    const crop = { x: 1000, y: 750, width: 2000, height: 1500 }
+    expect(displayScale(4000, 3000, 1000, 750, crop, IDENTITY_VIEW)).toBeCloseTo(0.5, 6)
+  })
+
+  it('multiplies by the zoom', () => {
+    const view = { scale: 3, offsetX: 0, offsetY: 0 }
+    expect(displayScale(4000, 3000, 1000, 750, null, view)).toBeCloseTo(0.75, 6)
   })
 })

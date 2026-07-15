@@ -5,13 +5,15 @@ import type { CropRegion } from './image'
 // Controlled editor store: the test drives `image`/`cropRegion`/`cropRatio` and
 // spies on `setCrop`/`commit` to observe when the overlay applies and checkpoints
 // the crop. `vi.hoisted` keeps the refs available to the (hoisted) `vi.mock` factory.
-const { setCrop, commit, state } = vi.hoisted(() => ({
+const { setCrop, commit, setView, state } = vi.hoisted(() => ({
   setCrop: vi.fn(),
   commit: vi.fn(),
+  setView: vi.fn(),
   state: {
     image: null as { width: number; height: number } | null,
     cropRegion: null as CropRegion | null,
     cropRatio: 'Original',
+    view: { scale: 1, offsetX: 0, offsetY: 0 },
   },
 }))
 
@@ -20,8 +22,10 @@ vi.mock('./editorContext', () => ({
     image: state.image,
     cropRegion: state.cropRegion,
     cropRatio: state.cropRatio,
+    view: state.view,
     setCrop,
     commit,
+    setView,
   }),
 }))
 
@@ -31,9 +35,22 @@ describe('CropOverlay', () => {
   beforeEach(() => {
     setCrop.mockClear()
     commit.mockClear()
+    setView.mockClear()
     state.image = { width: 4000, height: 3000 }
     state.cropRegion = null
     state.cropRatio = 'Original'
+    state.view = { scale: 1, offsetX: 0, offsetY: 0 }
+  })
+
+  it('fits the image on entering the tool', () => {
+    // The crop frame spans the whole image: under zoom its edges fall outside
+    // the viewport, leaving nothing on screen to grab — and the overlay covers
+    // the canvas that listens for wheel/drag, so the zoom cannot be undone.
+    state.view = { scale: 2.5, offsetX: 0.3, offsetY: 0 }
+
+    render(<CropOverlay onDone={() => {}} />)
+
+    expect(setView).toHaveBeenCalledWith({ scale: 1, offsetX: 0, offsetY: 0 })
   })
 
   it('keeps the crop local while editing, then applies it when it unmounts (leaving the tool)', () => {

@@ -43,7 +43,6 @@ interface AddOption {
 
 const ADD_OPTIONS: AddOption[] = [
   { type: 'subject', labelKey: 'selectSubject', icon: IconUser },
-  { type: 'sky', labelKey: 'selectSky', icon: IconCloud },
   { type: 'brush', labelKey: 'brush', icon: IconBrush },
   { type: null, labelKey: 'linearGradient', icon: IconLine, disabled: true },
   { type: null, labelKey: 'radialGradient', icon: IconCircleDot, disabled: true },
