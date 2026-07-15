@@ -8,27 +8,26 @@ afterEach(() => {
   localStorage.clear();
 });
 
-// A Mantine Select renders both a visible input and a hidden one under the same
-// label, so queries must target the visible input explicitly.
+// Mantine's NumberInput wraps the native <input> in a div; query by label text
+// targeting the visible input.
 const VISIBLE_INPUT = { selector: 'input:not([type="hidden"])' } as const;
 
 describe('General preferences', () => {
   it('renders the controls at their default values', () => {
     render(<General />);
 
-    expect(screen.getByLabelText('Panel position', VISIBLE_INPUT)).toHaveValue('Right');
-    expect(screen.getByLabelText('Dark theme')).toBeChecked();
-    expect(screen.getByLabelText('Font')).toHaveValue('14');
+    expect(screen.getByRole('radio', { name: 'Right', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Dark theme' })).toBeChecked();
+    expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('14');
   });
 
   it('persists the chosen panel position', async () => {
     const user = userEvent.setup();
     render(<General />);
 
-    await user.click(screen.getByLabelText('Panel position', VISIBLE_INPUT));
-    await user.click(await screen.findByRole('option', { name: 'Left', hidden: true }));
+    await user.click(screen.getByRole('radio', { name: 'Left' }));
 
-    expect(screen.getByLabelText('Panel position', VISIBLE_INPUT)).toHaveValue('Left');
+    expect(screen.getByRole('radio', { name: 'Left', checked: true })).toBeInTheDocument();
     expect(loadPreferences().panelPosition).toBe('left');
   });
 
@@ -36,7 +35,7 @@ describe('General preferences', () => {
     const user = userEvent.setup();
     render(<General />);
 
-    const themeSwitch = screen.getByLabelText('Dark theme');
+    const themeSwitch = screen.getByRole('switch', { name: 'Dark theme' });
     expect(themeSwitch).toBeChecked();
 
     await user.click(themeSwitch);
@@ -47,9 +46,9 @@ describe('General preferences', () => {
   it('persists the font size', () => {
     render(<General />);
 
-    fireEvent.change(screen.getByLabelText('Font'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Font', VISIBLE_INPUT), { target: { value: '20' } });
 
-    expect(screen.getByLabelText('Font')).toHaveValue('20');
+    expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('20');
     expect(loadPreferences().fontSize).toBe(20);
   });
 });

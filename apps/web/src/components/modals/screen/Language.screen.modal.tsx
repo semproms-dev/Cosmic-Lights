@@ -6,11 +6,13 @@ const LANGUAGES = [
   { value: 'de', label: 'Deutsch' },
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Castellano' },
+  { value: 'fr', label: 'Français' },
+  { value: 'it', label: 'Italiano' },
 ];
 
 /**
  * Language preferences tab: picks the interface language. The choice is
- * persisted; wiring it to actual translations is future work.
+ * persisted and synced with the i18n runtime.
  */
 export function Language() {
   const { preferences, setLanguage } = usePreferences();

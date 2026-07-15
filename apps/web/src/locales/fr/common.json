@@ -1,0 +1,132 @@
+{
+  "labels": {
+    "exposure": "Assombrir ou éclaircir l'image globale",
+    "contrast": "La différence de luminosité entre les zones claires et sombres d'une image",
+    "highlights": "Augmenter ou diminuer les parties claires de l'image",
+    "shadows": "Contrôle la luminosité des zones les plus sombres de votre photo",
+    "whites": "Modifier la luminosité globale d'une image ainsi que le point blanc",
+    "blacks": "Contrôle les pixels les plus sombres de votre image ainsi que le point noir",
+    "temperature": "Déplacer les couleurs entre les tons chauds (jaune) et froids (bleu)",
+    "tint": "Déplacer les couleurs entre les tons verts et magenta",
+    "vibrance": "Augmenter l'intensité des couleurs ternes tout en protégeant celles déjà saturées",
+    "saturation": "Augmenter ou diminuer l'intensité de toutes les couleurs de façon égale",
+    "clarity": "Ajouter ou retirer du contraste des tons moyens pour un rendu plus marqué ou plus doux",
+    "dehaze": "Supprimer ou ajouter de la brume atmosphérique à l'image",
+    "texture": "Rehausser ou adoucir les détails fins et les motifs de surface"
+  },
+  "groups": {
+    "basic": "Basique",
+    "whiteBalance": "Balance des blancs",
+    "presence": "Présence",
+    "color": "Couleur",
+    "details": "Détails",
+    "curves": "Courbes"
+  },
+  "nav": {
+    "info": "Info",
+    "adjustments": "Ajustements",
+    "masks": "Masques",
+    "crop": "Recadrer",
+    "shortcuts": "Raccourcis",
+    "export": "Exporter"
+  },
+  "topNav": {
+    "file": "Fichier",
+    "open": "Ouvrir...",
+    "exportJpg": "Exporter en JPG...",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "settings": "Paramètres",
+    "about": "À propos"
+  },
+  "lateralNavBar": {
+    "exposure": "Exposition",
+    "contrast": "Contraste",
+    "highlights": "Hautes lumières",
+    "shadows": "Ombres",
+    "whites": "Blancs",
+    "blacks": "Noirs",
+    "temperature": "Température",
+    "tint": "Teinte",
+    "clarity": "Clarté",
+    "dehaze": "Correction du voile"
+  },
+  "settings": {
+    "general": "Général",
+    "language": "Langue",
+    "panelPosition": "Position du panneau",
+    "left": "Gauche",
+    "right": "Droite",
+    "darkTheme": "Thème sombre",
+    "helpers": "Activer les aides",
+    "font": "Police"
+  },
+  "export": {
+    "title": "Exporter",
+    "format": "Format",
+    "metadata": "Métadonnées",
+    "includeMetadata": "Inclure les métadonnées",
+    "includeGps": "Inclure la position GPS",
+    "includeCamera": "Inclure les métadonnées de l'appareil",
+    "quality": "Qualité",
+    "exportImage": "Exporter l'image",
+    "jpegImage": "Image JPEG"
+  },
+  "info": {
+    "title": "Info",
+    "file": "Fichier : ",
+    "brand": "Marque : ",
+    "model": "Modèle : ",
+    "empty": "Aucune image chargée. Les métadonnées de la photo (EXIF) apparaîtront ici une fois qu'une image sera ouverte."
+  },
+  "shortcuts": {
+    "title": "Raccourcis",
+    "soon": " (bientôt)"
+  },
+  "crop": {
+    "title": "Recadrer",
+    "aspectRatio": "Rapport hauteur/largeur",
+    "original": "Original",
+    "free": "Libre"
+  },
+  "masks": {
+    "title": "Masques",
+    "addNew": "Ajouter un nouveau masque",
+    "invert": "Inverser",
+    "selectSubject": "Sélectionner le sujet",
+    "selectSky": "Sélectionner le ciel",
+    "brush": "Pinceau",
+    "linearGradient": "Dégradé linéaire",
+    "radialGradient": "Dégradé radial",
+    "colorRange": "Plage de couleurs",
+    "luminanceRange": "Plage de luminance",
+    "depthRange": "Plage de profondeur"
+  },
+  "curves": {
+    "resetChannel": "Réinitialiser le canal",
+    "rgb": "RVB",
+    "red": "Rouge",
+    "green": "Vert",
+    "blue": "Bleu"
+  },
+  "confirm": {
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "reset": "Réinitialiser",
+    "discard": "Ignorer",
+    "resetTitle": "Réinitialiser les modifications",
+    "resetMessage": "Cela réinitialisera tous les curseurs d'ajustement, la zone de recadrage et les courbes de tonalité à leurs valeurs par défaut.",
+    "discardTitle": "Ignorer les modifications ?",
+    "discardMessage": "Ouvrir une nouvelle image ignorera tous les ajustements non enregistrés. Continuer ?"
+  },
+  "about": {
+    "tagline": "Traitement professionnel de photos RAW dans votre navigateur",
+    "sourceCode": "Code source",
+    "website": "Site web",
+    "builtWith": "Créé avec React, Mantine et Vite",
+    "copyright": "CosmicLights. Tous droits réservés."
+  },
+  "common": {
+    "reset": "Réinitialiser"
+  }
+}

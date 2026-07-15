@@ -1,0 +1,132 @@
+{
+  "labels": {
+    "exposure": "Bild insgesamt abdunkeln oder aufhellen",
+    "contrast": "Der Helligkeitsunterschied zwischen den hellen und dunklen Bereichen eines Bildes",
+    "highlights": "Die hellen Bereiche des Bildes verstärken oder abschwächen",
+    "shadows": "Steuert die Helligkeit der dunkelsten Bereiche deines Fotos",
+    "whites": "Die Gesamthelligkeit eines Bildes zusammen mit dem Weißpunkt ändern",
+    "blacks": "Steuert die dunkelsten Pixel deines Bildes zusammen mit dem Schwarzpunkt",
+    "temperature": "Farben zwischen warmen (gelb) und kühlen (blau) Tönen verschieben",
+    "tint": "Farben zwischen grünen und magenta Tönen verschieben",
+    "vibrance": "Intensität stumpfer Farben erhöhen und dabei bereits gesättigte schützen",
+    "saturation": "Intensität aller Farben gleichmäßig erhöhen oder verringern",
+    "clarity": "Mitteltönigen Kontrast hinzufügen oder entfernen für einen knackigeren oder weicheren Look",
+    "dehaze": "Atmosphärischen Dunst aus dem Bild entfernen oder hinzufügen",
+    "texture": "Feine Details und Oberflächenmuster verstärken oder weichzeichnen"
+  },
+  "groups": {
+    "basic": "Grundlegend",
+    "whiteBalance": "Weißabgleich",
+    "presence": "Präsenz",
+    "color": "Farbe",
+    "details": "Details",
+    "curves": "Kurven"
+  },
+  "nav": {
+    "info": "Info",
+    "adjustments": "Anpassungen",
+    "masks": "Masken",
+    "crop": "Zuschneiden",
+    "shortcuts": "Tastenkürzel",
+    "export": "Exportieren"
+  },
+  "topNav": {
+    "file": "Datei",
+    "open": "Öffnen...",
+    "exportJpg": "Als JPG exportieren...",
+    "undo": "Rückgängig",
+    "redo": "Wiederholen",
+    "settings": "Einstellungen",
+    "about": "Über"
+  },
+  "lateralNavBar": {
+    "exposure": "Belichtung",
+    "contrast": "Kontrast",
+    "highlights": "Lichter",
+    "shadows": "Schatten",
+    "whites": "Weiß",
+    "blacks": "Schwarz",
+    "temperature": "Temperatur",
+    "tint": "Farbton",
+    "clarity": "Klarheit",
+    "dehaze": "Schlieren entfernen"
+  },
+  "settings": {
+    "general": "Allgemein",
+    "language": "Sprache",
+    "panelPosition": "Panel-Position",
+    "left": "Links",
+    "right": "Rechts",
+    "darkTheme": "Dunkles Thema",
+    "helpers": "Hilfen aktivieren",
+    "font": "Schriftart"
+  },
+  "export": {
+    "title": "Exportieren",
+    "format": "Format",
+    "metadata": "Metadaten",
+    "includeMetadata": "Metadaten einbeziehen",
+    "includeGps": "GPS-Standort einbeziehen",
+    "includeCamera": "Kamera-Metadaten einbeziehen",
+    "quality": "Qualität",
+    "exportImage": "Bild exportieren",
+    "jpegImage": "JPEG-Bild"
+  },
+  "info": {
+    "title": "Info",
+    "file": "Datei: ",
+    "brand": "Marke: ",
+    "model": "Modell: ",
+    "empty": "Kein Bild geladen. Foto-Metadaten (EXIF) erscheinen hier, sobald ein Bild geöffnet wird."
+  },
+  "shortcuts": {
+    "title": "Tastenkürzel",
+    "soon": " (bald)"
+  },
+  "crop": {
+    "title": "Zuschneiden",
+    "aspectRatio": "Seitenverhältnis",
+    "original": "Original",
+    "free": "Frei"
+  },
+  "masks": {
+    "title": "Masken",
+    "addNew": "Neue Maske hinzufügen",
+    "invert": "Invertieren",
+    "selectSubject": "Objekt auswählen",
+    "selectSky": "Himmel auswählen",
+    "brush": "Pinsel",
+    "linearGradient": "Linearer Verlauf",
+    "radialGradient": "Radialer Verlauf",
+    "colorRange": "Farbbereich",
+    "luminanceRange": "Luminanzbereich",
+    "depthRange": "Tiefenbereich"
+  },
+  "curves": {
+    "resetChannel": "Kanal zurücksetzen",
+    "rgb": "RGB",
+    "red": "Rot",
+    "green": "Grün",
+    "blue": "Blau"
+  },
+  "confirm": {
+    "confirm": "Bestätigen",
+    "cancel": "Abbrechen",
+    "reset": "Zurücksetzen",
+    "discard": "Verwerfen",
+    "resetTitle": "Änderungen zurücksetzen",
+    "resetMessage": "Dadurch werden alle Anpassungsschieber, der Zuschneidebereich und die Tonkurven auf ihre Standardwerte zurückgesetzt.",
+    "discardTitle": "Änderungen verwerfen?",
+    "discardMessage": "Das Öffnen eines neuen Bildes verwirft alle nicht gespeicherten Anpassungen. Fortfahren?"
+  },
+  "about": {
+    "tagline": "Professionelle RAW-Fotobearbeitung in Ihrem Browser",
+    "sourceCode": "Quellcode",
+    "website": "Webseite",
+    "builtWith": "Erstellt mit React, Mantine und Vite",
+    "copyright": "CosmicLights. Alle Rechte vorbehalten."
+  },
+  "common": {
+    "reset": "Zurücksetzen"
+  }
+}

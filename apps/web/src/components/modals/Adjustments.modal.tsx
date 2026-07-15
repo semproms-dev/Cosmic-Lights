@@ -1,6 +1,7 @@
 import { Tabs } from '@mantine/core';
 import { General } from './screen/General.screen.modal';
 import { Language } from './screen/Language.screen.modal';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Settings dialog body. A vertical tab list on the left switches between the
@@ -8,11 +9,13 @@ import { Language } from './screen/Language.screen.modal';
  * the Settings menu.
  */
 export function AdjustementsModal() {
+  const { t } = useTranslation(['common']);
+
   return (
     <Tabs defaultValue="general" orientation="vertical" variant="pills">
       <Tabs.List>
-        <Tabs.Tab value="general">General</Tabs.Tab>
-        <Tabs.Tab value="language">Language</Tabs.Tab>
+        <Tabs.Tab value="general">{t('settings.general')}</Tabs.Tab>
+        <Tabs.Tab value="language">{t('settings.language')}</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="general" pl="md">

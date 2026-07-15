@@ -1,0 +1,132 @@
+{
+  "labels": {
+    "exposure": "Darken or brighten the overall picture",
+    "contrast": "The difference in brightness between the light and dark areas of an image",
+    "highlights": "Increase or decrease the bright sides of the picture",
+    "shadows": "Controls the brightness of the darkest areas of your photo",
+    "whites": "Change the overall brightness of an image along with the white point",
+    "blacks": "Controls the overall darkest pixels in your image along with the black point",
+    "temperature": "Shift colors between warm (yellow) and cool (blue) tones",
+    "tint": "Shift colors between green and magenta tones",
+    "vibrance": "Boost the intensity of muted colors while protecting already saturated ones",
+    "saturation": "Increase or decrease the intensity of all colors equally",
+    "clarity": "Add or remove mid-tone contrast for a punchier or softer look",
+    "dehaze": "Remove or add atmospheric haze from the image",
+    "texture": "Enhance or soften fine details and surface patterns"
+  },
+  "groups": {
+    "basic": "Basic",
+    "whiteBalance": "White Balance",
+    "presence": "Presence",
+    "color": "Color",
+    "details": "Details",
+    "curves": "Curves"
+  },
+  "nav": {
+    "info": "Info",
+    "adjustments": "Adjustments",
+    "masks": "Masks",
+    "crop": "Crop",
+    "shortcuts": "Shortcuts",
+    "export": "Export"
+  },
+  "topNav": {
+    "file": "File",
+    "open": "Open...",
+    "exportJpg": "Export JPG...",
+    "undo": "Undo",
+    "redo": "Redo",
+    "settings": "Settings",
+    "about": "About"
+  },
+  "lateralNavBar": {
+    "exposure": "Exposure",
+    "contrast": "Contrast",
+    "highlights": "Highlights",
+    "shadows": "Shadows",
+    "whites": "Whites",
+    "blacks": "Blacks",
+    "temperature": "Temperature",
+    "tint": "Tint",
+    "clarity": "Clarity",
+    "dehaze": "Dehaze"
+  },
+  "settings": {
+    "general": "General",
+    "language": "Language",
+    "panelPosition": "Panel position",
+    "left": "Left",
+    "right": "Right",
+    "darkTheme": "Dark theme",
+    "helpers": "Activate helpers",
+    "font": "Font"
+  },
+  "export": {
+    "title": "Export",
+    "format": "Format",
+    "metadata": "Metadata",
+    "includeMetadata": "Include Metadata",
+    "includeGps": "Include GPS location",
+    "includeCamera": "Include camera metadata",
+    "quality": "Quality",
+    "exportImage": "Export image",
+    "jpegImage": "JPEG image"
+  },
+  "info": {
+    "title": "Info",
+    "file": "File: ",
+    "brand": "Brand: ",
+    "model": "Model: ",
+    "empty": "No image loaded. Photo metadata (EXIF) will appear here once an image is opened."
+  },
+  "shortcuts": {
+    "title": "Shortcuts",
+    "soon": " (soon)"
+  },
+  "crop": {
+    "title": "Crop",
+    "aspectRatio": "Aspect ratio",
+    "original": "Original",
+    "free": "Free"
+  },
+  "masks": {
+    "title": "Masks",
+    "addNew": "Add New Mask",
+    "invert": "Invert",
+    "selectSubject": "Select Subject",
+    "selectSky": "Select Sky",
+    "brush": "Brush",
+    "linearGradient": "Linear Gradient",
+    "radialGradient": "Radial Gradient",
+    "colorRange": "Color Range",
+    "luminanceRange": "Luminance Range",
+    "depthRange": "Depth Range"
+  },
+  "curves": {
+    "resetChannel": "Reset channel",
+    "rgb": "RGB",
+    "red": "Red",
+    "green": "Green",
+    "blue": "Blue"
+  },
+  "confirm": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "reset": "Reset",
+    "discard": "Discard",
+    "resetTitle": "Reset changes",
+    "resetMessage": "This will reset all adjustment sliders, the crop area and tone curves to their default values.",
+    "discardTitle": "Discard changes?",
+    "discardMessage": "Opening a new picture will discard all unsaved adjustments. Continue?"
+  },
+  "about": {
+    "tagline": "Professional RAW photo processing in your browser",
+    "sourceCode": "Source Code",
+    "website": "Website",
+    "builtWith": "Built with React, Mantine, and Vite",
+    "copyright": "CosmicLights. All rights reserved."
+  },
+  "common": {
+    "reset": "Reset"
+  }
+}

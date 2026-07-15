@@ -6,6 +6,7 @@ import { IoAperture } from "react-icons/io5";
 import { AiFillVideoCamera } from "react-icons/ai";
 import { BiSolidCameraPlus } from "react-icons/bi";
 import { SiLens } from "react-icons/si";
+import { useTranslation } from 'react-i18next';
 
 /**
  * Info tool panel. A placeholder until an image pipeline exists; it will show
@@ -14,6 +15,7 @@ import { SiLens } from "react-icons/si";
 export function InfoPanel() {
 
   const image = useEditor();
+  const { t } = useTranslation(['common']); 
   const loaded = image.image;
   const {
     camera_model,
@@ -69,8 +71,7 @@ export function InfoPanel() {
         </Stack>
       ) : (
         <Text size="sm" c="dimmed">
-          No image loaded. Photo metadata (EXIF) will appear here once an image
-          is opened.
+          {t('info.empty')}
         </Text>
       )}
     </Stack>

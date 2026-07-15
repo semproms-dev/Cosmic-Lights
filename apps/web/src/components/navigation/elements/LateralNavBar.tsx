@@ -8,6 +8,7 @@ import {
 } from '@tabler/icons-react';
 import { Stack, Tooltip, UnstyledButton } from '@mantine/core';
 import classes from '../styles/LateralNavBar.module.css';
+import { useTranslation } from 'react-i18next';
 
 interface RightNavBarProps {
     active: string;
@@ -17,15 +18,16 @@ interface RightNavBarProps {
 interface ToolLink {
   label: string;
   icon: typeof IconInfoCircle;
+  navKey: string;
 }
 
-const lateralNavBarButtons: ToolLink[] = [
-  { icon: IconInfoCircle, label: 'Info' },
-  { icon: IconAdjustments, label: 'Adjustments' },
-  { icon: IconMask, label: 'Masks' },
-  { icon: IconCrop, label: 'Crop' },
-  { icon: IconKeyboard, label: 'Shortcuts' },
-  { icon: IconFileExport, label: 'Export' }
+const getLateralNavBarButtons = (t: (key: string) => string): ToolLink[] => [
+  { icon: IconInfoCircle, label: t('nav.info'), navKey: 'info' },
+  { icon: IconAdjustments, label: t('nav.adjustments'), navKey: 'adjustments' },
+  { icon: IconMask, label: t('nav.masks'), navKey: 'masks' },
+  { icon: IconCrop, label: t('nav.crop'), navKey: 'crop' },
+  { icon: IconKeyboard, label: t('nav.shortcuts'), navKey: 'shortcuts' },
+  { icon: IconFileExport, label: t('nav.export'), navKey: 'export' }
 ];
 
 /**
@@ -36,18 +38,19 @@ const lateralNavBarButtons: ToolLink[] = [
  * `onChange` with its label.
  */
 export function LateralNavBar({ active, onChange }: RightNavBarProps) {
-  const tools = lateralNavBarButtons.map((tool) => (
+  const { t } = useTranslation(['common']);
+  const tools = getLateralNavBarButtons(t).map((tool) => (
     <Tooltip
-      key={tool.label}
+      key={tool.navKey}
       label={tool.label}
       position="right"
       withArrow
       transitionProps={{ duration: 0 }}
     >
       <UnstyledButton
-        onClick={() => onChange(tool.label)}
+        onClick={() => onChange(tool.navKey)}
         className={classes.toolLink}
-        data-active={tool.label === active || undefined}
+        data-active={tool.navKey === active || undefined}
         aria-label={tool.label}
       >
         <tool.icon size={22} stroke={1.5} />

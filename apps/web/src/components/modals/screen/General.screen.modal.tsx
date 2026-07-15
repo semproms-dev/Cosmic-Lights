@@ -1,6 +1,7 @@
 import { Group, NumberInput, Radio, Stack, Switch, useMantineColorScheme } from '@mantine/core';
 import { usePreferences, MIN_FONT_SIZE, MAX_FONT_SIZE } from '../../../preferences/preferences';
 import type { PanelPosition } from '../../../preferences/preferences';
+import { useTranslation } from 'react-i18next';
 
 /**
  * General preferences tab: tool-rail side, light/dark theme and the base font
@@ -8,7 +9,8 @@ import type { PanelPosition } from '../../../preferences/preferences';
  * is delegated to Mantine's color-scheme manager, which persists on its own).
  */
 export function General() {
-  const { preferences, setPanelPosition, setFontSize } = usePreferences();
+  const { t } = useTranslation(['common']);
+  const { preferences, setPanelPosition, setFontSize, setHelpers } = usePreferences();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
   return (
@@ -17,25 +19,33 @@ export function General() {
         value={preferences.panelPosition}
         onChange={(value) => value && setPanelPosition(value as PanelPosition)}
         name="panelPosition"
-        label="Panel position"
+        label={t('settings.panelPosition')}
         mt="xs"
-    >
-      <Group mt="xs">
-        <Radio value="left" label="Left" />
-        <Radio value="right" label="Right" />
-      </Group>
-    </Radio.Group>
+      >
+        <Group mt="xs">
+          <Radio value="left" label={t('settings.left')} />
+          <Radio value="right" label={t('settings.right')} />
+        </Group>
+      </Radio.Group>
 
       <Switch
-        label="Dark theme"
+        label={t('settings.darkTheme')}
         checked={colorScheme === 'dark'}
         onChange={(event) =>
           setColorScheme(event.currentTarget.checked ? 'dark' : 'light')
         }
       />
 
+      <Switch
+        label={t('settings.helpers')}
+        checked={preferences.helper === true}
+        onChange={() =>
+          setHelpers(!preferences.helper)
+        }
+      />
+
       <NumberInput
-        label="Font"
+        label={t('settings.font')}
         value={preferences.fontSize}
         onChange={(value) =>
           typeof value === 'number' && setFontSize(value)

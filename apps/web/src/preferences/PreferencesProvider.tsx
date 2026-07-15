@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import i18n from '../i18n'
 import {
   DEFAULT_PREFERENCES,
   loadPreferences,
@@ -51,13 +52,25 @@ export function PreferencesProvider({
   )
 
   const setLanguage = useCallback(
-    (language: Language) => update({ language }),
+    (language: Language) => {
+      update({ language })
+      void i18n.changeLanguage(language)
+    },
+    [update],
+  )
+
+  useEffect(() => {
+    void i18n.changeLanguage(preferences.language)
+  }, [preferences.language])
+
+  const setHelpers = useCallback(
+    (helper: boolean) => update({ helper }),
     [update],
   )
 
   const store = useMemo<PreferencesStore>(
-    () => ({ preferences, setPanelPosition, setFontSize, setLanguage }),
-    [preferences, setPanelPosition, setFontSize, setLanguage],
+    () => ({ preferences, setPanelPosition, setFontSize, setLanguage, setHelpers }),
+    [preferences, setPanelPosition, setFontSize, setLanguage, setHelpers],
   )
 
   return (

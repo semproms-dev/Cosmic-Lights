@@ -5,8 +5,8 @@ import { logger } from '../logger'
 /** Which side of the editor the tool rail and its panels live on. */
 export type PanelPosition = 'left' | 'right'
 
-/** Interface language. Full translation is future work; the choice is stored. */
-export type Language = 'de' | 'en' | 'es'
+/** Interface language. Synced with the i18n runtime via PreferencesProvider. */
+export type Language = 'de' | 'en' | 'es' | 'fr' | 'it'
 
 /** User-facing application preferences, persisted across sessions. */
 export interface Preferences {
@@ -16,6 +16,7 @@ export interface Preferences {
   fontSize: number
   /** Selected interface language. */
   language: Language
+  helper: boolean
 }
 
 /** Values used before the user changes anything (and the persistence fallback). */
@@ -23,6 +24,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   panelPosition: 'right',
   fontSize: 14,
   language: 'en',
+  helper: false,
 }
 
 /** Bounds for the font-size control, shared by the UI and the parser. */
@@ -39,7 +41,8 @@ const preferencesSchema = z.object({
     .min(MIN_FONT_SIZE)
     .max(MAX_FONT_SIZE)
     .catch(DEFAULT_PREFERENCES.fontSize),
-  language: z.enum(['de', 'en', 'es']).catch(DEFAULT_PREFERENCES.language),
+  language: z.enum(['de', 'en', 'es', 'fr', 'it']).catch(DEFAULT_PREFERENCES.language),
+  helper: z.boolean().catch(DEFAULT_PREFERENCES.helper),
 })
 
 /** localStorage key under which the serialized preferences live. */
@@ -94,6 +97,8 @@ export interface PreferencesStore {
   setFontSize: (size: number) => void
   /** Sets the interface language. */
   setLanguage: (language: Language) => void
+  /** Sets helps messages in the app */
+  setHelpers: (helper: boolean) => void
 }
 
 export const PreferencesContext = createContext<PreferencesStore | null>(null)

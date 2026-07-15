@@ -11,6 +11,7 @@ const CUSTOM: Preferences = {
   panelPosition: 'left',
   fontSize: 18,
   language: 'es',
+  helper: false,
 }
 
 afterEach(() => {
@@ -47,7 +48,7 @@ describe('loadPreferences', () => {
   it('falls back per field: an unknown language resets only that field', () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ ...CUSTOM, language: 'fr' }),
+      JSON.stringify({ ...CUSTOM, language: 'xx' }),
     )
     expect(loadPreferences()).toEqual({
       ...CUSTOM,

@@ -5,6 +5,7 @@ import { ContextMenuProvider } from 'mantine-contextmenu'
 import type { ReactNode } from 'react'
 import { EditorProvider } from '../editor/EditorProvider'
 import { PreferencesProvider } from '../preferences/PreferencesProvider'
+import '../i18n'
 
 /**
  * Renders a component wrapped in the providers the app relies on (Mantine,

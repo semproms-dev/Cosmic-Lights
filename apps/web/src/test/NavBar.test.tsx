@@ -9,6 +9,6 @@ describe('NavBar', () => {
     // The menu buttons expose their label via aria-label.
     expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Hello' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument()
   })
 })

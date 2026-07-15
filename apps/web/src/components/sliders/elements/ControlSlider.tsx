@@ -1,10 +1,14 @@
-import { Group, Slider, Stack, Text } from '@mantine/core';
+import { Group, Slider, Stack, Text, Tooltip } from '@mantine/core';
 import classes from '../styles/ControlSlider.module.css';
 import { useHover } from '@mantine/hooks';
 import { useEditor } from '../../../editor/editorContext';
+import { IconInfoCircle } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
+import { usePreferences } from '../../../preferences/preferences';
 
 interface ControlSliderProps {
   label: string;
+  description?: string;
   value: number;
   min: number;
   max: number;
@@ -20,6 +24,7 @@ interface ControlSliderProps {
  */
 export function ControlSlider({
   label,
+  description,
   value,
   min,
   max,
@@ -29,6 +34,8 @@ export function ControlSlider({
 }: ControlSliderProps) {
   const { hovered, ref } = useHover();
   const {setAdjustment, commit, image} = useEditor();
+  const { t } = useTranslation(['common']);
+  const { preferences } = usePreferences();
 
   // Resetting via the label is a discrete edit outside the slider's onChangeEnd,
   // so it needs its own checkpoint.
@@ -39,7 +46,14 @@ export function ControlSlider({
   return (
     <Stack gap={4} className={classes.control}>
       <Group justify="space-between" gap="xs">
-        <Text size="sm" onClick={handleReset} style={{cursor: 'pointer'}} ref={ref}>{hovered ? 'Reset' : label}</Text>
+         <Group gap={6}>
+         {preferences.helper ? 
+          <Tooltip label={description ?? label}>
+              <IconInfoCircle size={16} stroke={2} color="var(--mantine-color-dimmed)"  />
+            </Tooltip>: null
+          }
+          <Text size="sm" onClick={handleReset} style={{cursor: 'pointer'}} ref={ref}>{hovered ? t('common.reset') : label}</Text>
+        </Group> 
         <Text size="sm" c="dimmed">
           {value}
         </Text>

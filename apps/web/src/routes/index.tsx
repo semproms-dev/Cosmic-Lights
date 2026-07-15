@@ -23,22 +23,22 @@ export const Route = createFileRoute('/')({
 })
 
 /**
- * Tool panels keyed by their rail label. A tool without an entry opens no panel.
+ * Tool panels keyed by their rail nav key. A tool without an entry opens no panel.
  */
 const PANELS: Record<string, ComponentType> = {
-  Info: InfoPanel,
-  Adjustments: AdjustmentsPanel,
-  Masks: MasksPanel,
-  Crop: CropPanel,
-  Shortcuts: ShortcutsPanel,
-  Export: ExportPanel,
+  info: InfoPanel,
+  adjustments: AdjustmentsPanel,
+  masks: MasksPanel,
+  crop: CropPanel,
+  shortcuts: ShortcutsPanel,
+  export: ExportPanel,
 }
 
 /**
  * Landing page for CosmicLights.
  */
 function HomePage() {
-  const [activeTool, setActiveTool] = useState('Adjustments')
+  const [activeTool, setActiveTool] = useState('adjustments')
   const {imageStatus, masks, activeMaskId, maskOverlayHidden} = useEditor();
   const { preferences } = usePreferences();
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -47,11 +47,11 @@ function HomePage() {
   // that mask on drag instead of panning. Any other case → no painting (null).
   const activeMask = masks.find((m) => m.id === activeMaskId) ?? null
   const brushMaskId =
-    activeTool === 'Masks' && activeMask?.type === 'brush' ? activeMask.id : null
+    activeTool === 'masks' && activeMask?.type === 'brush' ? activeMask.id : null
   // Show the selected mask as a red overlay whenever the Masks tool is open,
   // except while a mask slider is being dragged (so the change stays visible).
   const overlayMaskId =
-    activeTool === 'Masks' && !maskOverlayHidden ? activeMaskId : null
+    activeTool === 'masks' && !maskOverlayHidden ? activeMaskId : null
 
   /**
    * Selecting a tool opens its panel; selecting the already-active tool toggles
@@ -65,7 +65,7 @@ function HomePage() {
   // NavBar's OpenImageButton; the reset shortcut opens the confirm dialog.
   useEditorShortcuts({
     openImage: () => fileInputRef.current?.click(),
-    showShortcuts: () => setActiveTool('Shortcuts'),
+    showShortcuts: () => setActiveTool('shortcuts'),
   })
 
   const ActivePanel = PANELS[activeTool]
@@ -88,8 +88,8 @@ function HomePage() {
       <div style={{ display: 'flex', flexDirection: rowDirection, flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>
-          <Canvas cropping={activeTool === 'Crop'} brushMaskId={brushMaskId} overlayMaskId={overlayMaskId} />
-          {activeTool === 'Crop' && <CropOverlay onDone={() => setActiveTool('')} />}
+          <Canvas cropping={activeTool === 'crop'} brushMaskId={brushMaskId} overlayMaskId={overlayMaskId} />
+          {activeTool === 'crop' && <CropOverlay onDone={() => setActiveTool('')} />}
         </div>
         {ActivePanel && (
           <aside className={classes.panel} aria-label={`${activeTool} panel`}>

@@ -21,6 +21,8 @@ export interface ColorOption {
   group: string
 }
 
+
+
 /** Basic tone adjustments shown in the Adjustments panel. */
 export const basicAdjustments: SliderOption[] = [
   { key: 'exposure', label: 'Exposure', min: -5, max: 5, step: 0.1, defaultValue: 0 },
@@ -43,7 +45,6 @@ export const detailsAdjustement: ColorOption[] = [
   { key: 'clarity', label: 'Clarity', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
   { key: 'dehaze', label: 'Dehaze', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
   { key: 'texture', label: 'Texture', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
-  { key: 'threshold', label: 'Threshold', min: -100, max: 100, step: 1, defaultValue: 0, group: '' },
 ]
 
 /**

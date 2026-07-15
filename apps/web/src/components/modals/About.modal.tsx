@@ -1,33 +1,21 @@
-import { Badge, SimpleGrid, Text, Title } from '@mantine/core';
+import { Badge, Text, Title } from '@mantine/core';
 import { SiLens } from 'react-icons/si';
 import {
-  IconAdjustments,
-  IconPhoto,
   IconBrandGithub,
   IconWorld,
 } from '@tabler/icons-react';
 import classes from './styles/About.modal.module.css';
+import { useTranslation } from 'react-i18next';
 
 const APP_VERSION = '1.0.0';
-
-const features = [
-  {
-    icon: IconAdjustments,
-    label: 'RAW Processing',
-    description: 'Fine-tune exposure, white balance, tone curves, and more',
-  },
-  {
-    icon: IconPhoto,
-    label: 'Non-Destructive',
-    description: 'Edit freely with full undo/redo support',
-  },
-] as const;
 
 /**
  * About dialog body. Displays app branding, feature highlights, useful links,
  * and copyright information. Rendered inside a Mantine modal by the NavBar.
  */
 export function AboutModal() {
+  const { t } = useTranslation(['common']);
+
   return (
     <div>
       <div className={classes.hero}>
@@ -36,7 +24,7 @@ export function AboutModal() {
         </div>
         <Title order={3}>CosmicLights</Title>
         <Text className={classes.tagline}>
-          Professional RAW photo processing in your browser
+          {t('about.tagline')}
         </Text>
         <Badge
           variant="light"
@@ -56,7 +44,7 @@ export function AboutModal() {
           rel="noopener noreferrer"
         >
           <IconBrandGithub size={16} stroke={1.5} />
-          Source Code
+          {t('about.sourceCode')}
         </a>
         <a
           className={classes.link}
@@ -65,16 +53,16 @@ export function AboutModal() {
           rel="noopener noreferrer"
         >
           <IconWorld size={16} stroke={1.5} />
-          Website
+          {t('about.website')}
         </a>
       </div>
 
       <div className={classes.footer}>
         <Text className={classes.footerText}>
-          Built with React, Mantine, and Vite
+          {t('about.builtWith')}
         </Text>
         <Text className={classes.footerText}>
-          &copy; {new Date().getFullYear()} CosmicLights. All rights reserved.
+          &copy; {new Date().getFullYear()} {t('about.copyright')}
         </Text>
       </div>
     </div>

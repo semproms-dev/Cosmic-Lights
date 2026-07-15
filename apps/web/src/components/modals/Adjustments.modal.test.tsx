@@ -7,8 +7,8 @@ afterEach(() => {
   localStorage.clear();
 });
 
-// A Mantine Select renders both a visible input and a hidden one under the same
-// label, so queries must target the visible input explicitly.
+// Mantine's NumberInput wraps the native <input> in a div; query by label text
+// targeting the visible input.
 const VISIBLE_INPUT = { selector: 'input:not([type="hidden"])' } as const;
 
 describe('AdjustementsModal', () => {
@@ -22,9 +22,9 @@ describe('AdjustementsModal', () => {
   it('shows the General panel by default', () => {
     render(<AdjustementsModal />);
 
-    expect(screen.getByLabelText('Panel position', VISIBLE_INPUT)).toBeInTheDocument();
-    expect(screen.getByLabelText('Dark theme')).toBeInTheDocument();
-    expect(screen.getByLabelText('Font')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Right' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Dark theme' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toBeInTheDocument();
   });
 
   it('reveals the Language panel when its tab is selected', async () => {
@@ -34,7 +34,7 @@ describe('AdjustementsModal', () => {
     await user.click(screen.getByRole('tab', { name: 'Language' }));
 
     expect(
-      await screen.findByLabelText('Language', VISIBLE_INPUT),
+      await screen.findByRole('combobox', { name: 'Language' }),
     ).toBeInTheDocument();
   });
 });
