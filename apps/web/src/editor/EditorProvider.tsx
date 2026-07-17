@@ -44,6 +44,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
       resetDialogOpen: false,
       masks: [],
       activeMaskId: null,
+      orientation: {flipH: false, flipV: false, quarterTurns: 0}
     }),
   )
   // The full live state lives in `history.present`; everything below reads it.
@@ -124,6 +125,26 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const redo = () => {
     dispatch({type: 'REDO'})
+  }
+
+  const rotateCw = () => {
+    dispatch({type: 'ROTATE_CW'})
+  }
+
+  const rotateCcw = () => {
+    dispatch({type: 'ROTATE_CCW'})
+  }
+
+   const flipH = () => {
+    dispatch({type: 'FLIP_H'})
+  }
+
+  const flipV = () => {
+    dispatch({type: 'FLIP_V'})
+  }
+
+  const resetOrientation = () => {
+    dispatch({type: 'RESET_ORIENTATION'})
   }
 
   const commit = () => {
@@ -296,6 +317,12 @@ export function EditorProvider({ children }: EditorProviderProps) {
         retryMask,
         view,
         setView,
+        orientation: state.orientation,
+        rotateCw,
+        rotateCcw,
+        resetOrientation,
+        flipV,
+        flipH
       }}
     >
       {children}

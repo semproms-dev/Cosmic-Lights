@@ -9,8 +9,8 @@ import {
   MASK_FRAGMENT_SHADER,
   VERTEX_SHADER,
 } from './shaders'
-import { cropToUvTransform } from '../crop'
 import type { CropRegion } from '../image'
+import { IDENTITY_ORIENTATION, uvTransform, type Orientation } from '../rotation'
 import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type Mask, type MaskPoint } from '../masks'
 import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
 
@@ -99,8 +99,8 @@ export class WebGLRenderer {
   private readonly uClarityBlur: WebGLUniformLocation | null
   private readonly uClarityBlurSmall: WebGLUniformLocation | null
   private readonly uClarity: WebGLUniformLocation | null
-  private readonly uCropOffset: WebGLUniformLocation | null
-  private readonly uCropScale: WebGLUniformLocation | null
+  private readonly uUvMatrix: WebGLUniformLocation | null
+  private readonly uUvCenter: WebGLUniformLocation | null
   private readonly uClarityOffset: WebGLUniformLocation | null
   private readonly uDehaze: WebGLUniformLocation | null
   private readonly uTexture: WebGLUniformLocation | null
@@ -139,9 +139,12 @@ export class WebGLRenderer {
   private readonly maskTargets = new Map<string, { target: RenderTarget; version: number }>()
   // Second developed target: the mask stacking passes ping-pong between the two.
   private developed2: RenderTarget | null = null
-  private cropOffset: [number, number] = [0, 0]
-  private cropScale: [number, number] = [1, 1]
-  private cropAspect: number | null = null
+  // Crop and orientation are stored as source data rather than as ready-made
+  // uniforms: they fold into a single transform that neither can build alone,
+  // and either setter may be the one called last. `render` combines them.
+  private cropRegion: CropRegion | null = null
+  private cropImageSize: [number, number] | null = null
+  private orientation: Orientation = IDENTITY_ORIENTATION
 
   // Interactive view (zoom/pan), applied to the final composite on top of the
   // letterbox. viewScale multiplies the fit-to-canvas scale; viewOffset pans the
@@ -252,8 +255,8 @@ export class WebGLRenderer {
     this.uClarity = gl.getUniformLocation(this.clarityProgram, 'uClarity')
     this.uDehaze = gl.getUniformLocation(this.clarityProgram, 'uDehaze')
     this.uTexture = gl.getUniformLocation(this.clarityProgram, 'uTexture')
-    this.uCropOffset = gl.getUniformLocation(this.clarityProgram, 'uCropOffset')
-    this.uCropScale = gl.getUniformLocation(this.clarityProgram, 'uCropScale')
+    this.uUvMatrix = gl.getUniformLocation(this.clarityProgram, 'uUvMatrix')
+    this.uUvCenter = gl.getUniformLocation(this.clarityProgram, 'uUvCenter')
     this.uClarityOffset = gl.getUniformLocation(this.clarityProgram, 'uOffset')
     this.uOverlayMask = gl.getUniformLocation(this.clarityProgram, 'uOverlayMask')
     this.uOverlay = gl.getUniformLocation(this.clarityProgram, 'uOverlay')
@@ -380,18 +383,32 @@ export class WebGLRenderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 4, 0, gl.RED, gl.UNSIGNED_BYTE, data)
   }
 
+  /**
+   * Sets the crop region for the next frame, or `null` for the full frame. The
+   * crop is non-destructive: it only changes which part of the developed texture
+   * the composite samples.
+   *
+   * @param region - The crop in image pixels, or `null` for the whole image.
+   * @param imageWidth - Full image width in pixels, the region's frame of reference.
+   * @param imageHeight - Full image height in pixels.
+   */
   setCrop(region: CropRegion | null, imageWidth: number, imageHeight: number) : void {
-    if(region === null) {
-      this.cropOffset = [0,0];
-      this.cropScale = [1,1];
-      this.cropAspect = null;
-      return;
-    }
+    this.cropRegion = region
+    this.cropImageSize = [imageWidth, imageHeight]
+  }
 
-    const {offsetX, offsetY, scaleX, scaleY} = cropToUvTransform(region, imageWidth, imageHeight);
-    this.cropOffset = [offsetX, offsetY];
-    this.cropScale = [scaleX, scaleY];
-    this.cropAspect = region.width / region.height;
+  /**
+   * Sets the 90° turns and mirroring applied to the image for the next frame.
+   * Like the crop, it is a remap of the composite's sampling coordinates — no
+   * pixels move and nothing is re-uploaded, so it is free to change per frame.
+   *
+   * Defaults to {@link IDENTITY_ORIENTATION}, so a caller that never touches
+   * this renders exactly as before.
+   *
+   * @param orientation - The turns and flips to display.
+   */
+  setOrientation(orientation: Orientation): void {
+    this.orientation = orientation
   }
 
   /**
@@ -702,10 +719,14 @@ export class WebGLRenderer {
     // ── Pass 4: clarity composite (developed + blur) → canvas, letterboxed. ──
     // Shrink the quad on the axis that would otherwise overflow.
     const canvasAspect = canvasWidth / canvasHeight
-    // Letterbox against the crop's aspect (not the full frame's) so the cropped
-    // region fills the canvas without stretching. Falls back to the full image
-    // when there is no crop.
-    const imageAspect = this.cropAspect ?? this.imageWidth / this.imageHeight
+    // Fold the crop and the orientation into the one UV remap the shader applies.
+    // Falls back to the uploaded image's size until `setCrop` has run.
+    const [transformWidth, transformHeight] = this.cropImageSize ?? [this.imageWidth, this.imageHeight]
+    const uv = uvTransform(this.orientation, this.cropRegion, transformWidth, transformHeight)
+    // Letterbox against the aspect as *displayed* (not the full frame's) so the
+    // cropped region fills the canvas without stretching. A quarter turn stands
+    // the frame on its end, so this is where a portrait/landscape swap lands.
+    const imageAspect = uv.displayedAspect
     let scaleX = 1
     let scaleY = 1
     if (imageAspect > canvasAspect) {
@@ -723,12 +744,12 @@ export class WebGLRenderer {
     gl.uniform2f(this.uClarityScale, scaleX * this.viewScale, scaleY * this.viewScale)
     gl.uniform2f(this.uClarityOffset, this.viewOffset[0], this.viewOffset[1])
     gl.uniform1f(this.uClarityFlipV, 1) // samples FBO textures: flip to cancel their inversion
-    // Non-destructive crop: the shader remaps the quad onto this UV region.
-    // Defaults to identity ([0,0]/[1,1]) until setCrop is called, so passing
-    // them unconditionally is what keeps the image visible (an unset uScale-like
-    // uniform would default to 0 and collapse the sample to a single texel).
-    gl.uniform2f(this.uCropOffset, this.cropOffset[0], this.cropOffset[1])
-    gl.uniform2f(this.uCropScale, this.cropScale[0], this.cropScale[1])
+    // Non-destructive crop + orientation: the shader remaps the quad onto this
+    // UV region. Defaults to the identity transform until setCrop is called, so
+    // passing them unconditionally is what keeps the image visible (an unset
+    // matrix uniform would default to 0 and collapse the sample to a texel).
+    gl.uniformMatrix2fv(this.uUvMatrix, false, uv.matrix)
+    gl.uniform2f(this.uUvCenter, uv.center[0], uv.center[1])
     gl.uniform1f(this.uClarity, adjustments.clarity)
     gl.uniform1f(this.uDehaze, adjustments.dehaze)
     gl.uniform1f(this.uTexture, adjustments.texture)

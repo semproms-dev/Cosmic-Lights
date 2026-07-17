@@ -60,17 +60,18 @@ uniform sampler2D uBlurSmall;   // its small-radius blur (for texture)
 uniform float uClarity;         // -5..5
 uniform float uDehaze;          // -5..5
 uniform float uTexture;         // -5..5
-uniform vec2 uCropOffset;       // UV origin of the crop region (0,0 = no crop)
-uniform vec2 uCropScale;        // UV size of the crop region (1,1 = no crop)
+uniform mat2 uUvMatrix;         // crop size + 90° turns + flips, about the centre
+uniform vec2 uUvCenter;         // UV of the crop centre (0.5,0.5 = no crop)
 uniform sampler2D uOverlayMask; // active mask alpha, for the editing overlay
 uniform float uOverlay;         // 1 → tint the masked area red so it's visible
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 void main() {
-  // Non-destructive crop: remap the full quad onto the selected region. With no
-  // crop (offset 0, scale 1) this is the identity, so uv == vUv.
-  vec2 uv = uCropOffset + vUv * uCropScale;
+  // Non-destructive crop + orientation: remap the quad onto the selected region,
+  // turned/mirrored about its centre. Built on the CPU by uvTransform()
+  // (editor/rotation.ts); identity (mat2(1.0), centre 0.5) means uv == vUv.
+  vec2 uv = uUvCenter + uUvMatrix * (vUv - 0.5);
   vec4 base = texture(uDeveloped, uv);
   vec3 rgb = base.rgb;
   float clarityAmt = uClarity * 0.2;              // slider → strength (k, tunable)

@@ -2,6 +2,7 @@ import { CHANNELS, type Curves } from "./curves";
 import type { EditorAction, editorReducer, EditorStoreState } from "./editorReducer";
 import type { CropRegion } from "./image";
 import type { BrushStroke, Mask } from "./masks";
+import type { Orientation } from "./rotation";
 
 
 
@@ -10,7 +11,8 @@ interface HistorySlice {
     cropRatio: string,
     curves: Curves,
     cropRegion: CropRegion | null,
-    masks: Mask[]
+    masks: Mask[],
+    orientation: Orientation
 }
 
 interface HistoryState {
@@ -32,7 +34,8 @@ const sliceOf = (s: EditorStoreState): HistorySlice => ({
     cropRatio: s.cropRatio,
     cropRegion: s.cropRegion,
     curves: s.curves,
-    masks: s.masks
+    masks: s.masks,
+    orientation: s.orientation
 });
 
 const regionEquals = (a: CropRegion | null, b: CropRegion | null): boolean =>
@@ -76,12 +79,17 @@ const maskEquals = (a: Mask, b: Mask): boolean =>
 const masksEqual = (a: Mask[], b: Mask[]): boolean =>
   a.length === b.length && a.every((m, i) => maskEquals(m, b[i]))
 
+const orientationEquals = (a: Orientation, b: Orientation): boolean =>
+  a === b || // RESET_ORIENTATION reparte la misma ref (IDENTITY_ORIENTATION)
+  (a.quarterTurns === b.quarterTurns && a.flipH === b.flipH && a.flipV === b.flipV)
+
 const sliceEquals = (a: HistorySlice, b: HistorySlice): boolean =>
   a.cropRatio === b.cropRatio &&
   regionEquals(a.cropRegion, b.cropRegion) &&
   recordEquals(a.adjustements, b.adjustements) &&
   curvesEqual(a.curves, b.curves) &&
-  masksEqual(a.masks, b.masks)
+  masksEqual(a.masks, b.masks) &&
+  orientationEquals(a.orientation, b.orientation)
 
 export const initHistory = (present: EditorStoreState): HistoryState => ({
   past: [], present, future: [], checkpoint: sliceOf(present),
@@ -96,6 +104,7 @@ const mergeSlice = (s: EditorStoreState, slice: HistorySlice): EditorStoreState 
   cropRegion: slice.cropRegion,
   cropRatio: slice.cropRatio,
   masks: slice.masks,
+  orientation: slice.orientation,
   // The restored mask set may not contain the currently-selected mask; drop a
   // dangling selection so the panel doesn't point at a mask that's gone.
   activeMaskId: slice.masks.some((m) => m.id === s.activeMaskId)

@@ -7,6 +7,7 @@ import {
   type EditorStoreState,
 } from './editorReducer'
 import { createMask, MAX_MASKS, type BrushStroke, type Mask } from './masks'
+import { IDENTITY_ORIENTATION } from './rotation'
 
 /** Builds a fresh store state, letting a test override individual slices. */
 const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreState => ({
@@ -20,6 +21,7 @@ const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreStat
   resetDialogOpen: false,
   masks: [],
   activeMaskId: null,
+  orientation: IDENTITY_ORIENTATION,
   ...overrides,
 })
 
@@ -149,6 +151,14 @@ describe('editorReducer — crop slice', () => {
     const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
 
     expect(next.cropRatio).toBe('Original')
+  })
+
+  it('SET_IMAGE resets the orientation, so a new photo does not inherit the turn', () => {
+    const state = createState({ orientation: { quarterTurns: 3, flipH: true, flipV: false } })
+
+    const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
+
+    expect(next.orientation).toEqual(IDENTITY_ORIENTATION)
   })
 })
 

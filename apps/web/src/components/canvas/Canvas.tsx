@@ -47,7 +47,26 @@ interface CanvasProps {
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = null }: CanvasProps) {
-  const { image, adjustments, curves, masks, maskAlphas, resetAdjustements, resetCurves, loadImage, cropRegion, clearCrop, resetDialogOpen, openResetDialog, closeResetDialog, addBrushStroke, commit, view, setView } = useEditor()
+  const { 
+    image, 
+    adjustments, 
+    curves, 
+    masks, 
+    maskAlphas, 
+    resetAdjustements, 
+    resetCurves, 
+    loadImage, 
+    cropRegion, 
+    clearCrop, 
+    resetDialogOpen, 
+    openResetDialog, 
+    closeResetDialog, 
+    addBrushStroke, 
+    commit, 
+    view, 
+    setView, 
+    orientation } = useEditor()
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
   const { showContextMenu } = useContextMenu()
@@ -126,6 +145,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       if(image != null) {
         // While cropping, show the full frame so the overlay stays aligned.
         renderer.setCrop(cropping ? null : cropRegion, image.width, image.height)
+        renderer.setOrientation(orientation);
       }
       renderer.setView(view.scale, view.offsetX, view.offsetY)
       renderer.render({
@@ -167,7 +187,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     }
     // `maskAlphas` is a stable ref-backed Map, so it never fires this effect on
     // its own: `masks` (via each mask's `version`) is what signals a new alpha.
-  }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId])
+  }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId, orientation])
 
   // Zoom toward a point (in clip space, −1..1) by a scale factor, keeping the
   // content under that point fixed. Clip space matches the renderer's view

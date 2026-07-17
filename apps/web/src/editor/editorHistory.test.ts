@@ -5,6 +5,7 @@ import { buildDefaultCurves } from './curves'
 import type { LoadedImage } from './image'
 import { undoable, initHistory, canUndo, canRedo } from './editorHistory'
 import { createMask } from './masks'
+import { IDENTITY_ORIENTATION } from './rotation'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TDD contract for `editor/editorHistory.ts` — a snapshot history wrapper around
@@ -46,6 +47,7 @@ const makeState = (): EditorStoreState => ({
   resetDialogOpen: false,
   masks: [],
   activeMaskId: null,
+  orientation: IDENTITY_ORIENTATION,
 })
 
 const wrapped = undoable(editorReducer)
@@ -192,6 +194,59 @@ describe('scope of undo', () => {
     // Redo reapplies the edited curve.
     h = wrapped(h, { type: 'REDO' })
     expect(h.present.curves.rgb).toEqual(edited)
+  })
+
+  it('includes the orientation in history', () => {
+    let h = initHistory(makeState())
+
+    h = wrapped(h, { type: 'ROTATE_CW' })
+    h = wrapped(h, { type: 'COMMIT' })
+    expect(h.present.orientation.quarterTurns).toBe(1)
+
+    h = wrapped(h, { type: 'UNDO' })
+    expect(h.present.orientation.quarterTurns).toBe(0)
+
+    h = wrapped(h, { type: 'REDO' })
+    expect(h.present.orientation.quarterTurns).toBe(1)
+  })
+
+  it('checkpoints each turn separately: four turns = four undo steps', () => {
+    // The panel dispatches ROTATE_CW + COMMIT per click, so a full circle back
+    // to 0 must still leave four steps to walk back through — not collapse into
+    // one no-op because the orientation ended where it started.
+    let h = initHistory(makeState())
+
+    for (let i = 0; i < 4; i++) {
+      h = wrapped(h, { type: 'ROTATE_CW' })
+      h = wrapped(h, { type: 'COMMIT' })
+    }
+    expect(h.present.orientation.quarterTurns).toBe(0)
+    expect(h.past).toHaveLength(4)
+
+    h = wrapped(h, { type: 'UNDO' })
+    expect(h.present.orientation.quarterTurns).toBe(3)
+  })
+
+  it('restores the flips on undo, not just the turns', () => {
+    let h = initHistory(makeState())
+
+    h = wrapped(h, { type: 'FLIP_H' })
+    h = wrapped(h, { type: 'COMMIT' })
+    expect(h.present.orientation.flipH).toBe(true)
+
+    h = wrapped(h, { type: 'UNDO' })
+    expect(h.present.orientation.flipH).toBe(false)
+  })
+
+  it('COMMIT is a no-op when the orientation is unchanged', () => {
+    // RESET_ORIENTATION on an already-upright image hands out a fresh reference
+    // to the same values; the checkpoint must compare by value, not identity.
+    let h = initHistory(makeState())
+
+    h = wrapped(h, { type: 'RESET_ORIENTATION' })
+    h = wrapped(h, { type: 'COMMIT' })
+
+    expect(h.past).toHaveLength(0)
   })
 
   it('includes masks in history and restores them on undo/redo', () => {

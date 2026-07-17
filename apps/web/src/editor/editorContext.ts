@@ -4,6 +4,7 @@ import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
 import type { BrushStroke, Mask, MaskType } from './masks'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
+import type { Orientation } from './rotation'
 
 /**
  * Shared editor state. For now it holds the live adjustment values; the canvas
@@ -124,6 +125,18 @@ export interface EditorState {
   view: CanvasView
   /** Replaces the zoom/pan. Accepts an updater, like `useState`. */
   setView: Dispatch<SetStateAction<CanvasView>>
+  /** Giros de 90° y volteos aplicados a la imagen. */
+  orientation: Orientation
+  /** Gira la imagen 90° en sentido horario. */
+  rotateCw: () => void
+  /** Gira la imagen 90° en sentido antihorario. */
+  rotateCcw: () => void
+  /** Espeja lo mostrado izquierda↔derecha. */
+  flipH: () => void
+  /** Espeja lo mostrado arriba↔abajo. */
+  flipV: () => void
+  /** Restaura la orientación original. */
+  resetOrientation: () => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

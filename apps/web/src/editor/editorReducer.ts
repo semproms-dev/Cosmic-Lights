@@ -8,6 +8,7 @@ import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
 import { MAX_MASKS, type BrushStroke, type Mask } from './masks'
+import { IDENTITY_ORIENTATION, turn, type Orientation } from './rotation'
 
 /**
  * Estado completo del editor: los valores de los sliders y las curvas de tono,
@@ -38,6 +39,7 @@ export interface EditorStoreState {
   masks: Mask[]
   /** Id de la máscara seleccionada en el panel, o `null` si ninguna. */
   activeMaskId: string | null
+  orientation: Orientation,
 }
 
 export type EditorAction =
@@ -64,6 +66,11 @@ export type EditorAction =
   | { type: 'UNDO' }
   | { type: 'REDO' }
   | { type: 'COMMIT' }
+  | { type: 'ROTATE_CW'}
+  | { type: 'ROTATE_CCW'}
+  | { type: 'FLIP_H'}
+  | { type: 'FLIP_V'}
+  | { type: 'RESET_ORIENTATION'}
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -98,6 +105,38 @@ export function editorReducer(
   action: EditorAction,
 ): EditorStoreState {
   switch (action.type) {
+    // Both turns go through `turn`, which is the only thing that knows a mirror
+    // reverses the direction the user sees. Never touch `quarterTurns` directly.
+    case 'ROTATE_CW':
+      return {
+        ...state,
+        orientation: turn(state.orientation, 'cw'),
+        imageDirty: true
+      }
+    case 'ROTATE_CCW':
+      return {
+        ...state,
+        orientation: turn(state.orientation, 'ccw'),
+        imageDirty: true
+      }
+    case 'FLIP_H':
+      return {
+        ...state,
+        orientation: { ...state.orientation, flipH: !state.orientation.flipH },
+        imageDirty: true
+      }
+    case 'FLIP_V':
+      return {
+        ...state,
+        orientation: { ...state.orientation, flipV: !state.orientation.flipV },
+        imageDirty: true
+      }
+    case 'RESET_ORIENTATION':
+      return {
+        ...state,
+        orientation: IDENTITY_ORIENTATION,
+        imageDirty: false
+      }
     case 'SET':
       return {
         ...state,
@@ -116,7 +155,7 @@ export function editorReducer(
       return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false,
            cropRegion: null, cropRatio: 'Original',
            adjustments: buildInitialAdjustments(), curves: buildDefaultCurves(),
-           masks: [], activeMaskId: null }
+           masks: [], activeMaskId: null, orientation: IDENTITY_ORIENTATION }
     case 'SET_IMAGE_STATUS':
       return { ...state, imageStatus: action.status }
     case 'CLEAR_IMAGE':
