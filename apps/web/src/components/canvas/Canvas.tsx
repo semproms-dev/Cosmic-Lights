@@ -63,11 +63,16 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     closeResetDialog, 
     addBrushStroke, 
     commit, 
-    view, 
-    setView, 
-    orientation } = useEditor()
+    view,
+    setView,
+    orientation,
+    rotationSpin,
+    resetOrientation
+  } = useEditor()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // Wrapper that plays the quarter-turn spin. Rotated only during the animation.
+  const spinRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
   const { showContextMenu } = useContextMenu()
   // Holds the last pointer position while panning; null when not dragging.
@@ -136,10 +141,13 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       if (renderer === null) {
         return
       }
-      const rect = canvas.getBoundingClientRect()
+      // Size the buffer from the *layout* box (`offset*`), not
+      // `getBoundingClientRect()`: during the rotation spin the canvas sits inside
+      // a transformed wrapper, and the client rect would report the rotated box —
+      // swapping width/height and baking a wrong aspect into the buffer.
       const dpr = window.devicePixelRatio || 1
-      const width = Math.round(rect.width * dpr)
-      const height = Math.round(rect.height * dpr)
+      const width = Math.round(canvas.offsetWidth * dpr)
+      const height = Math.round(canvas.offsetHeight * dpr)
       canvas.width = width
       canvas.height = height
       if(image != null) {
@@ -228,6 +236,36 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     return () => canvas.removeEventListener('wheel', handleWheel)
   }, [zoomAtPoint])
 
+  // Quarter-turn spin. The WebGL orientation has already flipped, so the canvas
+  // is showing the *final* frame upright. We fake the motion by starting the
+  // wrapper a quarter turn back — where the old frame sat — and gliding it to 0.
+  // A CW turn moved the image forward, so it starts a quarter CCW, and vice
+  // versa. The resting state is always a plain `rotate(0)`, i.e. pixel-exact.
+  //
+  // The wrapper is container-shaped (not image-shaped), so a bare 90° turn would
+  // stand its long side across the short side and spill out — which the clip then
+  // eats unevenly, reading as a squash. A *uniform* down-scale to the fit factor
+  // (short/long side) keeps the turned frame inside the box; being uniform, it
+  // preserves the aspect, so the image spins and zooms but never distorts.
+  useEffect(() => {
+    const el = spinRef.current
+    if (el === null || rotationSpin === null) {
+      return
+    }
+    // `offset*` are the layout box, unaffected by any transform still on `el`.
+    const fit = Math.min(el.offsetWidth, el.offsetHeight) / Math.max(el.offsetWidth, el.offsetHeight)
+    const from = rotationSpin.direction === 'cw' ? -90 : 90
+    el.style.transition = 'none'
+    el.style.transform = `rotate(${from}deg) scale(${fit})`
+    // Flush the start transform so the browser animates FROM it, not straight to 0.
+    el.getBoundingClientRect()
+    const frame = requestAnimationFrame(() => {
+      el.style.transition = 'transform 220ms ease'
+      el.style.transform = 'rotate(0deg) scale(1)'
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [rotationSpin])
+
   /**
    * What the canvas is currently showing: the full frame while the crop tool is
    * open (the overlay needs it), the committed crop otherwise. Mirrors the
@@ -236,7 +274,8 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
    */
   const shownCrop = cropping ? null : cropRegion
 
-  // Pointer position → image pixels, undoing the zoom/pan and the crop letterbox.
+  // Pointer position → image pixels, undoing the zoom/pan, the crop letterbox
+  // and the orientation.
   const toImagePoint = (e: React.PointerEvent<HTMLCanvasElement>): MaskPoint | null => {
     if (image === null) return null
     const rect = e.currentTarget.getBoundingClientRect()
@@ -244,7 +283,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       { x: e.clientX - rect.left, y: e.clientY - rect.top },
       rect.width, rect.height,
       image.width, image.height,
-      shownCrop, view,
+      shownCrop, view, orientation,
     )
   }
 
@@ -332,10 +371,15 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     clearCrop();
     closeResetDialog();
     setView(IDENTITY_VIEW);
+    resetOrientation();
   }
 
   return <>
-    <canvas onContextMenu={showContextMenu([
+  {/* Outer box clips the quarter-turn overshoot so the spin never spills over
+      the surrounding panels; the inner wrapper is what actually rotates. */}
+  <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+    <div ref={spinRef} style={{ width: '100%', height: '100%' }}>
+     <canvas onContextMenu={showContextMenu([
       {
         key: 'reset',
         icon: <IconZoomReset/>,
@@ -350,6 +394,9 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       onDoubleClick={() => setView(IDENTITY_VIEW)}
       ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : 'default' }} />
 
+    </div>
+  </div>
+   
     <DropOverlay imageLoaded={image !== null} onDropFile={handleDropFile} />
 
 

@@ -104,7 +104,12 @@
     "segmenting": "Segmentierung läuft…",
     "downloadingModel": "Modell wird geladen… {{progress}} %",
     "retry": "Erneut versuchen",
-    "segmentFailed": "Segmentierung fehlgeschlagen"
+    "segmentFailed": "Segmentierung fehlgeschlagen",
+    "rotate": "Drehen und spiegeln",
+    "rotateLeft": "Nach links drehen",
+    "rotateRight": "Nach rechts drehen",
+    "flipUp": "Nach rechts spiegeln",
+    "flipDown": "Nach unten spiegeln"
   },
   "curves": {
     "resetChannel": "Kanal zurücksetzen",

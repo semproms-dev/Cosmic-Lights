@@ -7,7 +7,6 @@ import {
   canvasToImageCoords,
   clampCropRegion,
   constrainAspectRatio,
-  cropToUvTransform,
   displayScale,
   IDENTITY_VIEW,
   pointerToImagePoint,
@@ -17,6 +16,7 @@ import {
   parseAspectRatio,
 } from './crop'
 import {MIN_CROP_SIZE} from '../utils'
+import { cropToUvTransform, IDENTITY_ORIENTATION, type Orientation, type QuarterTurns } from './rotation'
 
 describe('cropToUvTransform', () => {
   it('maps a full-image region to the identity transform', () => {
@@ -292,7 +292,7 @@ describe('pointerToImagePoint', () => {
   it('matches the plain letterbox mapping when nothing is cropped or zoomed', () => {
     const p = pointerToImagePoint(
       { x: 500, y: 375 }, container.w, container.h,
-      image.width, image.height, null, IDENTITY_VIEW,
+      image.width, image.height, null, IDENTITY_VIEW, IDENTITY_ORIENTATION,
     )
     expect(p).toEqual({ x: 2000, y: 1500 })
   })
@@ -302,7 +302,7 @@ describe('pointerToImagePoint', () => {
     // displaying only the crop, so every mark landed off by the crop's origin.
     const p = pointerToImagePoint(
       { x: 0, y: 0 }, container.w, container.h,
-      image.width, image.height, centredCrop, IDENTITY_VIEW,
+      image.width, image.height, centredCrop, IDENTITY_VIEW, IDENTITY_ORIENTATION,
     )
     // The canvas' top-left corner shows the crop's top-left corner.
     expect(p).toEqual({ x: 1000, y: 750 })
@@ -311,7 +311,7 @@ describe('pointerToImagePoint', () => {
   it('maps the far corner of a crop to the crop far corner', () => {
     const p = pointerToImagePoint(
       { x: 1000, y: 750 }, container.w, container.h,
-      image.width, image.height, centredCrop, IDENTITY_VIEW,
+      image.width, image.height, centredCrop, IDENTITY_VIEW, IDENTITY_ORIENTATION,
     )
     expect(p.x).toBeCloseTo(3000, 6)
     expect(p.y).toBeCloseTo(2250, 6)
@@ -322,14 +322,14 @@ describe('pointerToImagePoint', () => {
     // Screen centre is fixed by the zoom, and is the crop centre.
     const centre = pointerToImagePoint(
       { x: 500, y: 375 }, container.w, container.h,
-      image.width, image.height, centredCrop, zoomed,
+      image.width, image.height, centredCrop, zoomed, IDENTITY_ORIENTATION,
     )
     expect(centre.x).toBeCloseTo(2000, 6)
     expect(centre.y).toBeCloseTo(1500, 6)
     // A quarter-width right of centre on screen is an eighth of the crop at 2x.
     const off = pointerToImagePoint(
       { x: 750, y: 375 }, container.w, container.h,
-      image.width, image.height, centredCrop, zoomed,
+      image.width, image.height, centredCrop, zoomed, IDENTITY_ORIENTATION,
     )
     expect(off.x).toBeCloseTo(2000 + centredCrop.width / 8, 6)
   })
@@ -339,10 +339,99 @@ describe('pointerToImagePoint', () => {
     const square = { x: 0, y: 0, width: 1500, height: 1500 }
     const p = pointerToImagePoint(
       { x: 500, y: 375 }, container.w, container.h,
-      image.width, image.height, square, IDENTITY_VIEW,
+      image.width, image.height, square, IDENTITY_VIEW, IDENTITY_ORIENTATION,
     )
     expect(p.x).toBeCloseTo(750, 6)
     expect(p.y).toBeCloseTo(750, 6)
+  })
+
+  describe('with the image turned or mirrored', () => {
+    const oriented = (o: Partial<Orientation>): Orientation => ({ ...IDENTITY_ORIENTATION, ...o })
+
+    // Turned 90°, the 4000x3000 image displays as a 3:4 portrait frame, which
+    // letterboxes to 562.5x750 inside the 1000x750 container: bars left/right.
+    const turnedRect = { x: (1000 - 562.5) / 2, width: 562.5, y: 0, height: 750 }
+
+    it('sends the top-left of a 90° turned display to the image bottom-left', () => {
+      // Turning the photo clockwise carries its bottom-left corner to the top
+      // left, so that is the pixel under the corner of the displayed frame.
+      const p = pointerToImagePoint(
+        { x: turnedRect.x, y: 0 }, container.w, container.h,
+        image.width, image.height, null, IDENTITY_VIEW, oriented({ quarterTurns: 1 }),
+      )
+      expect(p.x).toBeCloseTo(0, 6)
+      expect(p.y).toBeCloseTo(3000, 6)
+    })
+
+    it('mirrors left↔right on flipH: the screen left edge is the image right edge', () => {
+      const p = pointerToImagePoint(
+        { x: 0, y: 375 }, container.w, container.h,
+        image.width, image.height, null, IDENTITY_VIEW, oriented({ flipH: true }),
+      )
+      expect(p.x).toBeCloseTo(4000, 6)
+      expect(p.y).toBeCloseTo(1500, 6)
+    })
+
+    it('walks the top-left of the display round the image, one corner per turn', () => {
+      // Which corner is under the display's top-left, per turn. Turning the
+      // photo clockwise carries its bottom-left corner up to the top-left, so
+      // the corners walk backwards round the image as the turns go forwards.
+      const expected: Record<QuarterTurns, { x: number; y: number }> = {
+        0: { x: 0, y: 0 },
+        1: { x: 0, y: 3000 },
+        2: { x: 4000, y: 3000 },
+        3: { x: 4000, y: 0 },
+      }
+
+      for (const quarterTurns of [0, 1, 2, 3] as QuarterTurns[]) {
+        const turned = quarterTurns % 2 === 1
+        const rect = turned ? turnedRect : { x: 0, y: 0, width: 1000, height: 750 }
+
+        const p = pointerToImagePoint(
+          { x: rect.x, y: rect.y }, container.w, container.h,
+          image.width, image.height, null, IDENTITY_VIEW, oriented({ quarterTurns }),
+        )
+
+        expect({ x: Math.round(p.x), y: Math.round(p.y) }, `turn ${quarterTurns}`)
+          .toEqual(expected[quarterTurns])
+      }
+    })
+
+    it('turns the screen axes: moving right on a 90° display moves up the image', () => {
+      // The property the corner tests cannot see: on an odd turn the screen's x
+      // axis runs along the image's y. 100px right of centre is 100/562.5 of the
+      // displayed width, which spans the image's 3000px height.
+      const p = pointerToImagePoint(
+        { x: 600, y: 375 }, container.w, container.h,
+        image.width, image.height, null, IDENTITY_VIEW, oriented({ quarterTurns: 1 }),
+      )
+      expect(p.x).toBeCloseTo(2000, 6)
+      expect(p.y).toBeCloseTo(1500 - (100 / 562.5) * 3000, 6)
+    })
+
+    it('composes the turn with a crop and a zoom', () => {
+      const zoomed = { scale: 2, offsetX: 0, offsetY: 0 }
+      const o = oriented({ quarterTurns: 3, flipV: true })
+
+      // Screen centre is fixed by every one of these transforms, so it pins the
+      // stack down: crop offset, zoom and turn all have to cancel exactly.
+      const centre = pointerToImagePoint(
+        { x: 500, y: 375 }, container.w, container.h,
+        image.width, image.height, centredCrop, zoomed, o,
+      )
+      expect(centre.x).toBeCloseTo(2000, 6)
+      expect(centre.y).toBeCloseTo(1500, 6)
+
+      // …and an off-centre point, which the centre alone cannot catch: at 2x the
+      // crop's 1500px height spans twice the display, and a 3-quarter turn with
+      // flipV sends screen-right to image-down.
+      const off = pointerToImagePoint(
+        { x: 600, y: 375 }, container.w, container.h,
+        image.width, image.height, centredCrop, zoomed, o,
+      )
+      expect(off.x).toBeCloseTo(2000, 6)
+      expect(off.y).toBeCloseTo(1500 + (100 / 2 / 562.5) * 1500, 6)
+    })
   })
 })
 

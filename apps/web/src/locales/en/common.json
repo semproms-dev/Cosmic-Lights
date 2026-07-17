@@ -104,7 +104,12 @@
     "segmenting": "Segmenting…",
     "downloadingModel": "Downloading model… {{progress}}%",
     "retry": "Retry",
-    "segmentFailed": "Segmentation failed"
+    "segmentFailed": "Segmentation failed",
+    "rotate": "Rotate and flip",
+    "rotateLeft": "Rotate left",
+    "rotateRight": "Rotate right",
+    "flipUp": "Flip right",
+    "flipDown": "Flip down"
   },
   "curves": {
     "resetChannel": "Reset channel",

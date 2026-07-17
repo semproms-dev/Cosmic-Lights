@@ -104,7 +104,12 @@
     "segmenting": "Segmentazione in corso…",
     "downloadingModel": "Download del modello… {{progress}}%",
     "retry": "Riprova",
-    "segmentFailed": "Segmentazione non riuscita"
+    "segmentFailed": "Segmentazione non riuscita",
+    "rotate": "Ruota e capovolgi",
+    "rotateLeft": "Ruota a sinistra",
+    "rotateRight": "Ruota a destra",
+    "flipUp": "Capovolgi a destra",
+    "flipDown": "Capovolgi in basso"
   },
   "curves": {
     "resetChannel": "Reimposta canale",

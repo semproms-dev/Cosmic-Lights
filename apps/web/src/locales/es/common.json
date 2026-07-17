@@ -104,7 +104,12 @@
     "segmenting": "Segmentando…",
     "downloadingModel": "Descargando modelo… {{progress}} %",
     "retry": "Reintentar",
-    "segmentFailed": "La segmentación ha fallado"
+    "segmentFailed": "La segmentación ha fallado",
+    "rotate": "Girar y voltear",
+    "rotateLeft": "Girar a la izquierda",
+    "rotateRight": "Girar a la derecha",
+    "flipUp": "Voltear a la derecha",
+    "flipDown": "Voltear hacia abajo"
   },
   "curves": {
     "resetChannel": "Restablecer canal",

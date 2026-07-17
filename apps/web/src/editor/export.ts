@@ -1,5 +1,6 @@
 import type { CropRegion } from './image'
 import type { ExportFormat } from './exportFormats'
+import type { Orientation } from './rotation'
 
 /**
  * File extension per export format. JPEG collapses to the conventional 'jpg';
@@ -21,23 +22,36 @@ export interface ExportSize {
 }
 
 /**
- * Output pixel dimensions for an export: the full frame when there is no crop,
- * otherwise the crop size rounded to whole pixels (a drag leaves sub-pixel
- * sizes). Sizing the export canvas to these values makes its aspect match the
- * crop's, so the renderer's letterbox collapses to identity — the crop fills
- * the frame, at its native resolution, with no bars.
+ * Output pixel dimensions for an export: the size of the frame **as the user
+ * sees it**. That is the crop (rounded to whole pixels — a drag leaves
+ * sub-pixel sizes), or the full frame when there is no crop, with the two axes
+ * **swapped on an odd quarter turn**, because a quarter turn stands the frame on
+ * its end.
+ *
+ * Sizing the export canvas to these values makes its aspect match the displayed
+ * aspect, so the renderer's letterbox collapses to identity — the frame fills
+ * the output, at its native resolution, with no bars. Get the swap wrong and the
+ * letterbox does *not* collapse: a turned photo exports with bars instead of
+ * matching what is on screen.
+ *
+ * The flips are deliberately ignored: a mirror moves pixels, never the frame.
  *
  * @param crop - The active crop region, or null for the full frame.
  * @param imageWidth - Full image width in pixels.
  * @param imageHeight - Full image height in pixels.
+ * @param orientation - The turns and mirroring the user has applied.
  */
 export function exportDimensions(
   crop: CropRegion | null,
   imageWidth: number,
   imageHeight: number,
+  orientation: Orientation,
 ): ExportSize {
-  if (!crop) return { width: imageWidth, height: imageHeight }
-  return { width: Math.round(crop.width), height: Math.round(crop.height) }
+  const width = crop ? Math.round(crop.width) : imageWidth
+  const height = crop ? Math.round(crop.height) : imageHeight
+  return orientation.quarterTurns % 2 === 1
+    ? { width: height, height: width }
+    : { width, height }
 }
 
 /**

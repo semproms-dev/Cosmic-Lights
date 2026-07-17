@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { CropRegion } from './image'
-import { cropToUvTransform } from './crop'
 import {
   applyUvTransform,
+  cropToUvTransform,
   IDENTITY_ORIENTATION,
   turn,
   uvTransform,

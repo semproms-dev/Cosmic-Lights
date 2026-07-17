@@ -1,9 +1,10 @@
-import { ActionIcon, Group, SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, Group, SegmentedControl, Stack, Text, Title, Tooltip } from '@mantine/core';
 import { useEditor } from '../../editor/editorContext';
 import { FaArrowRotateLeft } from "react-icons/fa6";
 import { FaArrowRotateRight } from "react-icons/fa6";
 import { LuFlipHorizontal2 } from "react-icons/lu";
 import { LuFlipVertical2 } from "react-icons/lu";
+import { useTranslation } from 'react-i18next';
 
 const aspectRatios = ['Original', '1:1', '16:9', '4:3', '3:2', '5:4', 'Free'];
 
@@ -12,7 +13,8 @@ const aspectRatios = ['Original', '1:1', '16:9', '4:3', '3:2', '5:4', 'Free'];
  * store so the crop overlay can constrain the draft to the chosen ratio.
  */
 export function CropPanel() {
-  const { cropRatio, setCropRatio, commit, image, clearCrop, cropRegion, rotateCcw, rotateCw, flipH, flipV } = useEditor();
+  const { cropRatio, setCropRatio, commit, image, rotateCcw, rotateCw, flipH, flipV } = useEditor();
+  const {t} = useTranslation(['common']);
 
   // Picking a ratio is a discrete edit: apply it, then checkpoint it as one undo step.
   const handleRatioChange = (value: string) => {
@@ -40,22 +42,31 @@ export function CropPanel() {
         onChange={handleRatioChange}
         data={aspectRatios}
       />
-      <Group>
-        <Text>Rotar y voltear:</Text>
-        <ActionIcon>
-          <FaArrowRotateLeft cursor={'pointer'} onClick={() => {rotateCcw(); commit();}}/>
-        </ActionIcon>
-        <ActionIcon>
-          <FaArrowRotateRight cursor={'pointer'} onClick={() => {rotateCw(); commit();}}/>
-        </ActionIcon>
-        <ActionIcon>
-          <LuFlipHorizontal2 cursor={'pointer'} onClick={() => {flipH(); commit();}}/>
-        </ActionIcon>
-        <ActionIcon>
-          <LuFlipVertical2 cursor={'pointer'} onClick={() => {flipV(); commit()}}/>
-        </ActionIcon>
-      </Group>
-
-    </Stack>
+        <Stack gap="xs">
+          <Group wrap="nowrap" gap="xs">
+            <Text size='sm'>{t('masks.rotate')}</Text>
+            <Tooltip label={t('masks.rotateLeft')}>
+                <ActionIcon disabled={image === null} size={'sm'} onClick={() => {rotateCcw(); commit();}}>
+                <FaArrowRotateLeft style={{width: '50%'}}/>
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('masks.rotateRight')}>
+              <ActionIcon disabled={image === null} size={'sm'} onClick={() => {rotateCw(); commit();}}>
+                <FaArrowRotateRight style={{width: '50%'}}/>
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('masks.flipUp')}>
+              <ActionIcon disabled={image === null} size={'sm'} onClick={() => {flipH(); commit();}}>
+                <LuFlipHorizontal2 style={{width: '50%'}}/>
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('masks.flipDown')}>
+              <ActionIcon disabled={image === null} size={'sm'} onClick={() => {flipV(); commit()}}>
+                <LuFlipVertical2 style={{width: '50%'}}/>
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        </Stack>
+      </Stack>
   );
 }

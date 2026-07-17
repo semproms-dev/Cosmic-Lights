@@ -52,7 +52,7 @@ const embedExif = async (
 };
 
 export function ExportPanel() {
-  const { image, adjustments, curves, cropRegion, masks, maskAlphas } = useEditor();
+  const { image, adjustments, curves, cropRegion, masks, maskAlphas, orientation } = useEditor();
   const [format, setFormat] = useState('JPEG');
   const [quality, setQuality] = useState(90);
   const [loading, setLoading] = useState(false);
@@ -75,15 +75,16 @@ export function ExportPanel() {
       return null;
     }
 
-    // Size the output to the crop (rounded, since a drag leaves sub-pixel
-    // sizes), or the full frame when there is no crop. Passing these same
-    // dimensions to render() makes the canvas aspect match the crop aspect, so
-    // the letterbox scale collapses to identity: the crop fills the frame with
-    // no bars, at its native resolution.
+    // Size the output to the frame as displayed — the crop (rounded, since a
+    // drag leaves sub-pixel sizes) or the full image, with the axes swapped on
+    // an odd turn. Passing these same dimensions to render() makes the canvas
+    // aspect match the displayed aspect, so the letterbox scale collapses to
+    // identity: the frame fills the output with no bars, at native resolution.
     const { width: outWidth, height: outHeight } = exportDimensions(
       cropRegion,
       image.width,
       image.height,
+      orientation,
     );
 
     const canvas = document.createElement('canvas');
@@ -96,6 +97,7 @@ export function ExportPanel() {
     renderer.uploadImage(image.bitmap);
     renderer.uploadCurves(compileCurveTexture(curves));
     renderer.setCrop(cropRegion, image.width, image.height);
+    renderer.setOrientation(orientation);
     renderer.render(
       {
         exposure: adjustments.exposure ?? 0,

@@ -4,7 +4,19 @@ import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
 import type { BrushStroke, Mask, MaskType } from './masks'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
-import type { Orientation } from './rotation'
+import type { Orientation, TurnDirection } from './rotation'
+
+/**
+ * One-shot signal that a 90° rotation was just applied, so the canvas can play
+ * the spin animation. Transient view state — never part of the undo history.
+ *
+ * `id` changes on every rotation (even repeats in the same direction) so the
+ * canvas effect re-fires each time; `direction` is which way the user turned.
+ */
+export interface RotationSpin {
+  direction: TurnDirection
+  id: number
+}
 
 /**
  * Shared editor state. For now it holds the live adjustment values; the canvas
@@ -137,6 +149,11 @@ export interface EditorState {
   flipV: () => void
   /** Restaura la orientación original. */
   resetOrientation: () => void
+  /**
+   * Transient signal fired by {@link rotateCw}/{@link rotateCcw} so the canvas
+   * can animate the quarter turn. `null` until the first rotation. Not undoable.
+   */
+  rotationSpin: RotationSpin | null
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

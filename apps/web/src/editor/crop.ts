@@ -1,18 +1,8 @@
 import { clamp, MIN_CROP_SIZE } from "../utils";
 import type { CropRegion } from "./image";
+import { applyUvTransform, uvTransform, type Orientation } from "./rotation";
 
-export const cropToUvTransform = (region: CropRegion, imageWidth: number, imageHeight: number) => {
-      let { x, y, width, height } = region
-      const offsetX = x / imageWidth;
-      const offsetY = y / imageHeight;
-
-      const scaleX = width / imageWidth;
-      const scaleY = height / imageHeight;
-
-      return {offsetX, offsetY, scaleX, scaleY}
-}
-
-export const clampCropRegion = (region: CropRegion, imageWidth: number, imageHeight: number): CropRegion => {
+export const clampCropRegion =(region: CropRegion, imageWidth: number, imageHeight: number): CropRegion => {
     const width = clamp(region.width, MIN_CROP_SIZE, imageWidth);
     const height = clamp(region.height, MIN_CROP_SIZE, imageHeight);
 
@@ -194,12 +184,20 @@ export const canvasToImageCoords = (
  * Maps a pointer position to image pixels, honouring everything the renderer
  * does to get the image on screen — in the same order, inverted.
  *
- * There are two transforms between a click and a pixel, and missing either one
+ * There are three transforms between a click and a pixel, and missing any one
  * fails silently (the mark simply lands somewhere else):
  *
- * 1. the interactive zoom/pan ({@link viewToBasePoint}), and
- * 2. the letterbox — which fits the **crop region** when one is applied, not the
- *    full frame, so a cropped image maps through the crop's own box.
+ * 1. the interactive zoom/pan ({@link viewToBasePoint}),
+ * 2. the letterbox — which fits the frame **as displayed**: the crop region when
+ *    one is applied rather than the full frame, and with its axes swapped on an
+ *    odd quarter turn, and
+ * 3. the orientation itself — the turns and mirrors.
+ *
+ * Steps 2 and 3 are not re-derived here. The renderer's own remap
+ * (`uvTransform`) already answers "which source pixel lands on this output
+ * point?", which is exactly this question, so this asks it instead of inverting
+ * it by hand: one definition, no drift. With an upright, unmirrored orientation
+ * it reduces exactly to the plain letterbox mapping it replaces.
  *
  * Anything that turns a pointer into an image pixel must come through here, or
  * it will quietly disagree with what the user sees.
@@ -212,6 +210,7 @@ export const canvasToImageCoords = (
  * @param crop - The crop the canvas is *currently displaying*, or `null` for the
  * full frame. Pass `null` while the crop tool is open: it shows the full frame.
  * @param view - The active zoom/pan.
+ * @param orientation - The turns and mirroring the canvas is displaying.
  * @returns The position in full-image pixels.
  */
 export const pointerToImagePoint = (
@@ -222,15 +221,31 @@ export const pointerToImagePoint = (
   imageHeight: number,
   crop: CropRegion | null,
   view: CanvasView,
+  orientation: Orientation,
 ): { x: number; y: number } => {
   const base = viewToBasePoint(point, containerWidth, containerHeight, view)
-  if (crop === null) {
-    return canvasToImageCoords(base, imageWidth, imageHeight, containerWidth, containerHeight)
+
+  // The letterbox fits the frame the user sees, so an odd turn stands it on its
+  // end here too — exactly as `uvTransform`'s `displayedAspect` reports it.
+  const frameWidth = crop?.width ?? imageWidth
+  const frameHeight = crop?.height ?? imageHeight
+  const turned = orientation.quarterTurns % 2 === 1
+  const disp = getImageDisplayRect(
+    turned ? frameHeight : frameWidth,
+    turned ? frameWidth : frameHeight,
+    containerWidth,
+    containerHeight,
+  )
+
+  // Where the point sits on the displayed quad, [0,1]² y-down — the shader's
+  // `vUv`. Points outside the letterboxed frame fall outside that range and map
+  // outside the image, which callers clamp.
+  const vUv = {
+    x: (base.x - disp.x) / disp.width,
+    y: (base.y - disp.y) / disp.height,
   }
-  // The canvas shows the crop letterboxed by its own aspect, so map into the
-  // crop's box and then shift by where that box sits in the image.
-  const inCrop = canvasToImageCoords(base, crop.width, crop.height, containerWidth, containerHeight)
-  return { x: crop.x + inCrop.x, y: crop.y + inCrop.y }
+  const uv = applyUvTransform(uvTransform(orientation, crop, imageWidth, imageHeight), vUv)
+  return { x: uv.x * imageWidth, y: uv.y * imageHeight }
 }
 
 /**

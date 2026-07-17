@@ -5,7 +5,7 @@ import type { ChannelId, CurvePoint } from './curves'
 import { rgbToRgba, type CropRegion } from './image'
 import { IDENTITY_VIEW, type CanvasView } from './crop'
 import { decodeRaw } from './decodeRaw'
-import { EditorContext } from './editorContext'
+import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
@@ -57,6 +57,12 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // Canvas zoom/pan. Transient (never undoable), but shared: the crop overlay
   // draws on top of the canvas and must undo the very same transform.
   const [view, setView] = useState<CanvasView>(IDENTITY_VIEW)
+
+  // One-shot spin signal for the canvas' rotation animation. Transient, like
+  // `view`: it only cues a CSS transition, so it must not live in the history.
+  // `spinId` mints a fresh id per turn so repeats re-fire the canvas effect.
+  const [rotationSpin, setRotationSpin] = useState<RotationSpin | null>(null)
+  const spinId = useRef(0)
 
   // Generated alphas for AI masks. A ref, not state: the pixels are heavy and
   // must stay out of the undo history, which only tracks each mask's `version`.
@@ -129,18 +135,23 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const rotateCw = () => {
     dispatch({type: 'ROTATE_CW'})
+    setRotationSpin({ direction: 'cw', id: ++spinId.current })
   }
 
   const rotateCcw = () => {
     dispatch({type: 'ROTATE_CCW'})
+    setRotationSpin({ direction: 'ccw', id: ++spinId.current })
   }
+  
 
    const flipH = () => {
     dispatch({type: 'FLIP_H'})
+    setRotationSpin({ direction: 'flipH', id: ++spinId.current })
   }
 
   const flipV = () => {
     dispatch({type: 'FLIP_V'})
+    setRotationSpin({ direction: 'flipV', id: ++spinId.current })
   }
 
   const resetOrientation = () => {
@@ -322,7 +333,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         rotateCcw,
         resetOrientation,
         flipV,
-        flipH
+        flipH,
+        rotationSpin
       }}
     >
       {children}

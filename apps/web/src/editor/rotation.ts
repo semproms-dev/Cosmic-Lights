@@ -1,5 +1,29 @@
-import { cropToUvTransform } from './crop'
 import type { CropRegion } from './image'
+
+/**
+ * A crop region in image pixels → the UV offset and scale that samples it: the
+ * fraction of the image its origin sits at, and the fraction of the image it
+ * spans.
+ *
+ * It lives here rather than in `crop.ts` because {@link uvTransform} is its only
+ * consumer, and the dependency has to run this way round: `crop.ts` needs this
+ * module to map a pointer through the orientation, so this module must not need
+ * `crop.ts` back.
+ *
+ * @param region - The crop region, in image pixels.
+ * @param imageWidth - Full image width in pixels.
+ * @param imageHeight - Full image height in pixels.
+ */
+export const cropToUvTransform = (region: CropRegion, imageWidth: number, imageHeight: number) => {
+  const { x, y, width, height } = region
+  const offsetX = x / imageWidth
+  const offsetY = y / imageHeight
+
+  const scaleX = width / imageWidth
+  const scaleY = height / imageHeight
+
+  return { offsetX, offsetY, scaleX, scaleY }
+}
 
 /**
  * Quarter turns applied to the image, **clockwise**, and measured against the
@@ -33,7 +57,7 @@ export const IDENTITY_ORIENTATION: Orientation = {
 }
 
 /** Which way a turn goes **from the user's point of view**, not the image's. */
-export type TurnDirection = 'cw' | 'ccw'
+export type TurnDirection = 'cw' | 'ccw' | 'flipH' | 'flipV'
 
 /**
  * Turns the orientation a quarter in the direction the user *sees* — what the
