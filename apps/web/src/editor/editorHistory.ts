@@ -1,7 +1,7 @@
 import { CHANNELS, type Curves } from "./curves";
 import type { EditorAction, editorReducer, EditorStoreState } from "./editorReducer";
 import type { CropRegion } from "./image";
-import type { BrushStroke, Mask } from "./masks";
+import type { BrushStroke, GradientLine, Mask } from "./masks";
 import type { Orientation } from "./rotation";
 
 
@@ -67,6 +67,11 @@ const strokesEqual = (a: BrushStroke[], b: BrushStroke[]): boolean =>
     )
   })
 
+const gradientEquals = (a: GradientLine | null, b: GradientLine | null): boolean =>
+  a === b || // covers null === null
+  (a !== null && b !== null &&
+   a.x1 === b.x1 && a.y1 === b.y1 && a.x2 === b.x2 && a.y2 === b.y2)
+
 const maskEquals = (a: Mask, b: Mask): boolean =>
   a.id === b.id &&
   a.type === b.type &&
@@ -74,7 +79,8 @@ const maskEquals = (a: Mask, b: Mask): boolean =>
   a.invert === b.invert &&
   a.version === b.version &&
   recordEquals(a.adjustments, b.adjustments) &&
-  strokesEqual(a.strokes, b.strokes)
+  strokesEqual(a.strokes, b.strokes) &&
+  gradientEquals(a.gradient, b.gradient)
 
 const masksEqual = (a: Mask[], b: Mask[]): boolean =>
   a.length === b.length && a.every((m, i) => maskEquals(m, b[i]))

@@ -276,6 +276,18 @@ describe('editorReducer — masks', () => {
     expect(next.imageDirty).toBe(true)
   })
 
+  it('SET_MASK_GRADIENT sets the ramp and bumps the version', () => {
+    const mask = createMask('linear', 'Linear Gradient 1')
+    const state = createState({ masks: [mask] })
+    const gradient = { x1: 0, y1: 0, x2: 100, y2: 200 }
+
+    const next = editorReducer(state, { type: 'SET_MASK_GRADIENT', id: mask.id, gradient })
+
+    expect(next.masks[0].gradient).toEqual(gradient)
+    expect(next.masks[0].version).toBe(1)
+    expect(next.imageDirty).toBe(true)
+  })
+
   it('SET_MASK_VERSION publishes the exact version it is given', () => {
     const mask = createMask('subject', 'Subject 1')
     const state = createState({ masks: [mask] })

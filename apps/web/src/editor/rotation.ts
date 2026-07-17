@@ -216,3 +216,32 @@ export function applyUvTransform(
     y: transform.center[1] + m10 * sx + m11 * sy,
   }
 }
+
+/**
+ * The inverse of {@link applyUvTransform}: given an image UV, returns the point
+ * on the output quad (`[0,1]²`, y-down from the top) that samples it.
+ *
+ * It exists so something authored in image space — a gradient's handles — can be
+ * drawn back where the user sees it, through the very same crop and orientation
+ * the forward transform bakes in. Solving `uv = center + M·(vUv − 0.5)` for `vUv`
+ * needs `M⁻¹`; `M` is a quarter-turn (optionally mirrored) of a non-empty crop,
+ * so it is always non-degenerate and `det ≠ 0`.
+ *
+ * @param transform - The transform to invert.
+ * @param uv - An image UV, y-down from the image's top.
+ * @returns The point on the output quad, `[0,1]²` y-down, that samples it.
+ */
+export function applyInverseUvTransform(
+  transform: UvTransform,
+  uv: { x: number; y: number },
+): { x: number; y: number } {
+  const [m00, m10, m01, m11] = transform.matrix
+  const det = m00 * m11 - m01 * m10
+  const dx = uv.x - transform.center[0]
+  const dy = uv.y - transform.center[1]
+  // vUv − 0.5 = M⁻¹ · (uv − center), with M = [[m00, m01], [m10, m11]].
+  return {
+    x: (m11 * dx - m01 * dy) / det + 0.5,
+    y: (-m10 * dx + m00 * dy) / det + 0.5,
+  }
+}

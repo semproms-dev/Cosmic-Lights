@@ -7,7 +7,7 @@ import {
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
-import { MAX_MASKS, type BrushStroke, type Mask } from './masks'
+import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask } from './masks'
 import { IDENTITY_ORIENTATION, turn, type Orientation } from './rotation'
 
 /**
@@ -62,6 +62,7 @@ export type EditorAction =
   | { type: 'SET_MASK_INVERT'; id: string; invert: boolean }
   | { type: 'RENAME_MASK'; id: string; name: string }
   | { type: 'ADD_BRUSH_STROKE'; id: string; stroke: BrushStroke }
+  | { type: 'SET_MASK_GRADIENT'; id: string; gradient: GradientLine }
   | { type: 'SET_MASK_VERSION'; id: string; version: number }
   | { type: 'UNDO' }
   | { type: 'REDO' }
@@ -229,6 +230,18 @@ export function editorReducer(
           ...mask,
           strokes: [...mask.strokes, action.stroke],
           // Bump the pixel-data revision so the cached alpha is rebuilt.
+          version: mask.version + 1,
+        })),
+        imageDirty: true,
+      }
+    case 'SET_MASK_GRADIENT':
+      // Changes the pixels → bump version, like ADD_BRUSH_STROKE. (Not
+      // SET_MASK_VERSION, which *fixes* a version for the async AI path.)
+      return {
+        ...state,
+        masks: updateMask(state.masks, action.id, (mask) => ({
+          ...mask,
+          gradient: action.gradient,
           version: mask.version + 1,
         })),
         imageDirty: true,

@@ -44,7 +44,7 @@ interface AddOption {
 const ADD_OPTIONS: AddOption[] = [
   { type: 'subject', labelKey: 'selectSubject', icon: IconUser },
   { type: 'brush', labelKey: 'brush', icon: IconBrush },
-  { type: null, labelKey: 'linearGradient', icon: IconLine, disabled: true },
+  { type: 'linear', labelKey: 'linearGradient', icon: IconLine },
   { type: null, labelKey: 'radialGradient', icon: IconCircleDot, disabled: true },
   { type: null, labelKey: 'colorRange', icon: IconColorSwatch, disabled: true },
   { type: null, labelKey: 'luminanceRange', icon: IconContrast, disabled: true },

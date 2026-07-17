@@ -9,7 +9,7 @@ import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
-import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type MaskType } from './masks'
+import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type GradientLine, type MaskType } from './masks'
 import {
   TransformersSegmentationProvider,
   type SegmentationProvider,
@@ -217,8 +217,9 @@ export function EditorProvider({ children }: EditorProviderProps) {
     const sameType = state.masks.filter((mask) => mask.type === type).length
     const mask = createMask(type, `${MASK_TYPE_LABEL[type]} ${sameType + 1}`)
     dispatch({ type: 'ADD_MASK', mask })
-    if (type !== 'brush') {
-      // `mask` is brand new, so its version is known here without reading state.
+    if (type === 'subject' || type === 'sky') {
+      // AI masks only. `mask` is brand new, so its version is known here without
+      // reading state. (`brush` paints later; `linear` rasterises from geometry.)
       void runSegmentation(mask.id, type, mask.version + 1)
     }
     return mask.id
@@ -229,11 +230,11 @@ export function EditorProvider({ children }: EditorProviderProps) {
    * version from state — safe here, because this is called from an event
    * handler, where `state` is the freshly rendered snapshot.
    *
-   * @param id - The mask to retry. Ignored if it is gone or is a brush.
+   * @param id - The mask to retry. Ignored if it is gone or is not an AI mask.
    */
   const retryMask = (id: string): void => {
     const mask = state.masks.find((candidate) => candidate.id === id)
-    if (mask === undefined || mask.type === 'brush') return
+    if (mask === undefined || (mask.type !== 'subject' && mask.type !== 'sky')) return
     void runSegmentation(id, mask.type, mask.version + 1)
   }
 
@@ -259,6 +260,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const addBrushStroke = (id: string, stroke: BrushStroke) => {
     dispatch({ type: 'ADD_BRUSH_STROKE', id, stroke })
+  }
+
+  const setMaskGradient = (id: string, gradient: GradientLine) => {
+    dispatch({ type: 'SET_MASK_GRADIENT', id, gradient })
   }
 
   /**
@@ -320,6 +325,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
         setMaskInvert,
         renameMask,
         addBrushStroke,
+        setMaskGradient,
         maskOverlayHidden,
         setMaskOverlayHidden,
         maskAlphas,

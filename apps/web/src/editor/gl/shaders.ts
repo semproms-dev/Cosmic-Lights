@@ -247,6 +247,50 @@ void main() {
 }
 `
 
+/**
+ * Linear-gradient rasteriser — vertex stage. A bare full-screen quad with no
+ * uniforms: `vUv` runs 0..1 with `vUv.y = 0` at the image top, matching the
+ * brush stamp's stored orientation (`renderer.ts` stamps `py/H`), so a rasterised
+ * ramp lines up with everything else the pipeline draws. Own shader rather than
+ * reusing `VERTEX_SHADER` so there is no `uScale`/`uOffset`/`uFlipV` to remember
+ * to set on this program.
+ */
+export const GRADIENT_VERTEX_SHADER = `#version 300 es
+layout(location = 0) in vec2 aPos;
+out vec2 vUv;
+void main() {
+  vUv = aPos * 0.5 + 0.5;            // vUv.y = 0 → image top
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}
+`
+
+/**
+ * Linear-gradient rasteriser — fragment stage. Writes a weight that is 1 on the
+ * line through `uP1` (perpendicular to P1→P2), 0 on the line through `uP2`, and
+ * ramps linearly between — Lightroom's three-line model.
+ *
+ * The projection runs in image PIXELS, not normalised UV: in UV the aspect ratio
+ * warps the metric, so the iso-lines would not come out perpendicular to the
+ * dragged line on any non-square photo. Hence `uImageSize`.
+ */
+export const GRADIENT_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+uniform vec2 uP1;         // image px — full-effect line (w = 1)
+uniform vec2 uP2;         // image px — zero-effect line (w = 0)
+uniform vec2 uImageSize;  // (W, H) in px
+void main() {
+  vec2 p = vUv * uImageSize;         // to PIXELS before anything else
+  vec2 d = uP2 - uP1;
+  float dd = dot(d, d);
+  // p1 == p2 (a click with no drag) → no direction: empty mask, not NaN.
+  float t = dd > 0.0 ? clamp(dot(p - uP1, d) / dd, 0.0, 1.0) : 1.0;
+  float w = 1.0 - t;
+  fragColor = vec4(w, w, w, w);      // the mask shader reads .r
+}
+`
+
 /** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation → curves → sharpness/threshold. */
 export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;

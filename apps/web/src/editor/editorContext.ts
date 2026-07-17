@@ -2,7 +2,7 @@ import { createContext, use, type Dispatch, type RefObject, type SetStateAction 
 import type { CanvasView } from './crop'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
-import type { BrushStroke, Mask, MaskType } from './masks'
+import type { BrushStroke, GradientLine, Mask, MaskType } from './masks'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
 import type { Orientation, TurnDirection } from './rotation'
 
@@ -95,6 +95,8 @@ export interface EditorState {
   renameMask: (id: string, name: string) => void
   /** Appends a freehand brush stroke to a brush mask. */
   addBrushStroke: (id: string, stroke: BrushStroke) => void
+  /** Sets (or replaces) the gradient ramp of a `linear` mask. */
+  setMaskGradient: (id: string, gradient: GradientLine) => void
   /**
    * Whether the red mask overlay is temporarily hidden — set while a mask slider
    * is being dragged so the adjustment is visible, cleared on release.

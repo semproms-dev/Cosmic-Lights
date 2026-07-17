@@ -1,17 +1,30 @@
 import { basicAdjustments, buildDefaults, colorAdjustement } from './adjustments'
 
 /**
- * How a mask's alpha map is produced. All three resolve to the same thing — a
+ * How a mask's alpha map is produced. All resolve to the same thing — a
  * single-channel weight per pixel — but differ in how that weight is generated:
  * `brush` from freehand strokes, `subject`/`sky` from an in-browser segmentation
- * model. The application pipeline treats them identically.
+ * model, `linear` from a rasterised gradient ramp. The application pipeline
+ * treats them identically.
  */
-export type MaskType = 'brush' | 'subject' | 'sky'
+export type MaskType = 'brush' | 'subject' | 'sky' | 'linear'
 
 /** A point of a brush stroke, in image-pixel coordinates. */
 export interface MaskPoint {
   x: number
   y: number
+}
+
+/**
+ * A linear gradient, in image pixels. The weight is 1 on the line through
+ * (x1,y1) perpendicular to the segment, 0 on the line through (x2,y2), and
+ * decreases linearly between them. Lightroom's three-line model.
+ */
+export interface GradientLine {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
 }
 
 /** Whether a brush stroke paints the mask in or carves it back out. */
@@ -36,9 +49,10 @@ export interface BrushStroke {
 
 /**
  * A single local-adjustment mask. `adjustments` holds this mask's own slider
- * values (see {@link MASK_ADJUSTMENT_KEYS}); `strokes` describes a brush mask
- * and stays empty for AI masks. `version` bumps whenever the mask's pixel data
- * changes, so the external pixel cache can be keyed by `id@version`.
+ * values (see {@link MASK_ADJUSTMENT_KEYS}); `strokes` describes a brush mask and
+ * `gradient` a linear one — each stays at its empty value for the other types.
+ * `version` bumps whenever the mask's pixel data changes, so the external pixel
+ * cache can be keyed by `id@version`.
  */
 export interface Mask {
   id: string
@@ -48,8 +62,11 @@ export interface Mask {
   adjustments: Record<string, number>
   /** Inverts the mask weight (affect everything *outside* the selection). */
   invert: boolean
-  /** Brush strokes, oldest first. Empty for `subject`/`sky` masks. */
+  /** Brush strokes, oldest first. Empty for non-brush masks. */
   strokes: BrushStroke[]
+  /** Gradient ramp for a `linear` mask; `null` for every other type, and for a
+   * `linear` mask until the first drag defines it. */
+  gradient: GradientLine | null
   /** Pixel-data revision; bump to invalidate the cached alpha for this mask. */
   version: number
 }
@@ -72,6 +89,7 @@ export const MASK_TYPE_LABEL: Record<MaskType, string> = {
   brush: 'Brush',
   subject: 'Subject',
   sky: 'Sky',
+  linear: 'Linear Gradient',
 }
 
 /**
@@ -101,6 +119,7 @@ export function createMask(type: MaskType, name: string): Mask {
     adjustments: buildMaskAdjustments(),
     invert: false,
     strokes: [],
+    gradient: null,
     version: 0,
   }
 }

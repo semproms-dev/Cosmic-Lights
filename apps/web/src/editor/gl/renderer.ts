@@ -6,12 +6,14 @@ import {
   BRUSH_VERTEX_SHADER,
   CLARITY_FRAGMENT_SHADER,
   FRAGMENT_SHADER,
+  GRADIENT_FRAGMENT_SHADER,
+  GRADIENT_VERTEX_SHADER,
   MASK_FRAGMENT_SHADER,
   VERTEX_SHADER,
 } from './shaders'
 import type { CropRegion } from '../image'
 import { IDENTITY_ORIENTATION, uvTransform, type Orientation } from '../rotation'
-import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type Mask, type MaskPoint } from '../masks'
+import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint } from '../masks'
 import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
 
 /**
@@ -133,6 +135,14 @@ export class WebGLRenderer {
   private readonly uBrushCenter: WebGLUniformLocation | null
   private readonly uBrushRadius: WebGLUniformLocation | null
   private readonly uBrushHardness: WebGLUniformLocation | null
+
+  // Sixth program: the linear-gradient rasteriser. Fills a mask's alpha target
+  // with a ramp described by two image-space points (full-effect and zero-effect
+  // lines). Shares the full-screen quad VAO; no vertex uniforms.
+  private readonly gradientProgram: WebGLProgram
+  private readonly uGradP1: WebGLUniformLocation | null
+  private readonly uGradP2: WebGLUniformLocation | null
+  private readonly uGradImageSize: WebGLUniformLocation | null
 
   // Per-mask alpha targets, keyed by mask id, with the mask version they were
   // last rebuilt from (so `syncMasks` only re-rasterises when strokes change).
@@ -287,6 +297,11 @@ export class WebGLRenderer {
     this.uBrushCenter = gl.getUniformLocation(this.brushProgram, 'uCenter')
     this.uBrushRadius = gl.getUniformLocation(this.brushProgram, 'uRadius')
     this.uBrushHardness = gl.getUniformLocation(this.brushProgram, 'uHardness')
+
+    this.gradientProgram = createProgram(gl, GRADIENT_VERTEX_SHADER, GRADIENT_FRAGMENT_SHADER)
+    this.uGradP1 = gl.getUniformLocation(this.gradientProgram, 'uP1')
+    this.uGradP2 = gl.getUniformLocation(this.gradientProgram, 'uP2')
+    this.uGradImageSize = gl.getUniformLocation(this.gradientProgram, 'uImageSize')
 
     gl.clearColor(0, 0, 0, 0)
   }
@@ -538,6 +553,35 @@ export class WebGLRenderer {
   }
 
   /**
+   * Clears a mask target and rasterises a linear gradient into it. A `null`
+   * gradient (a freshly created mask, before the first drag) leaves the target
+   * empty — the correct render of "no gradient yet".
+   *
+   * @param target - The mask alpha target to overwrite.
+   * @param gradient - The ramp, in image pixels, or `null` for an empty mask.
+   */
+  private rebuildGradientTarget(target: RenderTarget, gradient: GradientLine | null): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    gl.clearColor(0, 0, 0, 0)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    if (gradient === null) return
+
+    // The ramp overwrites the whole target, so blending must be off — otherwise
+    // it would composite against the cleared contents. Set it explicitly rather
+    // than trusting whatever the previous pass left.
+    gl.disable(gl.BLEND)
+    gl.useProgram(this.gradientProgram)
+    gl.bindVertexArray(this.vao)
+    gl.uniform2f(this.uGradP1, gradient.x1, gradient.y1)
+    gl.uniform2f(this.uGradP2, gradient.x2, gradient.y2)
+    gl.uniform2f(this.uGradImageSize, this.imageWidth, this.imageHeight)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    gl.bindVertexArray(null)
+  }
+
+  /**
    * Reconciles the per-mask alpha targets with the store's masks: creates a
    * target for each new mask, re-rasterises brush masks whose `version` changed,
    * and frees targets for removed masks. Call once per frame before the mask
@@ -571,17 +615,29 @@ export class WebGLRenderer {
       // Each branch marks its own work done, so a mask still waiting on its alpha
       // keeps a stale version and gets retried next frame.
       if (entry.version !== mask.version) {
-        if (mask.type === 'brush') {
-          this.rebuildMaskTarget(entry.target, mask.strokes)
-          entry.version = mask.version
-        } else {
-          const alpha = maskAlphas.get(mask.id)
-          if (alpha !== undefined && alpha.version === mask.version) {
-            this.uploadMaskAlpha(mask.id, alpha)
+        switch (mask.type) {
+          case 'brush':
+            this.rebuildMaskTarget(entry.target, mask.strokes)
             entry.version = mask.version
+            break
+          case 'linear':
+            // Rasterised synchronously from 4 numbers: nothing to wait for, so
+            // mark the version done unconditionally. A `null` gradient renders as
+            // an empty target — the right result. (Leaving the version stale here,
+            // as the AI branch does, would retry every frame forever.)
+            this.rebuildGradientTarget(entry.target, mask.gradient)
+            entry.version = mask.version
+            break
+          default: {
+            // subject/sky: the alpha arrives asynchronously from the segmentation
+            // worker. Until it does, leave the target empty and the version stale
+            // so the next frame tries again.
+            const alpha = maskAlphas.get(mask.id)
+            if (alpha !== undefined && alpha.version === mask.version) {
+              this.uploadMaskAlpha(mask.id, alpha)
+              entry.version = mask.version
+            }
           }
-          // No alpha yet (still inferring): leave the target empty and the
-          // version stale so the next frame tries again.
         }
       }
     }

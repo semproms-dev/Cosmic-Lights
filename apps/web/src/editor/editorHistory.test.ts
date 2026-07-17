@@ -92,6 +92,22 @@ describe('live edits vs commit', () => {
 
     expect(h.past).toHaveLength(1)
   })
+
+  it('records a gradient move as an undo step and restores it on undo', () => {
+    const mask = createMask('linear', 'Linear Gradient 1')
+    let h = initHistory({ ...makeState(), masks: [mask] })
+
+    h = wrapped(h, { type: 'SET_MASK_GRADIENT', id: mask.id, gradient: { x1: 0, y1: 0, x2: 10, y2: 0 } })
+    h = wrapped(h, { type: 'COMMIT' })
+    h = wrapped(h, { type: 'SET_MASK_GRADIENT', id: mask.id, gradient: { x1: 0, y1: 0, x2: 0, y2: 20 } })
+    h = wrapped(h, { type: 'COMMIT' })
+
+    expect(h.past).toHaveLength(2)
+
+    h = wrapped(h, { type: 'UNDO' })
+
+    expect(h.present.masks[0].gradient).toEqual({ x1: 0, y1: 0, x2: 10, y2: 0 })
+  })
 })
 
 describe('undo / redo', () => {

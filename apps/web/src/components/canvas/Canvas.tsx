@@ -34,6 +34,12 @@ interface CanvasProps {
    */
   brushMaskId?: string | null
   /**
+   * Id of the linear-gradient mask to define by dragging, or `null`/absent
+   * otherwise. When set, a pointer drag sets that mask's ramp (anchor → release)
+   * instead of panning. Like the brush, coordinates assume the fitted view.
+   */
+  gradientMaskId?: string | null
+  /**
    * Id of the mask to show as a red editing overlay (the selected mask while the
    * Masks tool is open), or `null` to render normally.
    */
@@ -46,7 +52,7 @@ interface CanvasProps {
  * change, adjustment change or resize, batching each into a single animation
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
-export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = null }: CanvasProps) {
+export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = null, overlayMaskId = null }: CanvasProps) {
   const { 
     image, 
     adjustments, 
@@ -61,8 +67,9 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     resetDialogOpen, 
     openResetDialog, 
     closeResetDialog, 
-    addBrushStroke, 
-    commit, 
+    addBrushStroke,
+    setMaskGradient,
+    commit,
     view,
     setView,
     orientation,
@@ -83,6 +90,9 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
   // Active brush stroke while painting: the accumulated points (image px) and
   // the last one, or null when not painting.
   const strokeRef = useRef<{ points: MaskPoint[]; last: MaskPoint } | null>(null)
+  // Anchor (full-effect point, image px) of the gradient being dragged, or null
+  // when not dragging one.
+  const gradientAnchorRef = useRef<MaskPoint | null>(null)
   // Brush cursor ring position/size in CSS px, or null when the pointer is off
   // the canvas or not in brush mode.
   const [brushCursor, setBrushCursor] = useState<{ x: number; y: number; d: number } | null>(null)
@@ -304,7 +314,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
     })
   }
 
-  // Drag either paints the active brush mask (when brushMaskId is set) or pans.
+  // Drag paints the active brush mask, defines the active gradient, or pans.
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (brushMaskId !== null && image !== null) {
       const p = toImagePoint(e)
@@ -314,6 +324,14 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       // Stamp a dot on press so a plain click still marks the mask.
       rendererRef.current?.paintSegment(brushMaskId, p, p, brushRadius(), BRUSH_HARDNESS, 'add')
       drawRef.current()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      return
+    }
+    if (gradientMaskId !== null && image !== null) {
+      const p = toImagePoint(e)
+      if (p === null) return
+      // Anchor = full-effect point (p1); the release point becomes p2.
+      gradientAnchorRef.current = p
       e.currentTarget.setPointerCapture(e.pointerId)
       return
     }
@@ -332,6 +350,15 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       stroke.points.push(p)
       stroke.last = p
       drawRef.current()
+      return
+    }
+    const anchor = gradientAnchorRef.current
+    if (anchor !== null && gradientMaskId !== null) {
+      const p = toImagePoint(e)
+      if (p === null) return
+      // Live update through the store; no commit yet (still dragging). `masks` is
+      // a draw-effect dependency, so this repaints for free.
+      setMaskGradient(gradientMaskId, { x1: anchor.x, y1: anchor.y, x2: p.x, y2: p.y })
       return
     }
     const start = panRef.current
@@ -358,6 +385,14 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       })
       commit()
       strokeRef.current = null
+      e.currentTarget.releasePointerCapture(e.pointerId)
+      return
+    }
+    if (gradientAnchorRef.current !== null) {
+      // One undo step per drag. The store already holds the final ramp from the
+      // last pointermove; just checkpoint it.
+      commit()
+      gradientAnchorRef.current = null
       e.currentTarget.releasePointerCapture(e.pointerId)
       return
     }
@@ -392,7 +427,7 @@ export function Canvas({ cropping = false, brushMaskId = null, overlayMaskId = n
       onPointerUp={handlePointerUp}
       onPointerLeave={() => setBrushCursor(null)}
       onDoubleClick={() => setView(IDENTITY_VIEW)}
-      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : 'default' }} />
+      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : gradientMaskId !== null ? 'crosshair' : 'default' }} />
 
     </div>
   </div>

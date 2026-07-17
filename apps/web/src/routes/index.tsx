@@ -17,6 +17,7 @@ import { useEditor } from '../editor/editorContext'
 import { usePreferences } from '../preferences/preferences'
 import { useEditorShortcuts } from '../editor/useEditorShortcuts'
 import { CropOverlay } from '../editor/CropOverlay'
+import { GradientOverlay } from '../editor/GradientOverlay'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -48,6 +49,9 @@ function HomePage() {
   const activeMask = masks.find((m) => m.id === activeMaskId) ?? null
   const brushMaskId =
     activeTool === 'masks' && activeMask?.type === 'brush' ? activeMask.id : null
+  // Same idea for a linear-gradient mask: a drag defines its ramp instead of panning.
+  const gradientMaskId =
+    activeTool === 'masks' && activeMask?.type === 'linear' ? activeMask.id : null
   // Show the selected mask as a red overlay whenever the Masks tool is open,
   // except while a mask slider is being dragged (so the change stays visible).
   const overlayMaskId =
@@ -88,8 +92,9 @@ function HomePage() {
       <div style={{ display: 'flex', flexDirection: rowDirection, flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>
-          <Canvas cropping={activeTool === 'crop'} brushMaskId={brushMaskId} overlayMaskId={overlayMaskId} />
+          <Canvas cropping={activeTool === 'crop'} brushMaskId={brushMaskId} gradientMaskId={gradientMaskId} overlayMaskId={overlayMaskId} />
           {activeTool === 'crop' && <CropOverlay onDone={() => setActiveTool('')} />}
+          {gradientMaskId !== null && <GradientOverlay maskId={gradientMaskId} />}
         </div>
         {ActivePanel && (
           <aside className={classes.panel} aria-label={`${activeTool} panel`}>

@@ -1,6 +1,6 @@
 import { clamp, MIN_CROP_SIZE } from "../utils";
 import type { CropRegion } from "./image";
-import { applyUvTransform, uvTransform, type Orientation } from "./rotation";
+import { applyInverseUvTransform, applyUvTransform, uvTransform, type Orientation } from "./rotation";
 
 export const clampCropRegion =(region: CropRegion, imageWidth: number, imageHeight: number): CropRegion => {
     const width = clamp(region.width, MIN_CROP_SIZE, imageWidth);
@@ -246,6 +246,60 @@ export const pointerToImagePoint = (
   }
   const uv = applyUvTransform(uvTransform(orientation, crop, imageWidth, imageHeight), vUv)
   return { x: uv.x * imageWidth, y: uv.y * imageHeight }
+}
+
+/**
+ * Maps a point in full-image pixels to its pointer position in container/CSS
+ * pixels — the exact inverse of {@link pointerToImagePoint}, in reverse order.
+ *
+ * The overlay authors its geometry in image space (so it survives zoom, pan,
+ * crop and orientation unchanged) and calls this only at paint time to place each
+ * line and handle where the user sees it. It must stay a mirror of the forward
+ * map: if the two drift, the overlay peels away from the mask the moment you zoom
+ * or rotate — the same class of bug the crop tool already paid for once.
+ *
+ * @param point - Position in full-image pixels.
+ * @param containerWidth - Container width in CSS pixels.
+ * @param containerHeight - Container height in CSS pixels.
+ * @param imageWidth - Full image width in pixels.
+ * @param imageHeight - Full image height in pixels.
+ * @param crop - The crop the canvas is *currently displaying*, or `null`.
+ * @param view - The active zoom/pan.
+ * @param orientation - The turns and mirroring the canvas is displaying.
+ * @returns The position in container/CSS pixels.
+ */
+export const imagePointToPointer = (
+  point: { x: number; y: number },
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+  crop: CropRegion | null,
+  view: CanvasView,
+  orientation: Orientation,
+): { x: number; y: number } => {
+  // Image pixels → image UV → the point on the displayed quad (undoing crop and
+  // orientation through the same transform the forward map applied).
+  const uv = { x: point.x / imageWidth, y: point.y / imageHeight }
+  const vUv = applyInverseUvTransform(uvTransform(orientation, crop, imageWidth, imageHeight), uv)
+
+  // The displayed frame stands on its end on an odd turn, exactly as the forward
+  // map's letterbox does.
+  const frameWidth = crop?.width ?? imageWidth
+  const frameHeight = crop?.height ?? imageHeight
+  const turned = orientation.quarterTurns % 2 === 1
+  const disp = getImageDisplayRect(
+    turned ? frameHeight : frameWidth,
+    turned ? frameWidth : frameHeight,
+    containerWidth,
+    containerHeight,
+  )
+
+  const base = {
+    x: disp.x + vUv.x * disp.width,
+    y: disp.y + vUv.y * disp.height,
+  }
+  return baseToViewPoint(base, containerWidth, containerHeight, view)
 }
 
 /**

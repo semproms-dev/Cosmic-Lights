@@ -10,6 +10,7 @@ import {
   displayScale,
   IDENTITY_VIEW,
   pointerToImagePoint,
+  imagePointToPointer,
   viewToBasePoint,
   getImageDisplayRect,
   imageToCanvasCoords,
@@ -432,6 +433,52 @@ describe('pointerToImagePoint', () => {
       expect(off.x).toBeCloseTo(2000, 6)
       expect(off.y).toBeCloseTo(1500 + (100 / 2 / 562.5) * 1500, 6)
     })
+  })
+})
+
+describe('imagePointToPointer (inverse of pointerToImagePoint)', () => {
+  const image = { width: 4000, height: 3000 }
+  const container = { w: 1000, h: 750 }
+  const centredCrop = { x: 1000, y: 750, width: 2000, height: 1500 }
+  const square = { x: 0, y: 0, width: 1500, height: 1500 }
+  const oriented = (o: Partial<Orientation>): Orientation => ({ ...IDENTITY_ORIENTATION, ...o })
+
+  const crops: (CropRegion | null)[] = [null, centredCrop, square]
+  const views = [IDENTITY_VIEW, { scale: 2, offsetX: 0.1, offsetY: -0.2 }]
+  const orientations: Orientation[] = [
+    oriented({}),
+    oriented({ quarterTurns: 1 }),
+    oriented({ quarterTurns: 2 }),
+    oriented({ quarterTurns: 3 }),
+    oriented({ flipH: true }),
+    oriented({ flipV: true }),
+    oriented({ quarterTurns: 3, flipV: true }),
+    oriented({ quarterTurns: 1, flipH: true }),
+  ]
+  const pointers = [
+    { x: 500, y: 375 }, { x: 123, y: 456 }, { x: 900, y: 100 }, { x: 250, y: 700 },
+  ]
+
+  it('round-trips a pointer through image space for every crop/view/orientation', () => {
+    for (const crop of crops) {
+      for (const view of views) {
+        for (const orientation of orientations) {
+          for (const pt of pointers) {
+            const img = pointerToImagePoint(
+              pt, container.w, container.h,
+              image.width, image.height, crop, view, orientation,
+            )
+            const back = imagePointToPointer(
+              img, container.w, container.h,
+              image.width, image.height, crop, view, orientation,
+            )
+            const label = `crop=${crop ? 'c' : 'null'} scale=${view.scale} q=${orientation.quarterTurns} fh=${orientation.flipH} fv=${orientation.flipV} pt=${pt.x},${pt.y}`
+            expect(back.x, label).toBeCloseTo(pt.x, 6)
+            expect(back.y, label).toBeCloseTo(pt.y, 6)
+          }
+        }
+      }
+    }
   })
 })
 

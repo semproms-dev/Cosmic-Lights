@@ -6,8 +6,12 @@ export interface MaskAlpha {
   height: number
 }
 
-/** The mask kinds a model generates, as opposed to the hand-painted `brush`. */
-export type SegmentationKind = Exclude<MaskType, 'brush'>
+/**
+ * The mask kinds a model generates, as opposed to the hand-painted `brush` or
+ * the rasterised `linear` gradient. Both of those are excluded — only AI masks
+ * run through the segmentation worker.
+ */
+export type SegmentationKind = Exclude<MaskType, 'brush' | 'linear'>
 
 /**
  * A generated alpha, tagged with the `Mask.version` it was produced for.
