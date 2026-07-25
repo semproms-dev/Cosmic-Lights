@@ -48,6 +48,8 @@
     "blacks": "Schwarz",
     "temperature": "Temperatur",
     "tint": "Farbton",
+    "vibrance": "Dynamik",
+    "saturation": "Sättigung",
     "clarity": "Klarheit",
     "dehaze": "Schlieren entfernen"
   },
@@ -98,6 +100,7 @@
     "brush": "Pinsel",
     "linearGradient": "Linearer Verlauf",
     "radialGradient": "Radialer Verlauf",
+    "selectObject": "Objekt auswählen",
     "colorRange": "Farbbereich",
     "luminanceRange": "Luminanzbereich",
     "depthRange": "Tiefenbereich",

@@ -40,6 +40,13 @@ interface CanvasProps {
    */
   gradientMaskId?: string | null
   /**
+   * Id of the radial-gradient mask to define by dragging, or `null`/absent
+   * otherwise. When set, a pointer drag sets that mask's ellipse: the press point
+   * is the centre and the drag delta the semi-axes. Like the linear gradient,
+   * coordinates assume the fitted view.
+   */
+  radialMaskId?: string | null
+  /**
    * Id of the mask to show as a red editing overlay (the selected mask while the
    * Masks tool is open), or `null` to render normally.
    */
@@ -52,7 +59,7 @@ interface CanvasProps {
  * change, adjustment change or resize, batching each into a single animation
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
-export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = null, overlayMaskId = null }: CanvasProps) {
+export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = null, radialMaskId = null, overlayMaskId = null }: CanvasProps) {
   const { 
     image, 
     adjustments, 
@@ -69,6 +76,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     closeResetDialog, 
     addBrushStroke,
     setMaskGradient,
+    setMaskRadial,
     commit,
     view,
     setView,
@@ -93,6 +101,9 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   // Anchor (full-effect point, image px) of the gradient being dragged, or null
   // when not dragging one.
   const gradientAnchorRef = useRef<MaskPoint | null>(null)
+  // Anchor (ellipse centre, image px) of the radial mask being dragged, or null
+  // when not dragging one.
+  const radialAnchorRef = useRef<MaskPoint | null>(null)
   // Brush cursor ring position/size in CSS px, or null when the pointer is off
   // the canvas or not in brush mode.
   const [brushCursor, setBrushCursor] = useState<{ x: number; y: number; d: number } | null>(null)
@@ -335,6 +346,14 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       e.currentTarget.setPointerCapture(e.pointerId)
       return
     }
+    if (radialMaskId !== null && image !== null) {
+      const p = toImagePoint(e)
+      if (p === null) return
+      // Anchor = ellipse centre; the drag delta becomes the semi-axes.
+      radialAnchorRef.current = p
+      e.currentTarget.setPointerCapture(e.pointerId)
+      return
+    }
     panRef.current = { x: e.clientX, y: e.clientY }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
@@ -359,6 +378,21 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       // Live update through the store; no commit yet (still dragging). `masks` is
       // a draw-effect dependency, so this repaints for free.
       setMaskGradient(gradientMaskId, { x1: anchor.x, y1: anchor.y, x2: p.x, y2: p.y })
+      return
+    }
+    const radialAnchor = radialAnchorRef.current
+    if (radialAnchor !== null && radialMaskId !== null) {
+      const p = toImagePoint(e)
+      if (p === null) return
+      // Semi-axes grow symmetrically about the anchored centre; start axis-aligned
+      // with a mid feather (the overlay handles rotation/feather afterwards).
+      setMaskRadial(radialMaskId, {
+        cx: radialAnchor.x, cy: radialAnchor.y,
+        rx: Math.max(1, Math.abs(p.x - radialAnchor.x)),
+        ry: Math.max(1, Math.abs(p.y - radialAnchor.y)),
+        rotation: 0,
+        feather: 0.5,
+      })
       return
     }
     const start = panRef.current
@@ -396,6 +430,13 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       e.currentTarget.releasePointerCapture(e.pointerId)
       return
     }
+    if (radialAnchorRef.current !== null) {
+      // One undo step per drag; the store already holds the final ellipse.
+      commit()
+      radialAnchorRef.current = null
+      e.currentTarget.releasePointerCapture(e.pointerId)
+      return
+    }
     panRef.current = null
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
@@ -427,7 +468,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       onPointerUp={handlePointerUp}
       onPointerLeave={() => setBrushCursor(null)}
       onDoubleClick={() => setView(IDENTITY_VIEW)}
-      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : gradientMaskId !== null ? 'crosshair' : 'default' }} />
+      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : gradientMaskId !== null || radialMaskId !== null ? 'crosshair' : 'default' }} />
 
     </div>
   </div>

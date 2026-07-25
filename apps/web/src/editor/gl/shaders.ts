@@ -291,6 +291,49 @@ void main() {
 }
 `
 
+/**
+ * Radial-gradient rasteriser — fragment stage. Writes a weight that is 1 at the
+ * ellipse centre and falls off smoothly to 0 at its boundary (and stays 0
+ * outside) — the radial analogue of the linear ramp above. Reuses
+ * `GRADIENT_VERTEX_SHADER` (bare quad, `vUv.y = 0` at the image top).
+ *
+ * Like the linear ramp, the maths runs in image PIXELS, not UV: in UV the aspect
+ * ratio warps the metric, so a circle would render as an ellipse on any
+ * non-square photo. The sample is rotated into the ellipse's own axes and each
+ * axis divided by its radius, collapsing the ellipse to the unit circle, so a
+ * single `length()` gives the normalised distance `d` (1 on the boundary).
+ *
+ * Feather is not a field on `RadialShape`, so the falloff spans the whole radius
+ * (`smoothstep(0,1,d)`). To get a Lightroom-style solid core + edge feather,
+ * add a `feather` (0..1) to `RadialShape`, pass it as a uniform and ramp over
+ * `smoothstep(1.0 - feather, 1.0, d)` instead.
+ */
+export const RADIAL_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+uniform vec2 uCenter;      // image px — ellipse centre (cx, cy)
+uniform vec2 uRadii;       // image px — semi-axes (rx, ry), before rotation
+uniform float uRotation;   // degrees; positive turns the ellipse clockwise on screen
+uniform vec2 uImageSize;   // (W, H) in px
+uniform float uFeather;
+void main() {
+  vec2 p = vUv * uImageSize;          // to PIXELS before anything else
+  vec2 q = p - uCenter;
+  float a = radians(uRotation);
+  float ca = cos(a);
+  float sa = sin(a);
+  // Rotate the sample into the ellipse's own axes (by -rotation), then normalise
+  // each axis by its radius: the ellipse becomes the unit circle, so d = 1 on the
+  // boundary, < 1 inside, > 1 outside.
+  vec2 local = vec2(q.x * ca + q.y * sa, -q.x * sa + q.y * ca);
+  vec2 r = max(uRadii, vec2(1e-4));   // rx/ry == 0 (no drag yet) → no divide-by-zero
+  float d = length(local / r);
+  float w = 1.0 - smoothstep(1.0 - clamp(uFeather, 0.0, 1.0), 1.0, d);
+  fragColor = vec4(w, w, w, w);       // the mask shader reads .r
+}
+`
+
 /** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation → curves → sharpness/threshold. */
 export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;

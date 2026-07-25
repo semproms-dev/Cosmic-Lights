@@ -48,6 +48,8 @@
     "blacks": "Neri",
     "temperature": "Temperatura",
     "tint": "Tinta",
+    "vibrance": "Vibranza",
+    "saturation": "Saturazione",
     "clarity": "Nitidezza",
     "dehaze": "Rimozione foschia"
   },
@@ -98,6 +100,7 @@
     "brush": "Pennello",
     "linearGradient": "Gradiente lineare",
     "radialGradient": "Gradiente radiale",
+    "selectObject": "Seleziona oggetto",
     "colorRange": "Intervallo di colore",
     "luminanceRange": "Intervallo di luminanza",
     "depthRange": "Intervallo di profondità",

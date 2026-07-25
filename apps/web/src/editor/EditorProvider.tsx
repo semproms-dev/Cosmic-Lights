@@ -9,7 +9,7 @@ import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
-import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type GradientLine, type MaskType } from './masks'
+import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type GradientLine, type MaskType, type RadialShape } from './masks'
 import {
   TransformersSegmentationProvider,
   type SegmentationProvider,
@@ -156,6 +156,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const resetOrientation = () => {
     dispatch({type: 'RESET_ORIENTATION'})
+  }
+
+  const setMaskRadial = (id: string, radial: RadialShape) => {
+    dispatch({ type: 'SET_MASK_RADIAL', id, radial });
   }
 
   const commit = () => {
@@ -340,7 +344,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         resetOrientation,
         flipV,
         flipH,
-        rotationSpin
+        rotationSpin,
+        setMaskRadial
       }}
     >
       {children}

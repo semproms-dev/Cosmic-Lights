@@ -7,7 +7,7 @@ import {
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
-import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask } from './masks'
+import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask, type RadialShape } from './masks'
 import { IDENTITY_ORIENTATION, turn, type Orientation } from './rotation'
 
 /**
@@ -72,6 +72,7 @@ export type EditorAction =
   | { type: 'FLIP_H'}
   | { type: 'FLIP_V'}
   | { type: 'RESET_ORIENTATION'}
+  | { type: 'SET_MASK_RADIAL',  id: string; radial: RadialShape}
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -131,6 +132,17 @@ export function editorReducer(
         ...state,
         orientation: { ...state.orientation, flipV: !state.orientation.flipV },
         imageDirty: true
+      }
+    case 'SET_MASK_RADIAL':
+      // Changes the pixels → bump version, like SET_MASK_GRADIENT.
+      return {
+        ...state,
+        masks: updateMask(state.masks, action.id, (mask) => ({
+          ...mask,
+          radial: action.radial,
+          version: mask.version + 1,
+        })),
+        imageDirty: true,
       }
     case 'RESET_ORIENTATION':
       return {

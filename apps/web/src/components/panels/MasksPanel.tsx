@@ -45,10 +45,8 @@ const ADD_OPTIONS: AddOption[] = [
   { type: 'subject', labelKey: 'selectSubject', icon: IconUser },
   { type: 'brush', labelKey: 'brush', icon: IconBrush },
   { type: 'linear', labelKey: 'linearGradient', icon: IconLine },
-  { type: null, labelKey: 'radialGradient', icon: IconCircleDot, disabled: true },
-  { type: null, labelKey: 'colorRange', icon: IconColorSwatch, disabled: true },
-  { type: null, labelKey: 'luminanceRange', icon: IconContrast, disabled: true },
-  { type: null, labelKey: 'depthRange', icon: IconMountain, disabled: true },
+  { type: 'radial', labelKey: 'radialGradient', icon: IconCircleDot },
+  { type: 'object', labelKey: 'selectObject', icon: IconCircleDot },
 ]
 
 /**
@@ -172,10 +170,11 @@ export function MasksPanel() {
             {MASK_ADJUSTMENT_KEYS.map((key) => {
               const meta = ADJ_META.get(key)
               if (meta === undefined) return null
+              const label = t(`lateralNavBar.${key}`)
               return (
                 <Stack key={key} gap={4}>
                   <Group justify="space-between" gap="xs">
-                    <Text size="sm">{meta.label}</Text>
+                    <Text size="sm">{label}</Text>
                     <Text size="sm" c="dimmed">{active.adjustments[key]}</Text>
                   </Group>
                   <Slider
@@ -194,7 +193,7 @@ export function MasksPanel() {
                     max={meta.max}
                     step={meta.step}
                     label={null}
-                    thumbLabel={meta.label}
+                    thumbLabel={label}
                   />
                 </Stack>
               )

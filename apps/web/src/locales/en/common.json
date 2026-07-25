@@ -48,6 +48,8 @@
     "blacks": "Blacks",
     "temperature": "Temperature",
     "tint": "Tint",
+    "vibrance": "Vibrance",
+    "saturation": "Saturation",
     "clarity": "Clarity",
     "dehaze": "Dehaze"
   },
@@ -98,6 +100,7 @@
     "brush": "Brush",
     "linearGradient": "Linear Gradient",
     "radialGradient": "Radial Gradient",
+    "selectObject": "Select object",
     "colorRange": "Color Range",
     "luminanceRange": "Luminance Range",
     "depthRange": "Depth Range",

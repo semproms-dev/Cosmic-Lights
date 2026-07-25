@@ -9,11 +9,12 @@ import {
   GRADIENT_FRAGMENT_SHADER,
   GRADIENT_VERTEX_SHADER,
   MASK_FRAGMENT_SHADER,
+  RADIAL_FRAGMENT_SHADER,
   VERTEX_SHADER,
 } from './shaders'
 import type { CropRegion } from '../image'
 import { IDENTITY_ORIENTATION, uvTransform, type Orientation } from '../rotation'
-import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint } from '../masks'
+import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint, type RadialShape } from '../masks'
 import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
 
 /**
@@ -143,6 +144,16 @@ export class WebGLRenderer {
   private readonly uGradP1: WebGLUniformLocation | null
   private readonly uGradP2: WebGLUniformLocation | null
   private readonly uGradImageSize: WebGLUniformLocation | null
+
+  // Seventh program: the radial-gradient rasteriser. Fills a mask's alpha target
+  // with an elliptical falloff (centre, semi-axes, rotation). Shares the
+  // full-screen quad VAO and the gradient vertex shader; no vertex uniforms.
+  private readonly radialProgram: WebGLProgram
+  private readonly uRadCenter: WebGLUniformLocation | null
+  private readonly uRadRadii: WebGLUniformLocation | null
+  private readonly uRadRotation: WebGLUniformLocation | null
+  private readonly uRadFeather: WebGLUniformLocation | null
+  private readonly uRadImageSize: WebGLUniformLocation | null
 
   // Per-mask alpha targets, keyed by mask id, with the mask version they were
   // last rebuilt from (so `syncMasks` only re-rasterises when strokes change).
@@ -302,6 +313,13 @@ export class WebGLRenderer {
     this.uGradP1 = gl.getUniformLocation(this.gradientProgram, 'uP1')
     this.uGradP2 = gl.getUniformLocation(this.gradientProgram, 'uP2')
     this.uGradImageSize = gl.getUniformLocation(this.gradientProgram, 'uImageSize')
+
+    this.radialProgram = createProgram(gl, GRADIENT_VERTEX_SHADER, RADIAL_FRAGMENT_SHADER)
+    this.uRadCenter = gl.getUniformLocation(this.radialProgram, 'uCenter')
+    this.uRadRadii = gl.getUniformLocation(this.radialProgram, 'uRadii')
+    this.uRadRotation = gl.getUniformLocation(this.radialProgram, 'uRotation')
+    this.uRadFeather = gl.getUniformLocation(this.radialProgram, 'uFeather')
+    this.uRadImageSize = gl.getUniformLocation(this.radialProgram, 'uImageSize')
 
     gl.clearColor(0, 0, 0, 0)
   }
@@ -582,6 +600,36 @@ export class WebGLRenderer {
   }
 
   /**
+   * Clears a mask target and rasterises a radial (elliptical) gradient into it.
+   * A `null` shape (a freshly created mask, before the first drag) leaves the
+   * target empty — the correct render of "no shape yet".
+   *
+   * @param target - The mask alpha target to overwrite.
+   * @param radial - The ellipse, in image pixels, or `null` for an empty mask.
+   */
+  private rebuildRadialTarget(target: RenderTarget, radial: RadialShape | null): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    gl.clearColor(0, 0, 0, 0)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    if (radial === null) return
+
+    // The ellipse overwrites the whole target, so blending must be off — same as
+    // the linear ramp: otherwise it would composite against the cleared contents.
+    gl.disable(gl.BLEND)
+    gl.useProgram(this.radialProgram)
+    gl.bindVertexArray(this.vao)
+    gl.uniform2f(this.uRadCenter, radial.cx, radial.cy)
+    gl.uniform2f(this.uRadRadii, radial.rx, radial.ry)
+    gl.uniform1f(this.uRadRotation, radial.rotation)
+    gl.uniform1f(this.uRadFeather, radial.feather)
+    gl.uniform2f(this.uRadImageSize, this.imageWidth, this.imageHeight)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    gl.bindVertexArray(null)
+  }
+
+  /**
    * Reconciles the per-mask alpha targets with the store's masks: creates a
    * target for each new mask, re-rasterises brush masks whose `version` changed,
    * and frees targets for removed masks. Call once per frame before the mask
@@ -626,6 +674,13 @@ export class WebGLRenderer {
             // an empty target — the right result. (Leaving the version stale here,
             // as the AI branch does, would retry every frame forever.)
             this.rebuildGradientTarget(entry.target, mask.gradient)
+            entry.version = mask.version
+            break
+          case 'radial':
+            // Same story as `linear`: rasterised synchronously from 5 numbers,
+            // nothing to wait for, so mark the version done unconditionally. A
+            // `null` shape renders as an empty target — the right result.
+            this.rebuildRadialTarget(entry.target, mask.radial)
             entry.version = mask.version
             break
           default: {

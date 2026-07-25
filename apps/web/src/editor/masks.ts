@@ -7,7 +7,7 @@ import { basicAdjustments, buildDefaults, colorAdjustement } from './adjustments
  * model, `linear` from a rasterised gradient ramp. The application pipeline
  * treats them identically.
  */
-export type MaskType = 'brush' | 'subject' | 'sky' | 'linear'
+export type MaskType = 'brush' | 'subject' | 'sky' | 'linear' | 'radial' | 'object'
 
 /** A point of a brush stroke, in image-pixel coordinates. */
 export interface MaskPoint {
@@ -69,6 +69,8 @@ export interface Mask {
   gradient: GradientLine | null
   /** Pixel-data revision; bump to invalidate the cached alpha for this mask. */
   version: number
+  /** Gradient ramp for `Radial shape` */
+  radial: RadialShape | null;
 }
 
 /** Maximum number of masks the editor keeps at once. */
@@ -84,12 +86,22 @@ export const MASK_ADJUSTMENT_KEYS: readonly string[] = [
   ...colorAdjustement.map((o) => o.key),
 ]
 
+export interface RadialShape {
+  cx: number; //x for the center point
+  cy: number; //y for the center point
+  rx: number; //horizontal radios
+  ry: number; //vertical radius
+  rotation: number; //rotation degrees
+  feather: number; // difumination of the center-border
+}
+
 /** Human-readable default name per mask type. */
 export const MASK_TYPE_LABEL: Record<MaskType, string> = {
   brush: 'Brush',
   subject: 'Subject',
   sky: 'Sky',
   linear: 'Linear Gradient',
+  radial: 'Radial Gradient'
 }
 
 /**
@@ -121,5 +133,6 @@ export function createMask(type: MaskType, name: string): Mask {
     strokes: [],
     gradient: null,
     version: 0,
+    radial: null
   }
 }

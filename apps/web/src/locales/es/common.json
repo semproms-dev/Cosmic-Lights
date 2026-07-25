@@ -48,6 +48,8 @@
     "blacks": "Negros",
     "temperature": "Temperatura",
     "tint": "Matiz",
+    "vibrance": "Vibración",
+    "saturation": "Saturación",
     "clarity": "Claridad",
     "dehaze": "Desempañar"
   },
@@ -98,6 +100,7 @@
     "brush": "Pincel",
     "linearGradient": "Degradado lineal",
     "radialGradient": "Degradado radial",
+    "selectObject": "Seleccionar objeto",
     "colorRange": "Rango de color",
     "luminanceRange": "Rango de luminancia",
     "depthRange": "Rango de profundidad",

@@ -63,7 +63,7 @@ export function AdjustmentsPanel() {
                   ) : (
                     <ControlSlider
                       key={option.key}
-                      label={option.label}
+                      label={t(`lateralNavBar.${option.key}`)}
                       description={t(`labels.${option.key}`)}
                       value={adjustments[option.key]}
                       min={option.min}

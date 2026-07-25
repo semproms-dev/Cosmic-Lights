@@ -2,7 +2,7 @@ import { createContext, use, type Dispatch, type RefObject, type SetStateAction 
 import type { CanvasView } from './crop'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
-import type { BrushStroke, GradientLine, Mask, MaskType } from './masks'
+import type { BrushStroke, GradientLine, Mask, MaskType, RadialShape } from './masks'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
 import type { Orientation, TurnDirection } from './rotation'
 
@@ -156,6 +156,7 @@ export interface EditorState {
    * can animate the quarter turn. `null` until the first rotation. Not undoable.
    */
   rotationSpin: RotationSpin | null
+  setMaskRadial: (id: string, radial: RadialShape) => void;
 }
 
 export const EditorContext = createContext<EditorState | null>(null)
