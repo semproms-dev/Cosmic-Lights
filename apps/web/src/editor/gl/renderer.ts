@@ -684,7 +684,7 @@ export class WebGLRenderer {
             entry.version = mask.version
             break
           default: {
-            // subject/sky: the alpha arrives asynchronously from the segmentation
+            // subject/sky/object: the alpha arrives asynchronously from the segmentation
             // worker. Until it does, leave the target empty and the version stale
             // so the next frame tries again.
             const alpha = maskAlphas.get(mask.id)

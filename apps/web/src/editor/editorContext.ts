@@ -2,7 +2,14 @@ import { createContext, use, type Dispatch, type RefObject, type SetStateAction 
 import type { CanvasView } from './crop'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
-import type { BrushStroke, GradientLine, Mask, MaskType, RadialShape } from './masks'
+import type {
+  BrushStroke,
+  GradientLine,
+  Mask,
+  MaskType,
+  ObjectPrompt,
+  RadialShape,
+} from './masks'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
 import type { Orientation, TurnDirection } from './rotation'
 
@@ -97,6 +104,15 @@ export interface EditorState {
   addBrushStroke: (id: string, stroke: BrushStroke) => void
   /** Sets (or replaces) the gradient ramp of a `linear` mask. */
   setMaskGradient: (id: string, gradient: GradientLine) => void
+  /**
+   * Sets the prompt of an `object` mask and re-segments it against the model.
+   * Call it on every refinement — each click, shift-click or box — with the
+   * **whole** prompt, in normalised [0,1] image coordinates.
+   *
+   * The first prompt of an image is slow (it encodes the image); the rest only
+   * run the mask decoder, so refining feels immediate.
+   */
+  setObjectPrompt: (id: string, prompt: ObjectPrompt) => void
   /**
    * Whether the red mask overlay is temporarily hidden — set while a mask slider
    * is being dragged so the adjustment is visible, cleared on release.

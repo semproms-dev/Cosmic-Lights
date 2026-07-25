@@ -19,6 +19,7 @@ import { useEditorShortcuts } from '../editor/useEditorShortcuts'
 import { CropOverlay } from '../editor/CropOverlay'
 import { GradientOverlay } from '../editor/GradientOverlay'
 import { RadialOverlay } from '../editor/RadialOverlay'
+import { ObjectPromptOverlay } from '../editor/ObjectPromptOverlay'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -61,6 +62,10 @@ function HomePage() {
   const overlayMaskId =
     activeTool === 'masks' && !maskOverlayHidden ? activeMaskId : null
 
+  // And for a promptable object mask: a click points at the object, a drag boxes it.
+  const objectMaskId =
+    activeTool === 'masks' && activeMask?.type === 'object' ? activeMask.id : null
+
   /**
    * Selecting a tool opens its panel; selecting the already-active tool toggles
    * the panel closed (empty string = nothing selected).
@@ -96,10 +101,18 @@ function HomePage() {
       <div style={{ display: 'flex', flexDirection: rowDirection, flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           <LoadingOverlay visible={imageStatus === 'loading'}/>
-          <Canvas cropping={activeTool === 'crop'} brushMaskId={brushMaskId} gradientMaskId={gradientMaskId} radialMaskId={radialMaskId} overlayMaskId={overlayMaskId} />
+          <Canvas 
+            cropping={activeTool === 'crop'} 
+            brushMaskId={brushMaskId} 
+            gradientMaskId={gradientMaskId} 
+            radialMaskId={radialMaskId} 
+            overlayMaskId={overlayMaskId}
+            objectMaskId={objectMaskId}
+          />
           {activeTool === 'crop' && <CropOverlay onDone={() => setActiveTool('')} />}
           {gradientMaskId !== null && <GradientOverlay maskId={gradientMaskId} />}
           {radialMaskId !== null && <RadialOverlay maskId={radialMaskId} />}
+          {objectMaskId !== null && <ObjectPromptOverlay maskId={objectMaskId} />}
         </div>
         {ActivePanel && (
           <aside className={classes.panel} aria-label={`${activeTool} panel`}>

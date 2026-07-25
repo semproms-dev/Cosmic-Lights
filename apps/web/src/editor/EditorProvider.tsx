@@ -9,7 +9,7 @@ import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
-import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type GradientLine, type MaskType, type RadialShape } from './masks'
+import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type GradientLine, type MaskType, type ObjectPrompt, type RadialShape } from './masks'
 import {
   TransformersSegmentationProvider,
   type SegmentationProvider,
@@ -80,6 +80,19 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   // The segmentation engine, built on first use. See `runSegmentation`.
   const providerRef = useRef<SegmentationProvider | null>(null)
+
+  // Identifies the open image for the object model's embedding cache. A counter
+  // rather than the image object itself: it crosses the worker boundary as a
+  // plain number, and bumping it on every load is enough to invalidate the
+  // (expensive) encoding of the previous image.
+  const imageId = useRef(0)
+
+  // Version of the last object segmentation requested per mask. Refining a
+  // prompt fires a new request before the previous one answers, and the decoder
+  // does not answer in order — this is what lets a stale alpha be dropped
+  // instead of overwriting the newest one. A ref: it must be readable from the
+  // async closure below, and it never affects rendering.
+  const objectRequests = useRef<Map<string, number>>(new Map())
 
   // Tear the worker (and its ONNX session) down with the app.
   useEffect(() => {
@@ -167,6 +180,19 @@ export function EditorProvider({ children }: EditorProviderProps) {
   }
 
   /**
+   * The app's single segmentation engine, built on first use. One provider owns
+   * one worker, and every worker downloads its own copy of the models — so this
+   * must stay a singleton, while still costing nothing to a session that never
+   * asks for an AI mask.
+   */
+  const ensureProvider = (): SegmentationProvider =>
+    (providerRef.current ??= new TransformersSegmentationProvider({
+      onModelProgress: (progress) => {
+        setModelProgress(progress.phase === 'downloading' ? progress.progress : null)
+      },
+    }))
+
+  /**
    * Generates the alpha of an AI mask and hands it to the renderer.
    *
    * The target `version` is chosen by the caller rather than read from state:
@@ -184,14 +210,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
       const image = state.image
       if (image === null) return
       setMaskStatus((current) => new Map(current).set(id, 'loading'))
-      // One provider for the whole app: each one owns a worker, and each worker
-      // downloads the model again. Built on first use so a session that never
-      // asks for an AI mask never fetches the inference runtime.
-      const provider = (providerRef.current ??= new TransformersSegmentationProvider({
-        onModelProgress: (progress) => {
-          setModelProgress(progress.phase === 'downloading' ? progress.progress : null)
-        },
-      }))
+      const provider = ensureProvider()
       // The provider consumes the bitmap (it is transferred to its worker), so
       // it gets a clone — the store's own bitmap must stay drawable.
       const alpha = await provider.segment(await createImageBitmap(image.bitmap), kind)
@@ -211,6 +230,84 @@ export function EditorProvider({ children }: EditorProviderProps) {
   }
 
   /**
+   * Generates the alpha of an `object` mask from the user's prompt.
+   *
+   * The sibling of {@link runSegmentation} for the promptable model, and it
+   * differs in two ways: it runs on every prompt refinement rather than once,
+   * and it can be overtaken — a slow decode must not overwrite the alpha of a
+   * newer prompt, so the answer is dropped unless this is still the mask's
+   * latest request.
+   *
+   * @param id - The mask to fill.
+   * @param prompt - Points/box in normalised [0,1] image coordinates.
+   * @param version - The revision to publish the alpha under, chosen by the
+   * caller for the same reason as in {@link runSegmentation}.
+   */
+  const runObjectSegmentation = async (
+    id: string,
+    prompt: ObjectPrompt,
+    version: number,
+  ): Promise<void> => {
+    try {
+      const image = state.image
+      if (image === null) return
+      // Nothing pointed at yet: SAM has nothing to segment, and asking would
+      // only produce an error state on a mask the user has just created.
+      if (prompt.points.length === 0 && prompt.box === null) {
+        setMaskStatus((current) => {
+          const next = new Map(current)
+          next.delete(id)
+          return next
+        })
+        return
+      }
+      objectRequests.current.set(id, version)
+      setMaskStatus((current) => new Map(current).set(id, 'loading'))
+      const provider = ensureProvider()
+      // A clone, like `runSegmentation`: the provider consumes the bitmap. From
+      // the second prompt on it is released immediately (the image is already
+      // encoded) — a wasted clone per click, but the store's bitmap stays safe.
+      const alpha = await provider.segmentObject(
+        await createImageBitmap(image.bitmap),
+        imageId.current,
+        prompt,
+      )
+      // Overtaken by a newer prompt while the decoder ran: its alpha is the one
+      // the user is waiting for, so this stale one is dropped, status included.
+      if (objectRequests.current.get(id) !== version) return
+      maskAlphas.current.set(id, { ...alpha, version })
+      // The mask already carries this version (`SET_MASK_PROMPT` bumped it), but
+      // the cache is a ref: this dispatch is what produces the frame that
+      // uploads the alpha to the GPU.
+      dispatch({ type: 'SET_MASK_VERSION', id, version })
+      setMaskStatus((current) => new Map(current).set(id, 'ready'))
+    } catch (error) {
+      logger.error(`Object segmentation failed for mask ${id}`, error)
+      if (objectRequests.current.get(id) !== version) return
+      setMaskStatus((current) => new Map(current).set(id, 'error'))
+    } finally {
+      setModelProgress(null)
+    }
+  }
+
+  /**
+   * Records the user's prompt for an `object` mask and re-segments it. Called on
+   * every refinement (a click, a shift-click, a box), so the mask follows the
+   * pointing live.
+   *
+   * @param id - The object mask being prompted. Ignored if it is gone.
+   * @param prompt - Points/box in normalised [0,1] image coordinates.
+   */
+  const setObjectPrompt = (id: string, prompt: ObjectPrompt): void => {
+    const mask = state.masks.find((candidate) => candidate.id === id)
+    if (mask === undefined) return
+    dispatch({ type: 'SET_MASK_PROMPT', id, prompt })
+    // The reducer increments the version, so the alpha must be published under
+    // that same next number for the renderer to accept it.
+    void runObjectSegmentation(id, prompt, mask.version + 1)
+  }
+
+  /**
    * Creates a mask of `type` with a unique default name ("Brush 1", "Sky 1", …),
    * appends it and selects it. AI masks additionally kick off their
    * segmentation. Returns the new id, or `null` if the cap blocked it (checked
@@ -222,8 +319,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
     const mask = createMask(type, `${MASK_TYPE_LABEL[type]} ${sameType + 1}`)
     dispatch({ type: 'ADD_MASK', mask })
     if (type === 'subject' || type === 'sky') {
-      // AI masks only. `mask` is brand new, so its version is known here without
-      // reading state. (`brush` paints later; `linear` rasterises from geometry.)
+      // Automatic AI masks only. `mask` is brand new, so its version is known
+      // here without reading state. (`brush` paints later; `linear`/`radial`
+      // rasterise from geometry; `object` waits for the user to point at
+      // something — see `setObjectPrompt`.)
       void runSegmentation(mask.id, type, mask.version + 1)
     }
     return mask.id
@@ -238,8 +337,16 @@ export function EditorProvider({ children }: EditorProviderProps) {
    */
   const retryMask = (id: string): void => {
     const mask = state.masks.find((candidate) => candidate.id === id)
-    if (mask === undefined || (mask.type !== 'subject' && mask.type !== 'sky')) return
-    void runSegmentation(id, mask.type, mask.version + 1)
+    if (mask === undefined) return
+    if (mask.type === 'subject' || mask.type === 'sky') {
+      void runSegmentation(id, mask.type, mask.version + 1)
+      return
+    }
+    // An object mask re-runs against the prompt it already has: the user should
+    // not have to point at the object again because the model download failed.
+    if (mask.type === 'object' && mask.prompt !== null) {
+      void runObjectSegmentation(id, mask.prompt, mask.version + 1)
+    }
   }
 
   const removeMask = (id: string) => {
@@ -284,6 +391,9 @@ export function EditorProvider({ children }: EditorProviderProps) {
       const { data, width, height, metadata } = await decodeRaw(buffer)
       const imageData = new ImageData(rgbToRgba(data, width, height), width, height)
       const bitmap = await createImageBitmap(imageData)
+      // A different image invalidates the object model's cached encoding: reuse
+      // it and every prompt would be decoded against the previous photo.
+      imageId.current += 1
       dispatch({
         type: 'SET_IMAGE',
         image: { bitmap, width, height, fileName: file.name, metadata },
@@ -330,6 +440,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
         renameMask,
         addBrushStroke,
         setMaskGradient,
+        setObjectPrompt,
         maskOverlayHidden,
         setMaskOverlayHidden,
         maskAlphas,

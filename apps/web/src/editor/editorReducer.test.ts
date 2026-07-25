@@ -288,6 +288,18 @@ describe('editorReducer — masks', () => {
     expect(next.imageDirty).toBe(true)
   })
 
+  it('SET_MASK_PROMPT stores the prompt and bumps the version', () => {
+    const mask = createMask('object', 'Select object 1')
+    const state = createState({ masks: [mask] })
+    const prompt = { points: [{ x: 0.5, y: 0.5, label: 1 as const }], box: null }
+
+    const next = editorReducer(state, { type: 'SET_MASK_PROMPT', id: mask.id, prompt })
+
+    expect(next.masks[0].prompt).toEqual(prompt)
+    expect(next.masks[0].version).toBe(1)
+    expect(next.imageDirty).toBe(true)
+  })
+
   it('SET_MASK_VERSION publishes the exact version it is given', () => {
     const mask = createMask('subject', 'Subject 1')
     const state = createState({ masks: [mask] })

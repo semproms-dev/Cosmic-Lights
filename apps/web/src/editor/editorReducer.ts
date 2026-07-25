@@ -7,7 +7,7 @@ import {
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
-import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask, type RadialShape } from './masks'
+import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask, type ObjectPrompt, type RadialShape } from './masks'
 import { IDENTITY_ORIENTATION, turn, type Orientation } from './rotation'
 
 /**
@@ -73,6 +73,7 @@ export type EditorAction =
   | { type: 'FLIP_V'}
   | { type: 'RESET_ORIENTATION'}
   | { type: 'SET_MASK_RADIAL',  id: string; radial: RadialShape}
+  | { type: 'SET_MASK_PROMPT'; id: string; prompt: ObjectPrompt }
 
 /**
  * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
@@ -140,6 +141,18 @@ export function editorReducer(
         masks: updateMask(state.masks, action.id, (mask) => ({
           ...mask,
           radial: action.radial,
+          version: mask.version + 1,
+        })),
+        imageDirty: true,
+      }
+    case 'SET_MASK_PROMPT':
+      // Re-prompting re-segments the object → bump version so the renderer asks
+      // the worker for a fresh alpha (the async AI path, like subject/sky).
+      return {
+        ...state,
+        masks: updateMask(state.masks, action.id, (mask) => ({
+          ...mask,
+          prompt: action.prompt,
           version: mask.version + 1,
         })),
         imageDirty: true,

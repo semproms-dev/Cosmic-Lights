@@ -1,11 +1,8 @@
 import {
   IconBrush,
   IconCircleDot,
-  IconCloud,
-  IconColorSwatch,
-  IconContrast,
+  IconClick,
   IconLine,
-  IconMountain,
   IconRefresh,
   IconTrash,
   IconUser,
@@ -15,6 +12,7 @@ import {
   Divider,
   Group,
   Loader,
+  SegmentedControl,
   Slider,
   Stack,
   Switch,
@@ -25,7 +23,17 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useEditor } from '../../editor/editorContext'
 import { basicAdjustments, colorAdjustement } from '../../editor/adjustments'
-import { MASK_ADJUSTMENT_KEYS, MAX_MASKS, type MaskType } from '../../editor/masks'
+import {
+  isPromptEmpty,
+  MASK_ADJUSTMENT_KEYS,
+  MASK_GRANULARITIES,
+  MAX_MASKS,
+  promptGranularity,
+  withPromptGranularity,
+  type Mask,
+  type MaskGranularity,
+  type MaskType,
+} from '../../editor/masks'
 
 /** Slider metadata (label/range/step) for every mask-adjustment key. */
 const ADJ_META = new Map(
@@ -46,14 +54,23 @@ const ADD_OPTIONS: AddOption[] = [
   { type: 'brush', labelKey: 'brush', icon: IconBrush },
   { type: 'linear', labelKey: 'linearGradient', icon: IconLine },
   { type: 'radial', labelKey: 'radialGradient', icon: IconCircleDot },
-  { type: 'object', labelKey: 'selectObject', icon: IconCircleDot },
+  { type: 'object', labelKey: 'selectObject', icon: IconClick },
 ]
+
+/**
+ * Whether a mask is still waiting for the user to say what to select. Only the
+ * promptable object mask can be in this state: it is created empty and segments
+ * nothing until the first click on the canvas.
+ */
+function awaitingPrompt(mask: Mask): boolean {
+  return mask.type === 'object' && (mask.prompt === null || isPromptEmpty(mask.prompt))
+}
 
 /**
  * Masks tool panel: recreates Lightroom's "Add New Mask" menu, lists the current
  * masks and — for the selected mask — exposes its local adjustment sliders and
- * an invert toggle. Brush/Subject/Sky are wired; the gradient and range tools
- * are shown disabled until they are built.
+ * an invert toggle. Brush, Subject, both gradients and the promptable object
+ * mask are wired; the range tools are shown disabled until they are built.
  */
 export function MasksPanel() {
   const { t } = useTranslation()
@@ -66,6 +83,7 @@ export function MasksPanel() {
     setActiveMask,
     setMaskAdjustment,
     setMaskInvert,
+    setObjectPrompt,
     commit,
     setMaskOverlayHidden,
     maskStatus,
@@ -78,8 +96,12 @@ export function MasksPanel() {
   const active = masks.find((m) => m.id === activeMaskId) ?? null
   // A mask with no alpha yet has nothing to adjust: its sliders would silently
   // do nothing, which reads as a broken control rather than as "not ready".
-  const activeBusy = active !== null && maskStatus.get(active.id) !== undefined
-    && maskStatus.get(active.id) !== 'ready'
+  // An object mask that has never been prompted is in exactly that state without
+  // ever having had a status, so it has to be asked separately.
+  const activeBusy = active !== null && (
+    (maskStatus.get(active.id) !== undefined && maskStatus.get(active.id) !== 'ready')
+    || awaitingPrompt(active)
+  )
 
   return (
     <Stack gap="sm" p="xs">
@@ -160,6 +182,36 @@ export function MasksPanel() {
       {active !== null && (
         <>
           <Divider label={active.name} labelPosition="left" />
+          {awaitingPrompt(active) && (
+            // Nothing on screen would otherwise say that this mask is waiting on
+            // the canvas, not on the model: it has no status, no spinner and its
+            // controls are disabled.
+            <Text size="xs" c="dimmed">{t('masks.objectHint')}</Text>
+          )}
+          {active.type === 'object' && !awaitingPrompt(active) && active.prompt !== null && (
+            // One click means three things at once (the eye, the face, the
+            // person) and SAM's confidence does not rank them by intent, so the
+            // reading is the user's to pick. Changing it re-decodes against the
+            // cached embedding — cheap, no re-encoding of the image.
+            <Stack gap={4}>
+              <Text size="xs" c="dimmed">{t('masks.granularity')}</Text>
+              <SegmentedControl
+                size="xs"
+                fullWidth
+                value={promptGranularity(active.prompt)}
+                onChange={(value) => {
+                  const prompt = active.prompt
+                  if (prompt === null) return
+                  setObjectPrompt(active.id, withPromptGranularity(prompt, value as MaskGranularity))
+                  commit()
+                }}
+                data={MASK_GRANULARITIES.map((option) => ({
+                  value: option,
+                  label: t(`masks.granularity${option.charAt(0).toUpperCase()}${option.slice(1)}`),
+                }))}
+              />
+            </Stack>
+          )}
           <Switch
             label={t('masks.invert')}
             checked={active.invert}

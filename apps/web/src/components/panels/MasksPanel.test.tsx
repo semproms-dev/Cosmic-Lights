@@ -9,9 +9,10 @@ import '../../i18n'
 // Controlled editor store: the test drives the masks and their segmentation
 // status, and spies on the actions the panel triggers. `vi.hoisted` keeps the
 // refs reachable from the (hoisted) `vi.mock` factory.
-const { retryMask, addMask, state } = vi.hoisted(() => ({
+const { retryMask, addMask, setObjectPrompt, state } = vi.hoisted(() => ({
   retryMask: vi.fn(),
   addMask: vi.fn(),
+  setObjectPrompt: vi.fn(),
   state: {
     masks: [] as Mask[],
     activeMaskId: null as string | null,
@@ -29,6 +30,7 @@ vi.mock('../../editor/editorContext', () => ({
     modelProgress: state.modelProgress,
     addMask,
     retryMask,
+    setObjectPrompt,
     removeMask: vi.fn(),
     setActiveMask: vi.fn(),
     setMaskAdjustment: vi.fn(),
@@ -52,6 +54,7 @@ describe('MasksPanel', () => {
   beforeEach(() => {
     retryMask.mockClear()
     addMask.mockClear()
+    setObjectPrompt.mockClear()
     state.masks = []
     state.activeMaskId = null
     state.maskStatus = new Map()
@@ -150,5 +153,80 @@ describe('MasksPanel', () => {
     renderPanel()
 
     expect(screen.getByRole('switch', { name: 'Invert' })).not.toBeDisabled()
+  })
+
+  it('tells the user to point at something when an object mask has no prompt', () => {
+    // The mask is waiting on the canvas, not on the model: it has no status and
+    // no spinner, so without this line nothing explains the dead controls.
+    const mask = createMask('object', 'Select object 1')
+    state.masks = [mask]
+    state.activeMaskId = mask.id
+
+    renderPanel()
+
+    expect(screen.getByText(/Click the object/)).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Invert' })).toBeDisabled()
+  })
+
+  it('drops the hint and enables the controls once the object has been pointed at', () => {
+    const mask: Mask = {
+      ...createMask('object', 'Select object 1'),
+      prompt: { points: [{ x: 0.5, y: 0.5, label: 1 }], box: null },
+    }
+    state.masks = [mask]
+    state.activeMaskId = mask.id
+    state.maskStatus = new Map([[mask.id, 'ready']])
+
+    renderPanel()
+
+    expect(screen.queryByText(/Click the object/)).not.toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Invert' })).not.toBeDisabled()
+  })
+
+  it('keeps the object mask disabled while its first segmentation runs', () => {
+    const mask: Mask = {
+      ...createMask('object', 'Select object 1'),
+      prompt: { points: [{ x: 0.5, y: 0.5, label: 1 }], box: null },
+    }
+    state.masks = [mask]
+    state.activeMaskId = mask.id
+    state.maskStatus = new Map([[mask.id, 'loading']])
+
+    renderPanel()
+
+    expect(screen.getByText('Segmenting…')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Invert' })).toBeDisabled()
+  })
+
+  it('lets the user pick which reading of the click to keep', () => {
+    // One click means the eye, the face and the person at once, and the model's
+    // confidence does not rank them by intent — so the choice is the user's.
+    const mask: Mask = {
+      ...createMask('object', 'Select object 1'),
+      prompt: { points: [{ x: 0.5, y: 0.5, label: 1 }], box: null },
+    }
+    state.masks = [mask]
+    state.activeMaskId = mask.id
+    state.maskStatus = new Map([[mask.id, 'ready']])
+
+    renderPanel()
+
+    fireEvent.click(screen.getByText('Detail'))
+
+    expect(setObjectPrompt).toHaveBeenCalledWith(mask.id, {
+      points: [{ x: 0.5, y: 0.5, label: 1 }],
+      box: null,
+      granularity: 'detail',
+    })
+  })
+
+  it('offers no granularity control until something has been pointed at', () => {
+    const mask = createMask('object', 'Select object 1')
+    state.masks = [mask]
+    state.activeMaskId = mask.id
+
+    renderPanel()
+
+    expect(screen.queryByText('Detail')).not.toBeInTheDocument()
   })
 })

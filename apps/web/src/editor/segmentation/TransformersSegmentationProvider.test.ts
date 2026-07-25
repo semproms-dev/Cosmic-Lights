@@ -5,6 +5,7 @@ import {
 } from './TransformersSegmentationProvider'
 import type {
   ModelLoadProgress,
+  ModelPrompt,
   SegmentationRequest,
   SegmentationResponse,
   WorkerMessage,
@@ -59,6 +60,11 @@ function success(id: number, data: number[]): SegmentationResponse {
   return { kind: 'result', id, ok: true, data: new Uint8Array(data), width: data.length, height: 1 }
 }
 
+/** One foreground click in the middle of the frame. */
+function clickPrompt(): ModelPrompt {
+  return { points: [{ x: 0.5, y: 0.5, label: 1 }], box: null }
+}
+
 describe('TransformersSegmentationProvider', () => {
   it('does not build a worker until the first segmentation', () => {
     const createWorker = vi.fn(() => new FakeWorker())
@@ -101,7 +107,11 @@ describe('TransformersSegmentationProvider', () => {
 
     void provider.segment(bitmap, 'subject')
 
-    expect(worker.posted[0].bitmap).toBe(bitmap)
+    const posted = worker.posted[0]
+    expect(posted.op).toBe('segment')
+    // Narrow the request union: `decode` carries no bitmap.
+    if (posted.op === 'decode') throw new Error('expected a segment request')
+    expect(posted.bitmap).toBe(bitmap)
     expect(worker.transfers[0]).toEqual([bitmap])
   })
 
@@ -249,5 +259,166 @@ describe('TransformersSegmentationProvider', () => {
       'Worker constructor unavailable',
     )
     expect(bitmap.closed).toBe(true)
+  })
+
+  describe('segmentObject', () => {
+    /**
+     * Lets the microtasks between the embed acknowledgement and the decode that
+     * follows it run — `segmentObject` chains the two, so the second request is
+     * only posted a tick after the first is answered.
+     */
+    function flush(): Promise<void> {
+      return new Promise((resolve) => {
+        setTimeout(resolve, 0)
+      })
+    }
+
+    /** Answers an `embed` posted at `id`, then lets its decode be dispatched. */
+    async function acknowledgeEmbed(worker: FakeWorker, id: number): Promise<void> {
+      worker.respond({ kind: 'embedded', id, imageId: 7, ok: true })
+      await flush()
+    }
+
+    it('encodes the image first, then decodes the prompt', async () => {
+      const worker = new FakeWorker()
+      const provider = new TransformersSegmentationProvider({ createWorker: () => worker })
+
+      const result = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      expect(worker.posted[0]).toMatchObject({ op: 'embed', id: 0, imageId: 7 })
+
+      await acknowledgeEmbed(worker, 0)
+      expect(worker.posted[1]).toMatchObject({ op: 'decode', id: 1, imageId: 7 })
+      worker.respond(success(1, [255]))
+
+      await expect(result).resolves.toEqual({
+        data: new Uint8Array([255]),
+        width: 1,
+        height: 1,
+      })
+    })
+
+    it('reuses the encoding for the next prompt on the same image', async () => {
+      const worker = new FakeWorker()
+      const provider = new TransformersSegmentationProvider({ createWorker: () => worker })
+
+      const first = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      await acknowledgeEmbed(worker, 0)
+      worker.respond(success(1, [255]))
+      await first
+
+      // The second click is where the design pays off: no encoder, just a decode.
+      const bitmap = fakeBitmap()
+      const second = provider.segmentObject(bitmap, 7, clickPrompt())
+      await flush()
+      worker.respond(success(2, [128]))
+      await expect(second).resolves.toMatchObject({ data: new Uint8Array([128]) })
+
+      expect(worker.posted.filter((request) => request.op === 'embed')).toHaveLength(1)
+      // Nobody else can free the clone the caller handed over.
+      expect(bitmap.closed).toBe(true)
+    })
+
+    it('encodes only once when two prompts race on an unencoded image', async () => {
+      const worker = new FakeWorker()
+      const provider = new TransformersSegmentationProvider({ createWorker: () => worker })
+
+      const first = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      const second = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      await acknowledgeEmbed(worker, 0)
+      // Both decodes wait on the single embed, so they take the next two ids.
+      worker.respond(success(1, [1]))
+      worker.respond(success(2, [2]))
+      await Promise.all([first, second])
+
+      expect(worker.posted.filter((request) => request.op === 'embed')).toHaveLength(1)
+    })
+
+    it('re-encodes when the image changes', async () => {
+      const worker = new FakeWorker()
+      const provider = new TransformersSegmentationProvider({ createWorker: () => worker })
+
+      const first = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      await acknowledgeEmbed(worker, 0)
+      worker.respond(success(1, [1]))
+      await first
+
+      void provider.segmentObject(fakeBitmap(), 8, clickPrompt())
+      expect(worker.posted[2]).toMatchObject({ op: 'embed', imageId: 8 })
+    })
+
+    it('does not remember a failed encoding as done', async () => {
+      const worker = new FakeWorker()
+      const provider = new TransformersSegmentationProvider({ createWorker: () => worker })
+
+      const first = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      worker.respond({ kind: 'embedded', id: 0, ok: false, error: 'model download failed' })
+      await expect(first).rejects.toThrow('model download failed')
+
+      // A retry has to encode again, or every decode would be answered with
+      // "re-embed required" forever.
+      void provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      expect(worker.posted[1]).toMatchObject({ op: 'embed', imageId: 7 })
+    })
+
+    it('rejects with the decoder message when the prompt cannot be segmented', async () => {
+      const worker = new FakeWorker()
+      const provider = new TransformersSegmentationProvider({ createWorker: () => worker })
+
+      const result = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      await acknowledgeEmbed(worker, 0)
+      worker.respond({ kind: 'result', id: 1, ok: false, error: 'Empty prompt' })
+
+      await expect(result).rejects.toThrow('Empty prompt')
+    })
+
+    it('transfers the bitmap for the encoding but nothing for the decoding', async () => {
+      const worker = new FakeWorker()
+      const provider = new TransformersSegmentationProvider({ createWorker: () => worker })
+      const bitmap = fakeBitmap()
+
+      void provider.segmentObject(bitmap, 7, clickPrompt())
+      await acknowledgeEmbed(worker, 0)
+
+      expect(worker.transfers[0]).toEqual([bitmap])
+      // The worker keeps the encoded image; a prompt is a handful of numbers.
+      expect(worker.transfers[1]).toEqual([])
+    })
+
+    it('fails an in-flight encoding on dispose instead of hanging', async () => {
+      const worker = new FakeWorker()
+      const provider = new TransformersSegmentationProvider({ createWorker: () => worker })
+
+      const result = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      provider.dispose()
+
+      await expect(result).rejects.toThrow(/disposed/)
+    })
+
+    it('re-encodes after the worker dies, since the new one knows nothing', async () => {
+      const worker = new FakeWorker()
+      const replacement = new FakeWorker()
+      let built = 0
+      const provider = new TransformersSegmentationProvider({
+        createWorker: () => (built++ === 0 ? worker : replacement),
+      })
+
+      const first = provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      await acknowledgeEmbed(worker, 0)
+      worker.respond(success(1, [1]))
+      await first
+      worker.crash('out of memory')
+
+      void provider.segmentObject(fakeBitmap(), 7, clickPrompt())
+      expect(replacement.posted[0]).toMatchObject({ op: 'embed', imageId: 7 })
+    })
+
+    it('rejects and releases the bitmap when used after dispose', async () => {
+      const provider = new TransformersSegmentationProvider({ createWorker: () => new FakeWorker() })
+      provider.dispose()
+      const bitmap = fakeBitmap()
+
+      await expect(provider.segmentObject(bitmap, 7, clickPrompt())).rejects.toThrow(/disposed/)
+      expect(bitmap.closed).toBe(true)
+    })
   })
 })

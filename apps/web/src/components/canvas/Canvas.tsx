@@ -8,7 +8,12 @@ import { IconZoomReset } from '@tabler/icons-react'
 import { ConfirmDialog } from '../window/ConfirmDialog'
 import { clampZoom } from '../../utils'
 import { displayScale, IDENTITY_VIEW, pointerToImagePoint } from '../../editor/crop'
-import type { MaskPoint } from '../../editor/masks'
+import {
+  EMPTY_OBJECT_PROMPT,
+  promptBoxFromCorners,
+  withPromptPoint,
+} from '../../editor/masks'
+import type { MaskPoint, NormalizedPoint, ObjectPrompt } from '../../editor/masks'
 import { DropOverlay } from './DropOverlay'
 import { isRawFile } from './rawFormats'
 
@@ -51,7 +56,32 @@ interface CanvasProps {
    * Masks tool is open), or `null` to render normally.
    */
   overlayMaskId?: string | null
+  /**
+   * Id of the promptable object mask being pointed at, or `null`/absent
+   * otherwise. When set, a click adds a foreground point (shift-click a
+   * background one) and a drag encloses the object in a box, instead of panning.
+   * Like the other tools, coordinates assume the fitted view.
+   */
+  objectMaskId?: string | null
 }
+
+/**
+ * A drag with the object tool armed: where it started (normalised [0,1]) and
+ * whether it has travelled far enough to count as a box rather than a click.
+ */
+interface ObjectDrag {
+  anchor: NormalizedPoint
+  /** Press position in CSS pixels — the click/drag threshold is a screen distance. */
+  screen: { x: number; y: number }
+  moved: boolean
+}
+
+/**
+ * How far (CSS px) the pointer must travel before a press counts as a box drag
+ * rather than a click. Small enough to feel deliberate, large enough to survive
+ * the wobble of a click on a trackpad.
+ */
+const OBJECT_DRAG_THRESHOLD = 6
 
 /**
  * Central editor canvas. Renders the decoded image through the WebGL pipeline,
@@ -59,7 +89,7 @@ interface CanvasProps {
  * change, adjustment change or resize, batching each into a single animation
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
-export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = null, radialMaskId = null, overlayMaskId = null }: CanvasProps) {
+export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = null, radialMaskId = null, overlayMaskId = null, objectMaskId = null }: CanvasProps) {
   const { 
     image, 
     adjustments, 
@@ -77,12 +107,13 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     addBrushStroke,
     setMaskGradient,
     setMaskRadial,
+    setObjectPrompt,
     commit,
     view,
     setView,
     orientation,
     rotationSpin,
-    resetOrientation
+    resetOrientation,
   } = useEditor()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -104,9 +135,17 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   // Anchor (ellipse centre, image px) of the radial mask being dragged, or null
   // when not dragging one.
   const radialAnchorRef = useRef<MaskPoint | null>(null)
+  // The object-prompt gesture in progress (click or box drag), or null.
+  const objectDragRef = useRef<ObjectDrag | null>(null)
   // Brush cursor ring position/size in CSS px, or null when the pointer is off
   // the canvas or not in brush mode.
   const [brushCursor, setBrushCursor] = useState<{ x: number; y: number; d: number } | null>(null)
+  // Rubber band for the object box being dragged, in CSS px, or null. Kept local
+  // (and in screen space) on purpose: the store only hears about the box once, on
+  // release, so a drag costs no bitmap clones and needs no debouncing. Quarter
+  // turns map an axis-aligned rectangle to an axis-aligned one, so what the band
+  // encloses on screen is exactly what the box encloses in the image.
+  const [objectBand, setObjectBand] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   // A file dropped or picked via the DropOverlay; ignore anything that is not a
   // recognised RAW photo.
@@ -308,6 +347,37 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     )
   }
 
+  // Pointer position → normalised [0,1] image coordinates, the units the object
+  // prompt speaks (see `ObjectPrompt`). This is the *only* place the main thread
+  // divides by the image size; the worker rescales from [0,1] on its side. A press
+  // on the letterbox lands outside [0,1] and is left that way here — see below.
+  const toPromptPointRaw = (e: React.PointerEvent<HTMLCanvasElement>): NormalizedPoint | null => {
+    const point = toImagePoint(e);
+    if (point === null || image === null) return null;
+    return {
+      x: point.x / image.width,
+      y: point.y / image.height
+    }
+  }
+
+  // The same, but rejecting anything outside the image: a click on the black bar
+  // is not a click on the object's edge, so it adds no point. A box instead uses
+  // the raw value and clamps — a drag that overshoots the frame still means
+  // "enclose everything up to the edge".
+  const toPromptPoint = (e: React.PointerEvent<HTMLCanvasElement>): NormalizedPoint | null => {
+    const result = toPromptPointRaw(e)
+    if (result === null) return null
+
+    if((result.x < 0 || result.x > 1) || (result.y < 0 || result.y > 1))
+      return null; // click outside the image
+
+    return result;
+  }
+
+  /** The prompt the active object mask carries right now, never null. */
+  const currentPrompt = (): ObjectPrompt =>
+    masks.find((m) => m.id === objectMaskId)?.prompt ?? EMPTY_OBJECT_PROMPT
+
   /** Brush radius in image pixels, scaled to the image's short side. */
   const brushRadius = (): number =>
     image === null ? 0 : BRUSH_RADIUS_FRACTION * Math.min(image.width, image.height)
@@ -354,6 +424,20 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       e.currentTarget.setPointerCapture(e.pointerId)
       return
     }
+    if (objectMaskId !== null && image !== null) {
+      const n = toPromptPoint(e)
+      // A press on the letterbox arms nothing — and deliberately does not pan
+      // either, so the gesture stays predictable while the tool is open.
+      if (n === null) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      objectDragRef.current = {
+        anchor: n,
+        screen: { x: e.clientX - rect.left, y: e.clientY - rect.top },
+        moved: false,
+      }
+      e.currentTarget.setPointerCapture(e.pointerId)
+      return
+    }
     panRef.current = { x: e.clientX, y: e.clientY }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
@@ -392,6 +476,25 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
         ry: Math.max(1, Math.abs(p.y - radialAnchor.y)),
         rotation: 0,
         feather: 0.5,
+      })
+      return
+    }
+    const objectDrag = objectDragRef.current
+    if (objectDrag !== null && objectMaskId !== null) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      // Below the threshold the press is still a click-in-progress: no band yet,
+      // or every click would flash a one-pixel rectangle.
+      if (!objectDrag.moved && Math.hypot(x - objectDrag.screen.x, y - objectDrag.screen.y) < OBJECT_DRAG_THRESHOLD) {
+        return
+      }
+      objectDrag.moved = true
+      setObjectBand({
+        x: Math.min(x, objectDrag.screen.x),
+        y: Math.min(y, objectDrag.screen.y),
+        w: Math.abs(x - objectDrag.screen.x),
+        h: Math.abs(y - objectDrag.screen.y),
       })
       return
     }
@@ -437,6 +540,29 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       e.currentTarget.releasePointerCapture(e.pointerId)
       return
     }
+    const objectDrag = objectDragRef.current
+    if (objectDrag !== null && objectMaskId !== null) {
+      objectDragRef.current = null
+      setObjectBand(null)
+      e.currentTarget.releasePointerCapture(e.pointerId)
+      // One store call per gesture, then one undo step: the prompt is always sent
+      // whole, and `setObjectPrompt` re-segments and discards stale answers.
+      if (objectDrag.moved) {
+        const end = toPromptPointRaw(e)
+        if (end === null) return
+        const box = promptBoxFromCorners(objectDrag.anchor, end)
+        // A degenerate box selects nothing; drop it rather than confuse the model.
+        if (box.x0 === box.x1 || box.y0 === box.y1) return
+        setObjectPrompt(objectMaskId, { ...currentPrompt(), box })
+      } else {
+        const n = toPromptPoint(e)
+        if (n === null) return
+        // Shift-click carves the selection back: this pixel is *not* the object.
+        setObjectPrompt(objectMaskId, withPromptPoint(currentPrompt(), n, e.shiftKey ? 0 : 1))
+      }
+      commit()
+      return
+    }
     panRef.current = null
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
@@ -468,7 +594,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       onPointerUp={handlePointerUp}
       onPointerLeave={() => setBrushCursor(null)}
       onDoubleClick={() => setView(IDENTITY_VIEW)}
-      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : gradientMaskId !== null || radialMaskId !== null ? 'crosshair' : 'default' }} />
+      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : gradientMaskId !== null || radialMaskId !== null || objectMaskId !== null ? 'crosshair' : 'default' }} />
 
     </div>
   </div>
@@ -488,6 +614,21 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
           transform: 'translate(-50%, -50%)',
           borderRadius: '50%',
           border: '1px solid rgba(255,255,255,0.9)',
+          boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+        }}
+      />
+    )}
+    {objectBand !== null && (
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: objectBand.x,
+          top: objectBand.y,
+          width: objectBand.w,
+          height: objectBand.h,
+          border: '1px dashed rgba(255,255,255,0.95)',
           boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
           pointerEvents: 'none',
         }}

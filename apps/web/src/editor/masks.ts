@@ -1,4 +1,10 @@
 import { basicAdjustments, buildDefaults, colorAdjustement } from './adjustments'
+import type { MaskGranularity } from './segmentation/types'
+
+export type { MaskGranularity }
+
+/** The granularity choices offered, coarsest first — the order the UI shows. */
+export const MASK_GRANULARITIES: readonly MaskGranularity[] = ['auto', 'whole', 'part', 'detail']
 
 /**
  * How a mask's alpha map is produced. All resolve to the same thing — a
@@ -8,6 +14,134 @@ import { basicAdjustments, buildDefaults, colorAdjustement } from './adjustments
  * treats them identically.
  */
 export type MaskType = 'brush' | 'subject' | 'sky' | 'linear' | 'radial' | 'object'
+
+/**
+ * The user's prompt for a promptable object mask (SAM), in **normalised [0,1]
+ * image coordinates**. Refined iteratively: each extra click is another point.
+ */
+export interface ObjectPrompt {
+  /**
+   * Foreground/background points. `label` 1 = the object *contains* this pixel
+   * (a click); 0 = it *does not* (a shift-click, to carve the selection back).
+   */
+  points: { x: number; y: number; label: 0 | 1 }[]
+  /** An optional bounding box, corners in [0,1] as `(x0,y0)`–`(x1,y1)`. */
+  box: { x0: number; y0: number; x1: number; y1: number } | null
+  /**
+   * Which reading of the click to keep — the eye, the face or the person. Absent
+   * means `'auto'`: let the model's confidence decide.
+   */
+  granularity?: MaskGranularity
+}
+
+/** One foreground/background point of an {@link ObjectPrompt}. */
+export type PromptPoint = ObjectPrompt['points'][number]
+
+/** An {@link ObjectPrompt} bounding box. */
+export type PromptBox = NonNullable<ObjectPrompt['box']>
+
+/**
+ * A point in **normalised [0,1] image coordinates**, as the segmentation prompt
+ * speaks them — deliberately a different type from {@link MaskPoint} (image
+ * pixels), because the two are trivially confused and nothing else would catch it.
+ */
+export interface NormalizedPoint {
+  x: number
+  y: number
+}
+
+/** The empty prompt a fresh object mask starts from. */
+export const EMPTY_OBJECT_PROMPT: ObjectPrompt = { points: [], box: null }
+
+/**
+ * Whether a prompt says nothing at all. The model needs at least one point or a
+ * box; an empty prompt is never worth sending.
+ */
+export function isPromptEmpty(prompt: ObjectPrompt): boolean {
+  return prompt.points.length === 0 && prompt.box === null
+}
+
+/**
+ * Returns `prompt` with one more point. The prompt is always replaced whole
+ * (never mutated) — the store diffs nothing and simply re-segments.
+ *
+ * @param prompt - The prompt so far.
+ * @param point - Where the user clicked, normalised to [0,1].
+ * @param label - 1 = the object contains this pixel, 0 = it does not.
+ * @returns A new prompt with the point appended.
+ */
+export function withPromptPoint(
+  prompt: ObjectPrompt,
+  point: NormalizedPoint,
+  label: 0 | 1,
+): ObjectPrompt {
+  return { ...prompt, points: [...prompt.points, { x: point.x, y: point.y, label }] }
+}
+
+/**
+ * Returns `prompt` without the point at `index`.
+ *
+ * Removing the *last* thing a prompt says is refused: the already-segmented alpha
+ * stays on screen once uploaded, so an empty prompt would leave the mask showing
+ * a selection the user can no longer explain or change. Deleting the final point
+ * is only allowed when a box still carries the prompt.
+ *
+ * @param prompt - The prompt to trim.
+ * @param index - Which point to drop; out-of-range indices are ignored.
+ * @returns A new prompt, or `prompt` itself when the removal is refused.
+ */
+export function withoutPromptPoint(prompt: ObjectPrompt, index: number): ObjectPrompt {
+  if (index < 0 || index >= prompt.points.length) return prompt
+  const points = prompt.points.filter((_, i) => i !== index)
+  if (points.length === 0 && prompt.box === null) return prompt
+  return { ...prompt, points }
+}
+
+/**
+ * Returns `prompt` asking for a different reading of the same click.
+ *
+ * Only the granularity changes: the points and box the user placed are what
+ * SAM re-decodes against, and that decode is cheap because the image embedding
+ * is already cached.
+ *
+ * @param prompt - The prompt to re-read.
+ * @param granularity - Which rung of the size ladder to keep.
+ * @returns A new prompt, or `prompt` itself when nothing would change.
+ */
+export function withPromptGranularity(
+  prompt: ObjectPrompt,
+  granularity: MaskGranularity,
+): ObjectPrompt {
+  if (promptGranularity(prompt) === granularity) return prompt
+  return { ...prompt, granularity }
+}
+
+/** The granularity a prompt asks for, defaulting to `'auto'` when unset. */
+export function promptGranularity(prompt: ObjectPrompt | null): MaskGranularity {
+  return prompt?.granularity ?? 'auto'
+}
+
+/**
+ * Builds a prompt box from the two corners of a drag, in normalised coordinates.
+ * The corners are ordered (`x0 <= x1`, `y0 <= y1`) and clamped to [0,1], so a
+ * drag that runs off the image still encloses everything visible along that edge
+ * — unlike a stray point, a box that overshoots is exactly what the user meant.
+ *
+ * @param a - Where the drag started, normalised.
+ * @param b - Where it ended, normalised.
+ * @returns The ordered, clamped box.
+ */
+export function promptBoxFromCorners(a: NormalizedPoint, b: NormalizedPoint): PromptBox {
+  const clamp = (value: number): number => Math.min(1, Math.max(0, value))
+  return {
+    x0: clamp(Math.min(a.x, b.x)),
+    y0: clamp(Math.min(a.y, b.y)),
+    x1: clamp(Math.max(a.x, b.x)),
+    y1: clamp(Math.max(a.y, b.y)),
+  }
+}
+
+
 
 /** A point of a brush stroke, in image-pixel coordinates. */
 export interface MaskPoint {
@@ -71,6 +205,8 @@ export interface Mask {
   version: number
   /** Gradient ramp for `Radial shape` */
   radial: RadialShape | null;
+  /**Prompt for selecting objects */
+  prompt: ObjectPrompt | null;
 }
 
 /** Maximum number of masks the editor keeps at once. */
@@ -134,6 +270,7 @@ export function createMask(type: MaskType, name: string): Mask {
     strokes: [],
     gradient: null,
     version: 0,
-    radial: null
+    radial: null,
+    prompt: null
   }
 }

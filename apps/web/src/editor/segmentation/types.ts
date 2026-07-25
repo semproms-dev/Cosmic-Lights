@@ -11,7 +11,7 @@ export interface MaskAlpha {
  * the rasterised `linear` gradient. Both of those are excluded — only AI masks
  * run through the segmentation worker.
  */
-export type SegmentationKind = Exclude<MaskType, 'brush' | 'linear'>
+export type SegmentationKind = Exclude<MaskType, 'brush' | 'linear' | 'radial' | 'object'>
 
 /**
  * A generated alpha, tagged with the `Mask.version` it was produced for.
@@ -39,16 +39,49 @@ export type MaskStatus = 'loading' | 'ready' | 'error'
  */
 export type MaskAlphaCache = Map<string, CachedMaskAlpha>
 
-/** A segmentation job sent from the main thread to the worker. */
-export interface SegmentationRequest {
-  /** Correlates the response with the caller's pending promise. */
-  id: number
+/**
+ * Which reading of an ambiguous click to keep.
+ *
+ * A click is ambiguous by design — clicking an eye could mean the eye, the face
+ * or the person — and SAM answers with all three at once. Its confidence scores
+ * do not rank them by what the user meant (measured: a face scored 0.874 against
+ * the eye's 0.717), so the choice is the user's to make. `auto` guesses, the rest
+ * name a rung on the size ladder the candidates form.
+ */
+export type MaskGranularity = 'auto' | 'whole' | 'part' | 'detail'
+
+/**
+ * A promptable-segmentation prompt (SAM), in **normalised [0,1] image
+ * coordinates** so the worker can scale it to whatever resolution it fed the
+ * model. The main thread never needs to know the model's internal size.
+ */
+export interface ModelPrompt {
   /**
-   * The image to segment. This is *transferred* to the worker, not copied, so
-   * the sender must clone it (`createImageBitmap`) if it still needs the pixels.
+   * Foreground/background points. `label` 1 = the object *contains* this pixel
+   * (a click); 0 = it *does not* (a shift-click, to carve the selection back).
    */
-  bitmap: ImageBitmap
+  points: { x: number; y: number; label: 0 | 1 }[]
+  /** An optional bounding box, corners in [0,1] as `(x0,y0)`–`(x1,y1)`. */
+  box: { x0: number; y0: number; x1: number; y1: number } | null
+  /** Which candidate to keep; absent means {@link MaskGranularity} `'auto'`. */
+  granularity?: MaskGranularity
 }
+
+/**
+ * A job sent from the main thread to the worker. Discriminate on `op`:
+ * - `segment` — one-shot background removal (Subject), as before.
+ * - `embed` — SAM stage 1: run the (expensive) image encoder once per image and
+ *   cache its embedding, keyed by `imageId`.
+ * - `decode` — SAM stage 2: run the (cheap) mask decoder against the cached
+ *   embedding for a given prompt. Reuses the embedding whenever `imageId` matches.
+ *
+ * The `bitmap` of `segment`/`embed` is *transferred*, not copied, so the sender
+ * must clone it (`createImageBitmap`) if it still needs the pixels.
+ */
+export type SegmentationRequest =
+  | { op: 'segment'; id: number; bitmap: ImageBitmap }
+  | { op: 'embed'; id: number; imageId: number; bitmap: ImageBitmap }
+  | { op: 'decode'; id: number; imageId: number; prompt: ModelPrompt }
 
 /** A completed segmentation: the alpha map, ready for `uploadMaskAlpha`. */
 export interface SegmentationSuccess extends MaskAlpha {
@@ -87,5 +120,29 @@ export type ModelLoadProgress =
   /** The pipeline is built. Any further wait is inference, not download. */
   | { kind: 'model-progress'; phase: 'ready' }
 
+/**
+ * The answer to an `embed` request: the image encoder ran (or failed). Carries
+ * no pixels — a successful embed just means a later `decode` for the same
+ * `imageId` can skip straight to the mask decoder.
+ */
+export interface EmbedSuccess {
+  kind: 'embedded'
+  id: number
+  /** The image the embedding was cached under, echoed back for confirmation. */
+  imageId: number
+  ok: true
+}
+
+/** A failed `embed`. `error` is a message, not an `Error` (not cloneable). */
+export interface EmbedFailure {
+  kind: 'embedded'
+  id: number
+  ok: false
+  error: string
+}
+
+/** The terminal answer to one `embed` request. Discriminate on `ok`. */
+export type EmbedResponse = EmbedSuccess | EmbedFailure
+
 /** Anything the worker posts back. Discriminate on `kind`. */
-export type WorkerMessage = SegmentationResponse | ModelLoadProgress
+export type WorkerMessage = SegmentationResponse | EmbedResponse | ModelLoadProgress
