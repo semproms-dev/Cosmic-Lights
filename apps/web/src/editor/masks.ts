@@ -101,7 +101,8 @@ export const MASK_TYPE_LABEL: Record<MaskType, string> = {
   subject: 'Subject',
   sky: 'Sky',
   linear: 'Linear Gradient',
-  radial: 'Radial Gradient'
+  radial: 'Radial Gradient',
+  object: 'Select object'
 }
 
 /**
