@@ -2,6 +2,7 @@ import {
   basicAdjustments,
   colorAdjustement,
   detailsAdjustement,
+  effectsAdjustement,
   buildDefaults,
 } from './adjustments'
 import { buildDefaultCurves } from './curves'
@@ -76,14 +77,17 @@ export type EditorAction =
   | { type: 'SET_MASK_PROMPT'; id: string; prompt: ObjectPrompt }
 
 /**
- * Construye el mapa inicial de sliders a partir de los tres grupos (Basic,
- * Color, Details). Centralizarlo aquí evita el bug de sembrar solo `basic`.
+ * Construye el mapa inicial de sliders a partir de los cuatro grupos (Basic,
+ * Color, Details, Effects). Centralizarlo aquí evita el bug de sembrar solo
+ * `basic`: una clave que falte llega al shader como `NaN` y tiñe de negro el
+ * fotograma entero sin dar ningún error.
  */
 export function buildInitialAdjustments(): Record<string, number> {
   return {
     ...buildDefaults(basicAdjustments),
     ...buildDefaults(colorAdjustement),
     ...buildDefaults(detailsAdjustement),
+    ...buildDefaults(effectsAdjustement),
   }
 }
 

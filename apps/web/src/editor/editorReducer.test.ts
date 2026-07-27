@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { effectsAdjustement } from './adjustments'
 import { buildDefaultCurves } from './curves'
 import type { CropRegion, LoadedImage } from './image'
 import {
@@ -99,6 +100,42 @@ describe('editorReducer — image slice', () => {
 
     expect(next.adjustments).toEqual(buildInitialAdjustments())
     expect(next.curves).toEqual(buildDefaultCurves())
+  })
+})
+
+describe('editorReducer — effects slice (vignette)', () => {
+  it('seeds every effects key, so none reaches the shader as NaN', () => {
+    const adjustments = buildInitialAdjustments()
+
+    for (const option of effectsAdjustement) {
+      expect(adjustments[option.key]).toBe(option.defaultValue)
+    }
+  })
+
+  it('starts neutral: no shading, midpoint and feather centred', () => {
+    const adjustments = buildInitialAdjustments()
+
+    expect(adjustments.vignette).toBe(0)
+    expect(adjustments.vignetteMidpoint).toBe(50)
+    expect(adjustments.vignetteFeather).toBe(50)
+  })
+
+  it('SET stores a negative amount (Lightroom sign: negative darkens)', () => {
+    const next = editorReducer(createState(), { type: 'SET', key: 'vignette', value: -60 })
+
+    expect(next.adjustments.vignette).toBe(-60)
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('RESET_ADJUSTEMENTS returns the vignette to its defaults', () => {
+    const state = createState({
+      adjustments: { ...buildInitialAdjustments(), vignette: -60, vignetteMidpoint: 10 },
+    })
+
+    const next = editorReducer(state, { type: 'RESET_ADJUSTEMENTS' })
+
+    expect(next.adjustments.vignette).toBe(0)
+    expect(next.adjustments.vignetteMidpoint).toBe(50)
   })
 })
 

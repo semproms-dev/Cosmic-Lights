@@ -232,6 +232,9 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
         clarity: adjustments.clarity ?? 0,
         dehaze: adjustments.dehaze ?? 0,
         texture: adjustments.texture ?? 0,
+        vignette: adjustments.vignette ?? 0,
+        vignetteMidpoint: adjustments.vignetteMidpoint ?? 50,
+        vignetteFeather: adjustments.vignetteFeather ?? 50,
       }, masks, maskAlphas.current, overlayMaskId, width, height)
     }
     // Expose the latest draw so live brush painting can force a redraw (painting

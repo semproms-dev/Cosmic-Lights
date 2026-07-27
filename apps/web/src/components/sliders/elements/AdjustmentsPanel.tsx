@@ -1,5 +1,5 @@
 import { Accordion, Group, Stack, Text } from '@mantine/core';
-import { basicAdjustments, colorAdjustement, detailsAdjustement } from '../../../editor/adjustments';
+import { basicAdjustments, colorAdjustement, detailsAdjustement, effectsAdjustement } from '../../../editor/adjustments';
 import { useEditor } from '../../../editor/editorContext';
 import { ControlSlider } from './ControlSlider';
 import { GradientSlider } from './GradientSlider';
@@ -87,6 +87,26 @@ export function AdjustmentsPanel() {
               <ControlSlider
                 key={option.key}
                 label={option.label}
+                description={t(`labels.${option.key}`)}
+                value={adjustments[option.key]}
+                min={option.min}
+                max={option.max}
+                step={option.step}
+                onChangeEnd={() => commit()}
+                onChange={(value) => setAdjustment(option.key, value)}
+              />
+            ))}
+          </Stack>
+        </Accordion.Panel>
+      </Accordion.Item>
+      <Accordion.Item value='Effects'>
+        <Accordion.Control><Text fw={700}>{t('groups.effects')}</Text></Accordion.Control>
+        <Accordion.Panel>
+          <Stack gap="md">
+            {effectsAdjustement.map((option) => (
+              <ControlSlider
+                key={option.key}
+                label={t(`lateralNavBar.${option.key}`)}
                 description={t(`labels.${option.key}`)}
                 value={adjustments[option.key]}
                 min={option.min}

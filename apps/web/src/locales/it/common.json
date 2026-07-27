@@ -12,7 +12,10 @@
     "saturation": "Aumentare o diminuire l'intensità di tutti i colori in egual misura",
     "clarity": "Aggiungere o rimuovere contrasto dei mezzitoni per un aspetto più deciso o più morbido",
     "dehaze": "Rimuovere o aggiungere foschia atmosferica all'immagine",
-    "texture": "Esaltare o ammorbidire i dettagli fini e i motivi di superficie"
+    "texture": "Esaltare o ammorbidire i dettagli fini e i motivi di superficie",
+    "vignette": "Scurire o schiarire i bordi dell'inquadratura, ricentrato sul ritaglio",
+    "vignetteMidpoint": "A che distanza dal centro inizia l'ombreggiatura dei bordi",
+    "vignetteFeather": "Quanto è morbida la transizione verso i bordi ombreggiati"
   },
   "groups": {
     "basic": "Base",
@@ -20,7 +23,8 @@
     "presence": "Presenza",
     "color": "Colore",
     "details": "Dettagli",
-    "curves": "Curve"
+    "curves": "Curve",
+    "effects": "Effetti"
   },
   "nav": {
     "info": "Info",
@@ -51,7 +55,10 @@
     "vibrance": "Vibranza",
     "saturation": "Saturazione",
     "clarity": "Nitidezza",
-    "dehaze": "Rimozione foschia"
+    "dehaze": "Rimozione foschia",
+    "vignette": "Vignettatura",
+    "vignetteMidpoint": "Punto medio",
+    "vignetteFeather": "Sfumatura"
   },
   "settings": {
     "general": "Generale",

@@ -47,6 +47,9 @@ void main() {
  *   saturation + cool tint, so removing it lowers the black point, adds local
  *   contrast, restores saturation and warms the tint (all scaled by `d`, and
  *   reversed for negative dehaze = adding haze).
+ * - Vignette: post-crop shading of the frame's edges. It rides here (and not in
+ *   FRAGMENT_SHADER) because this is the only pass that knows `vUv`, the
+ *   displayed frame — which is what makes it post-crop at no cost.
  */
 export const CLARITY_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
@@ -64,6 +67,10 @@ uniform mat2 uUvMatrix;         // crop size + 90° turns + flips, about the cen
 uniform vec2 uUvCenter;         // UV of the crop centre (0.5,0.5 = no crop)
 uniform sampler2D uOverlayMask; // active mask alpha, for the editing overlay
 uniform float uOverlay;         // 1 → tint the masked area red so it's visible
+uniform float uVignette;        // -100..100; negative darkens (Lightroom's sign)
+uniform float uVignetteMid;     // 0..100; where the falloff starts
+uniform float uVignetteFeather; // 0..100; how soft the transition is
+uniform float uFrameAspect;     // width/height of the DISPLAYED frame
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
@@ -97,6 +104,25 @@ void main() {
   rgb += d * 0.05 * vec3(1.0, 0.0, -1.0);          // warm the tint against the cool haze
 
   vec3 outRgb = clamp(rgb, 0.0, 1.0);
+
+  // Post-crop vignette. Computed on vUv (the displayed frame), never on uv (the
+  // uncropped image), so the oval recentres on the crop and turns with the 90°
+  // rotations for free. Applied after clarity/dehaze — it shades already graded
+  // light — and on the clamped colour, so the "screen" branch can't invert.
+  vec2 vAxis = vec2(max(uFrameAspect, 1.0), max(1.0 / uFrameAspect, 1.0));
+  // Aspect-corrected distance to the centre: 0 at the centre, 1 at the corner.
+  // length(), not max(abs()), or the falloff would be a rectangle.
+  float r = length((vUv - 0.5) * vAxis) / length(vec2(0.5) * vAxis);
+  float mid = uVignetteMid / 100.0;                   // where the falloff starts
+  float soft = max(uVignetteFeather / 100.0, 1e-3);   // 0 → hard edge
+  float v = smoothstep(mid, mid + soft * (1.0 - mid), r);
+  float vAmount = uVignette / 100.0;                  // -1..1
+  // Negative multiplies (darkens), positive screens (lightens) — screening keeps
+  // a bright sky from flattening to pure white as a multiply > 1 would.
+  outRgb = vAmount < 0.0
+    ? outRgb * (1.0 + vAmount * v)
+    : outRgb + (1.0 - outRgb) * (vAmount * v);
+
   // Mask-editing overlay: tint the painted area red so the user sees the mask
   // regardless of its adjustments. Off (uOverlay = 0) during normal viewing.
   float mo = texture(uOverlayMask, uv).r * uOverlay;

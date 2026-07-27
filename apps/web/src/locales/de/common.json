@@ -12,7 +12,10 @@
     "saturation": "Intensität aller Farben gleichmäßig erhöhen oder verringern",
     "clarity": "Mitteltönigen Kontrast hinzufügen oder entfernen für einen knackigeren oder weicheren Look",
     "dehaze": "Atmosphärischen Dunst aus dem Bild entfernen oder hinzufügen",
-    "texture": "Feine Details und Oberflächenmuster verstärken oder weichzeichnen"
+    "texture": "Feine Details und Oberflächenmuster verstärken oder weichzeichnen",
+    "vignette": "Die Bildränder abdunkeln oder aufhellen, zentriert auf den Ausschnitt",
+    "vignetteMidpoint": "Wie weit von der Mitte entfernt die Abschattung beginnt",
+    "vignetteFeather": "Wie weich der Übergang zu den abgeschatteten Rändern verläuft"
   },
   "groups": {
     "basic": "Grundlegend",
@@ -20,7 +23,8 @@
     "presence": "Präsenz",
     "color": "Farbe",
     "details": "Details",
-    "curves": "Kurven"
+    "curves": "Kurven",
+    "effects": "Effekte"
   },
   "nav": {
     "info": "Info",
@@ -51,7 +55,10 @@
     "vibrance": "Dynamik",
     "saturation": "Sättigung",
     "clarity": "Klarheit",
-    "dehaze": "Schlieren entfernen"
+    "dehaze": "Schlieren entfernen",
+    "vignette": "Vignettierung",
+    "vignetteMidpoint": "Mittelpunkt",
+    "vignetteFeather": "Weiche Kante"
   },
   "settings": {
     "general": "Allgemein",

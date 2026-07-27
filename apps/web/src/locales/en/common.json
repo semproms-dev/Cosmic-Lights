@@ -12,7 +12,10 @@
     "saturation": "Increase or decrease the intensity of all colors equally",
     "clarity": "Add or remove mid-tone contrast for a punchier or softer look",
     "dehaze": "Remove or add atmospheric haze from the image",
-    "texture": "Enhance or soften fine details and surface patterns"
+    "texture": "Enhance or soften fine details and surface patterns",
+    "vignette": "Darken or lighten the edges of the frame, recentred on the crop",
+    "vignetteMidpoint": "How far from the centre the edge shading starts",
+    "vignetteFeather": "How soft the transition into the shaded edges is"
   },
   "groups": {
     "basic": "Basic",
@@ -20,7 +23,8 @@
     "presence": "Presence",
     "color": "Color",
     "details": "Details",
-    "curves": "Curves"
+    "curves": "Curves",
+    "effects": "Effects"
   },
   "nav": {
     "info": "Info",
@@ -51,7 +55,10 @@
     "vibrance": "Vibrance",
     "saturation": "Saturation",
     "clarity": "Clarity",
-    "dehaze": "Dehaze"
+    "dehaze": "Dehaze",
+    "vignette": "Vignette",
+    "vignetteMidpoint": "Midpoint",
+    "vignetteFeather": "Feather"
   },
   "settings": {
     "general": "General",

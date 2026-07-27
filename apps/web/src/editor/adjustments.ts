@@ -48,6 +48,18 @@ export const detailsAdjustement: ColorOption[] = [
 ]
 
 /**
+ * Frame effects: they act on the displayed frame, not on the pixel. Post-crop,
+ * like Lightroom's Post-Crop Vignetting — the oval recentres on the crop and
+ * turns with the image. Kept out of `MASK_ADJUSTMENT_KEYS` on purpose: a mask
+ * with its own vignette means nothing.
+ */
+export const effectsAdjustement: ColorOption[] = [
+  { key: 'vignette', label: 'Vignette', min: -100, max: 100, step: 1, defaultValue: 0, group: '' },
+  { key: 'vignetteMidpoint', label: 'Midpoint', min: 0, max: 100, step: 1, defaultValue: 50, group: '' },
+  { key: 'vignetteFeather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 50, group: '' },
+]
+
+/**
  * Builds the initial value map (`key -> defaultValue`) for a set of sliders.
  */
 export function buildDefaults(options: SliderOption[]): Record<string, number> {

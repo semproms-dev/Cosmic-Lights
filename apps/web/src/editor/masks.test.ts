@@ -33,6 +33,14 @@ describe('mask helpers', () => {
     expect(MASK_ADJUSTMENT_KEYS).not.toContain('texture')
   })
 
+  it('excludes the frame effects from mask adjustments', () => {
+    // The vignette shades the displayed frame, not the pixel: a per-mask one
+    // means nothing, and listing it here would print dead sliders on every mask.
+    expect(MASK_ADJUSTMENT_KEYS).not.toContain('vignette')
+    expect(MASK_ADJUSTMENT_KEYS).not.toContain('vignetteMidpoint')
+    expect(MASK_ADJUSTMENT_KEYS).not.toContain('vignetteFeather')
+  })
+
   it('includes the core tone and colour sliders', () => {
     for (const key of ['exposure', 'contrast', 'temperature', 'saturation']) {
       expect(MASK_ADJUSTMENT_KEYS).toContain(key)

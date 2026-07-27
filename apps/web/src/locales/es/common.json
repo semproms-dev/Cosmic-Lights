@@ -12,7 +12,10 @@
     "saturation": "Aumentar o disminuir la intensidad de todos los colores por igual",
     "clarity": "Añadir o quitar contraste de tonos medios para un aspecto más definido o suave",
     "dehaze": "Eliminar o añadir bruma atmosférica a la imagen",
-    "texture": "Mejorar o suavizar los detalles finos y los patrones de superficie"
+    "texture": "Mejorar o suavizar los detalles finos y los patrones de superficie",
+    "vignette": "Oscurece o aclara los bordes del encuadre, recentrado sobre el recorte",
+    "vignetteMidpoint": "A qué distancia del centro empieza el sombreado de los bordes",
+    "vignetteFeather": "Cómo de suave es la transición hacia los bordes sombreados"
   },
   "groups": {
     "basic": "Básico",
@@ -20,7 +23,8 @@
     "presence": "Presencia",
     "color": "Color",
     "details": "Detalles",
-    "curves": "Curvas"
+    "curves": "Curvas",
+    "effects": "Efectos"
   },
   "nav": {
     "info": "Info",
@@ -51,7 +55,10 @@
     "vibrance": "Vibración",
     "saturation": "Saturación",
     "clarity": "Claridad",
-    "dehaze": "Desempañar"
+    "dehaze": "Desempañar",
+    "vignette": "Viñeteado",
+    "vignetteMidpoint": "Punto medio",
+    "vignetteFeather": "Suavizado"
   },
   "settings": {
     "general": "General",

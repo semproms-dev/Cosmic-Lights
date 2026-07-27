@@ -53,6 +53,12 @@ export interface RenderAdjustments {
   dehaze: number
   /** Texture in [-5, 5]; small-radius fine-detail local-contrast (negatives soften). */
   texture: number
+  /** Vignette in [-100, 100]; post-crop edge shading. Negative darkens, as in Lightroom. */
+  vignette: number
+  /** Vignette midpoint in [0, 100]; where the falloff starts (0 = near the centre). */
+  vignetteMidpoint: number
+  /** Vignette feather in [0, 100]; softness of the falloff (0 = hard edge). */
+  vignetteFeather: number
 }
 
 /**
@@ -107,6 +113,10 @@ export class WebGLRenderer {
   private readonly uClarityOffset: WebGLUniformLocation | null
   private readonly uDehaze: WebGLUniformLocation | null
   private readonly uTexture: WebGLUniformLocation | null
+  private readonly uVignette: WebGLUniformLocation | null
+  private readonly uVignetteMid: WebGLUniformLocation | null
+  private readonly uVignetteFeather: WebGLUniformLocation | null
+  private readonly uFrameAspect: WebGLUniformLocation | null
   private readonly uOverlayMask: WebGLUniformLocation | null
   private readonly uOverlay: WebGLUniformLocation | null
 
@@ -276,6 +286,10 @@ export class WebGLRenderer {
     this.uClarity = gl.getUniformLocation(this.clarityProgram, 'uClarity')
     this.uDehaze = gl.getUniformLocation(this.clarityProgram, 'uDehaze')
     this.uTexture = gl.getUniformLocation(this.clarityProgram, 'uTexture')
+    this.uVignette = gl.getUniformLocation(this.clarityProgram, 'uVignette')
+    this.uVignetteMid = gl.getUniformLocation(this.clarityProgram, 'uVignetteMid')
+    this.uVignetteFeather = gl.getUniformLocation(this.clarityProgram, 'uVignetteFeather')
+    this.uFrameAspect = gl.getUniformLocation(this.clarityProgram, 'uFrameAspect')
     this.uUvMatrix = gl.getUniformLocation(this.clarityProgram, 'uUvMatrix')
     this.uUvCenter = gl.getUniformLocation(this.clarityProgram, 'uUvCenter')
     this.uClarityOffset = gl.getUniformLocation(this.clarityProgram, 'uOffset')
@@ -864,6 +878,13 @@ export class WebGLRenderer {
     gl.uniform1f(this.uClarity, adjustments.clarity)
     gl.uniform1f(this.uDehaze, adjustments.dehaze)
     gl.uniform1f(this.uTexture, adjustments.texture)
+    // Post-crop vignette. `imageAspect` is the *displayed* aspect, so it already
+    // carries the crop and the quarter-turn axis swap — never rebuild it from
+    // imageWidth/imageHeight or the oval stretches on a rotated frame.
+    gl.uniform1f(this.uVignette, adjustments.vignette)
+    gl.uniform1f(this.uVignetteMid, adjustments.vignetteMidpoint)
+    gl.uniform1f(this.uVignetteFeather, adjustments.vignetteFeather)
+    gl.uniform1f(this.uFrameAspect, imageAspect)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, finalDeveloped.texture)
     gl.uniform1i(this.uClarityDeveloped, 0)

@@ -12,7 +12,10 @@
     "saturation": "Augmenter ou diminuer l'intensité de toutes les couleurs de façon égale",
     "clarity": "Ajouter ou retirer du contraste des tons moyens pour un rendu plus marqué ou plus doux",
     "dehaze": "Supprimer ou ajouter de la brume atmosphérique à l'image",
-    "texture": "Rehausser ou adoucir les détails fins et les motifs de surface"
+    "texture": "Rehausser ou adoucir les détails fins et les motifs de surface",
+    "vignette": "Assombrir ou éclaircir les bords du cadre, recentré sur le recadrage",
+    "vignetteMidpoint": "À quelle distance du centre commence l'assombrissement",
+    "vignetteFeather": "Douceur de la transition vers les bords assombris"
   },
   "groups": {
     "basic": "Basique",
@@ -20,7 +23,8 @@
     "presence": "Présence",
     "color": "Couleur",
     "details": "Détails",
-    "curves": "Courbes"
+    "curves": "Courbes",
+    "effects": "Effets"
   },
   "nav": {
     "info": "Info",
@@ -51,7 +55,10 @@
     "vibrance": "Vibrance",
     "saturation": "Saturation",
     "clarity": "Clarté",
-    "dehaze": "Correction du voile"
+    "dehaze": "Correction du voile",
+    "vignette": "Vignettage",
+    "vignetteMidpoint": "Point médian",
+    "vignetteFeather": "Contour progressif"
   },
   "settings": {
     "general": "Général",
