@@ -182,6 +182,63 @@ export interface BrushStroke {
 }
 
 /**
+ * The live brush-tool settings the next stroke will be born with.
+ *
+ * Deliberately *not* document state: every {@link BrushStroke} already stores
+ * its own radius/hardness/mode, so a mask redraws identically no matter what the
+ * tool is set to now. Keeping these out of the store is what stops undo from
+ * resizing the brush under the user's hand.
+ */
+export interface BrushSettings {
+  /**
+   * Radius as a fraction of the image's **short side**, not in pixels: the same
+   * setting then covers the same portion of a 24 MP and a 60 MP frame.
+   */
+  size: number
+  /** Edge softness, 0 (hard) to 1 (fully feathered). */
+  hardness: number
+  /** Whether the next stroke paints into or carves out of the mask. */
+  mode: BrushMode
+}
+
+/** Bounds of {@link BrushSettings.size}: a fine 0.5% detail brush up to half the frame. */
+export const BRUSH_SIZE_MIN = 0.005
+export const BRUSH_SIZE_MAX = 0.5
+
+/** What a fresh session (and every new image) starts with. */
+export const DEFAULT_BRUSH: BrushSettings = { size: 0.04, hardness: 0.5, mode: 'add' }
+
+/** Factor applied per `[` / `]` press. */
+const BRUSH_SIZE_STEP = 1.25
+
+/**
+ * Resizes the brush by `steps` notches, clamped to the legal range.
+ *
+ * Multiplicative, not additive: a fixed increment is a huge jump on a fine brush
+ * and imperceptible on a coarse one, so the same key would feel like two
+ * different controls at the two ends of the range.
+ *
+ * @param size - Current size, as a fraction of the short side.
+ * @param steps - Notches to grow (positive) or shrink (negative).
+ * @returns The new size, within [{@link BRUSH_SIZE_MIN}, {@link BRUSH_SIZE_MAX}].
+ */
+export function stepBrushSize(size: number, steps: number): number {
+  const scaled = size * Math.pow(BRUSH_SIZE_STEP, steps)
+  return Math.min(BRUSH_SIZE_MAX, Math.max(BRUSH_SIZE_MIN, scaled))
+}
+
+/**
+ * Converts a brush size to the radius in image pixels that strokes are stored in.
+ *
+ * @param size - Size as a fraction of the short side.
+ * @param imageWidth - Image width in pixels.
+ * @param imageHeight - Image height in pixels.
+ */
+export function brushRadiusPx(size: number, imageWidth: number, imageHeight: number): number {
+  return size * Math.min(imageWidth, imageHeight)
+}
+
+/**
  * A single local-adjustment mask. `adjustments` holds this mask's own slider
  * values (see {@link MASK_ADJUSTMENT_KEYS}); `strokes` describes a brush mask and
  * `gradient` a linear one — each stays at its empty value for the other types.

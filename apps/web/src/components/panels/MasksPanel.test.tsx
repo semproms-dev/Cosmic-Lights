@@ -9,15 +9,17 @@ import '../../i18n'
 // Controlled editor store: the test drives the masks and their segmentation
 // status, and spies on the actions the panel triggers. `vi.hoisted` keeps the
 // refs reachable from the (hoisted) `vi.mock` factory.
-const { retryMask, addMask, setObjectPrompt, state } = vi.hoisted(() => ({
+const { retryMask, addMask, setObjectPrompt, setBrush, state } = vi.hoisted(() => ({
   retryMask: vi.fn(),
   addMask: vi.fn(),
   setObjectPrompt: vi.fn(),
+  setBrush: vi.fn(),
   state: {
     masks: [] as Mask[],
     activeMaskId: null as string | null,
     maskStatus: new Map<string, MaskStatus>(),
     modelProgress: null as number | null,
+    brush: { size: 0.04, hardness: 0.5, mode: 'add' as 'add' | 'erase' },
   },
 }))
 
@@ -37,6 +39,8 @@ vi.mock('../../editor/editorContext', () => ({
     setMaskInvert: vi.fn(),
     commit: vi.fn(),
     setMaskOverlayHidden: vi.fn(),
+    brush: state.brush,
+    setBrush,
   }),
 }))
 
@@ -55,6 +59,8 @@ describe('MasksPanel', () => {
     retryMask.mockClear()
     addMask.mockClear()
     setObjectPrompt.mockClear()
+    setBrush.mockClear()
+    state.brush = { size: 0.04, hardness: 0.5, mode: 'add' }
     state.masks = []
     state.activeMaskId = null
     state.maskStatus = new Map()
@@ -129,6 +135,42 @@ describe('MasksPanel', () => {
 
     expect(screen.queryByText('Segmenting…')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+  })
+
+  it('exposes the brush tool settings on a selected brush mask', () => {
+    const mask = createMask('brush', 'Brush 1')
+    state.masks = [mask]
+    state.activeMaskId = mask.id
+
+    renderPanel()
+
+    expect(screen.getByText('Brush size')).toBeInTheDocument()
+    expect(screen.getByText('Hardness')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Erase' })).toBeInTheDocument()
+  })
+
+  it('arms erase mode without touching the mask itself', () => {
+    const mask = createMask('brush', 'Brush 1')
+    state.masks = [mask]
+    state.activeMaskId = mask.id
+
+    renderPanel()
+    fireEvent.click(screen.getByRole('radio', { name: 'Erase' }))
+
+    // A tool setting, not an edit: it must not reach the store or the history.
+    expect(setBrush).toHaveBeenCalledWith({ mode: 'erase' })
+  })
+
+  it('hides the brush settings on a mask that is not painted by hand', () => {
+    // They would be dead controls: nothing on a subject mask reads them.
+    const mask = createMask('subject', 'Subject 1')
+    state.masks = [mask]
+    state.activeMaskId = mask.id
+    state.maskStatus = new Map([[mask.id, 'ready']])
+
+    renderPanel()
+
+    expect(screen.queryByText('Brush size')).not.toBeInTheDocument()
   })
 
   it('disables the sliders of a mask that has no alpha yet', () => {

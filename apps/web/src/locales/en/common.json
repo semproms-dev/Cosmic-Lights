@@ -125,7 +125,11 @@
     "rotateLeft": "Rotate left",
     "rotateRight": "Rotate right",
     "flipUp": "Flip right",
-    "flipDown": "Flip down"
+    "flipDown": "Flip down",
+    "brushSize": "Brush size",
+    "brushHardness": "Hardness",
+    "brushAdd": "Add",
+    "brushErase": "Erase"
   },
   "curves": {
     "resetChannel": "Reset channel",

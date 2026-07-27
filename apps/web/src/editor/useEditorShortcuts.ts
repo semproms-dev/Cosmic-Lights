@@ -1,5 +1,6 @@
 import { useHotkeys } from '@mantine/hooks'
 import { useEditor } from './editorContext'
+import { stepBrushSize } from './masks'
 import { SHORTCUTS, type ShortcutActionId } from './shortcuts'
 
 /**
@@ -23,7 +24,7 @@ export interface EditorShortcutHandlers {
  * @param handlers - Host-provided callbacks (open image, show help).
  */
 export function useEditorShortcuts(handlers: EditorShortcutHandlers): void {
-  const { openResetDialog, image, undo, redo } = useEditor()
+  const { openResetDialog, image, undo, redo, brush, setBrush } = useEditor()
 
   const actions: Record<ShortcutActionId, () => void> = {
     openImage: handlers.openImage,
@@ -33,6 +34,10 @@ export function useEditorShortcuts(handlers: EditorShortcutHandlers): void {
     undo,
     redo,
     showShortcuts: handlers.showShortcuts,
+    // Brush size, Photoshop-style. Harmless outside the Masks tool: they only
+    // move a tool setting, which nothing else reads.
+    brushSmaller: () => setBrush({ size: stepBrushSize(brush.size, -1) }),
+    brushLarger: () => setBrush({ size: stepBrushSize(brush.size, 1) }),
   }
 
   useHotkeys(

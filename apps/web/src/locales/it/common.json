@@ -125,7 +125,11 @@
     "rotateLeft": "Ruota a sinistra",
     "rotateRight": "Ruota a destra",
     "flipUp": "Capovolgi a destra",
-    "flipDown": "Capovolgi in basso"
+    "flipDown": "Capovolgi in basso",
+    "brushSize": "Dimensione del pennello",
+    "brushHardness": "Durezza",
+    "brushAdd": "Aggiungi",
+    "brushErase": "Cancella"
   },
   "curves": {
     "resetChannel": "Reimposta canale",

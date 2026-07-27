@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BRUSH_SIZE_MAX,
+  BRUSH_SIZE_MIN,
+  brushRadiusPx,
   buildMaskAdjustments,
   createMask,
+  DEFAULT_BRUSH,
+  stepBrushSize,
   EMPTY_OBJECT_PROMPT,
   isPromptEmpty,
   MASK_ADJUSTMENT_KEYS,
@@ -159,5 +164,37 @@ describe('prompt granularity', () => {
 
   it('offers the four choices, coarsest first', () => {
     expect(MASK_GRANULARITIES).toEqual(['auto', 'whole', 'part', 'detail'])
+  })
+})
+
+describe('brush tool settings', () => {
+  it('starts within its own bounds', () => {
+    expect(DEFAULT_BRUSH.size).toBeGreaterThanOrEqual(BRUSH_SIZE_MIN)
+    expect(DEFAULT_BRUSH.size).toBeLessThanOrEqual(BRUSH_SIZE_MAX)
+    expect(DEFAULT_BRUSH.mode).toBe('add')
+  })
+
+  it('resizes multiplicatively, so a step feels the same at both ends', () => {
+    const small = stepBrushSize(0.01, 1) / 0.01
+    const large = stepBrushSize(0.2, 1) / 0.2
+    expect(small).toBeCloseTo(large)
+    expect(stepBrushSize(0.04, 1)).toBeGreaterThan(0.04)
+    expect(stepBrushSize(0.04, -1)).toBeLessThan(0.04)
+  })
+
+  it('is reversible: a step out and back returns to the same size', () => {
+    expect(stepBrushSize(stepBrushSize(0.04, 1), -1)).toBeCloseTo(0.04)
+  })
+
+  it('clamps at both ends instead of running off', () => {
+    // Holding the key down must not leave the brush at zero or off the frame.
+    expect(stepBrushSize(BRUSH_SIZE_MIN, -20)).toBe(BRUSH_SIZE_MIN)
+    expect(stepBrushSize(BRUSH_SIZE_MAX, 20)).toBe(BRUSH_SIZE_MAX)
+  })
+
+  it('scales the radius to the short side, so it covers as much on any image', () => {
+    // Same setting, landscape and portrait: the short side decides both times.
+    expect(brushRadiusPx(0.1, 4000, 3000)).toBe(300)
+    expect(brushRadiusPx(0.1, 3000, 4000)).toBe(300)
   })
 })

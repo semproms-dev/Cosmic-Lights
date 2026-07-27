@@ -125,7 +125,11 @@
     "rotateLeft": "Girar a la izquierda",
     "rotateRight": "Girar a la derecha",
     "flipUp": "Voltear a la derecha",
-    "flipDown": "Voltear hacia abajo"
+    "flipDown": "Voltear hacia abajo",
+    "brushSize": "Tamaño del pincel",
+    "brushHardness": "Dureza",
+    "brushAdd": "Añadir",
+    "brushErase": "Borrar"
   },
   "curves": {
     "resetChannel": "Restablecer canal",

@@ -9,7 +9,7 @@ import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
-import { createMask, MASK_TYPE_LABEL, MAX_MASKS, type BrushStroke, type GradientLine, type MaskType, type ObjectPrompt, type RadialShape } from './masks'
+import { createMask, DEFAULT_BRUSH, MASK_TYPE_LABEL, MAX_MASKS, type BrushSettings, type BrushStroke, type GradientLine, type MaskType, type ObjectPrompt, type RadialShape } from './masks'
 import {
   TransformersSegmentationProvider,
   type SegmentationProvider,
@@ -53,6 +53,16 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // Transient UI: hide the red mask overlay while a mask slider is being dragged
   // so the change is visible. Not part of the editor store (never undoable).
   const [maskOverlayHidden, setMaskOverlayHidden] = useState(false)
+
+  // Brush tool settings. Transient like the overlay flag: each stroke stores its
+  // own radius/hardness/mode, so undo replays the mask exactly as painted no
+  // matter where the tool sits now.
+  const [brush, setBrushState] = useState<BrushSettings>(DEFAULT_BRUSH)
+
+  /** Patches the brush settings, leaving the untouched fields alone. */
+  const setBrush = (patch: Partial<BrushSettings>) => {
+    setBrushState((current) => ({ ...current, ...patch }))
+  }
 
   // Canvas zoom/pan. Transient (never undoable), but shared: the crop overlay
   // draws on top of the canvas and must undo the very same transform.
@@ -439,6 +449,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         setMaskInvert,
         renameMask,
         addBrushStroke,
+        brush,
+        setBrush,
         setMaskGradient,
         setObjectPrompt,
         maskOverlayHidden,

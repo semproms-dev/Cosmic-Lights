@@ -24,12 +24,15 @@ import { useTranslation } from 'react-i18next'
 import { useEditor } from '../../editor/editorContext'
 import { basicAdjustments, colorAdjustement } from '../../editor/adjustments'
 import {
+  BRUSH_SIZE_MAX,
+  BRUSH_SIZE_MIN,
   isPromptEmpty,
   MASK_ADJUSTMENT_KEYS,
   MASK_GRANULARITIES,
   MAX_MASKS,
   promptGranularity,
   withPromptGranularity,
+  type BrushMode,
   type Mask,
   type MaskGranularity,
   type MaskType,
@@ -84,6 +87,8 @@ export function MasksPanel() {
     setMaskAdjustment,
     setMaskInvert,
     setObjectPrompt,
+    brush,
+    setBrush,
     commit,
     setMaskOverlayHidden,
     maskStatus,
@@ -209,6 +214,48 @@ export function MasksPanel() {
                   value: option,
                   label: t(`masks.granularity${option.charAt(0).toUpperCase()}${option.slice(1)}`),
                 }))}
+              />
+            </Stack>
+          )}
+          {active.type === 'brush' && (
+            // Tool settings, not mask settings: they seed the *next* stroke and
+            // leave the strokes already painted exactly as they are.
+            <Stack gap={6}>
+              <SegmentedControl
+                size="xs"
+                fullWidth
+                value={brush.mode}
+                onChange={(value) => setBrush({ mode: value as BrushMode })}
+                data={[
+                  { value: 'add', label: t('masks.brushAdd') },
+                  { value: 'erase', label: t('masks.brushErase') },
+                ]}
+              />
+              <Group justify="space-between" gap="xs">
+                <Text size="sm">{t('masks.brushSize')}</Text>
+                <Text size="sm" c="dimmed">{Math.round(brush.size * 100)}</Text>
+              </Group>
+              <Slider
+                value={brush.size}
+                onChange={(v) => setBrush({ size: v })}
+                min={BRUSH_SIZE_MIN}
+                max={BRUSH_SIZE_MAX}
+                step={0.005}
+                label={null}
+                thumbLabel={t('masks.brushSize')}
+              />
+              <Group justify="space-between" gap="xs">
+                <Text size="sm">{t('masks.brushHardness')}</Text>
+                <Text size="sm" c="dimmed">{Math.round(brush.hardness * 100)}</Text>
+              </Group>
+              <Slider
+                value={brush.hardness}
+                onChange={(v) => setBrush({ hardness: v })}
+                min={0}
+                max={1}
+                step={0.05}
+                label={null}
+                thumbLabel={t('masks.brushHardness')}
               />
             </Stack>
           )}

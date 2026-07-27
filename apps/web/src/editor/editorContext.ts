@@ -3,6 +3,7 @@ import type { CanvasView } from './crop'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
 import type {
+  BrushSettings,
   BrushStroke,
   GradientLine,
   Mask,
@@ -102,6 +103,14 @@ export interface EditorState {
   renameMask: (id: string, name: string) => void
   /** Appends a freehand brush stroke to a brush mask. */
   addBrushStroke: (id: string, stroke: BrushStroke) => void
+  /**
+   * Live brush-tool settings (size/hardness/add-erase). Transient UI state, like
+   * {@link maskOverlayHidden}: strokes carry their own copy, so this never
+   * belongs in the undo history.
+   */
+  brush: BrushSettings
+  /** Patches the brush settings; unlisted fields keep their current value. */
+  setBrush: (patch: Partial<BrushSettings>) => void
   /** Sets (or replaces) the gradient ramp of a `linear` mask. */
   setMaskGradient: (id: string, gradient: GradientLine) => void
   /**

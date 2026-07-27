@@ -125,7 +125,11 @@
     "rotateLeft": "Nach links drehen",
     "rotateRight": "Nach rechts drehen",
     "flipUp": "Nach rechts spiegeln",
-    "flipDown": "Nach unten spiegeln"
+    "flipDown": "Nach unten spiegeln",
+    "brushSize": "Pinselgröße",
+    "brushHardness": "Härte",
+    "brushAdd": "Hinzufügen",
+    "brushErase": "Löschen"
   },
   "curves": {
     "resetChannel": "Kanal zurücksetzen",

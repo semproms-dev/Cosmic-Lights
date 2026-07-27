@@ -1,6 +1,7 @@
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
+  IconBrush,
   IconFolderOpen,
   IconInfoCircle,
   IconKeyboard,
@@ -14,9 +15,11 @@ export type ShortcutActionId =
   | 'undo'
   | 'redo'
   | 'showShortcuts'
+  | 'brushSmaller'
+  | 'brushLarger'
 
 /** Grouping used to lay out the reference panel. */
-export type ShortcutCategory = 'File' | 'Edit'  | 'View'
+export type ShortcutCategory = 'File' | 'Edit'  | 'View' | 'Masks'
 
 /** Any Tabler icon component (they all share one type). */
 type ShortcutIcon = typeof IconInfoCircle
@@ -49,6 +52,8 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: 'undo', combo: 'mod+Z', label: 'Undo', category: 'Edit', icon: IconArrowBackUp, enabled: true },
   { id: 'redo', combo: 'mod+shift+Z', label: 'Redo', category: 'Edit', icon: IconArrowForwardUp, enabled: true },
   { id: 'showShortcuts', combo: '?', label: 'Show shortcuts', category: 'View', icon: IconKeyboard },
+  { id: 'brushSmaller', combo: '[', label: 'Smaller brush', category: 'Masks', icon: IconBrush, enabled: true },
+  { id: 'brushLarger', combo: ']', label: 'Larger brush', category: 'Masks', icon: IconBrush, enabled: true },
 ]
 
 // `mod` is Cmd on macOS and Ctrl elsewhere; resolve which for display only.

@@ -9,17 +9,14 @@ import { ConfirmDialog } from '../window/ConfirmDialog'
 import { clampZoom } from '../../utils'
 import { displayScale, IDENTITY_VIEW, pointerToImagePoint } from '../../editor/crop'
 import {
+  brushRadiusPx,
   EMPTY_OBJECT_PROMPT,
   promptBoxFromCorners,
   withPromptPoint,
 } from '../../editor/masks'
-import type { MaskPoint, NormalizedPoint, ObjectPrompt } from '../../editor/masks'
+import type { BrushMode, MaskPoint, NormalizedPoint, ObjectPrompt } from '../../editor/masks'
 import { DropOverlay } from './DropOverlay'
 import { isRawFile } from './rawFormats'
-
-/** Default brush geometry (radius as a fraction of the image's short side). */
-const BRUSH_RADIUS_FRACTION = 0.04
-const BRUSH_HARDNESS = 0.5
 
 /** Per wheel notch, the fitted image grows/shrinks by this factor. */
 const ZOOM_STEP = 1.1
@@ -105,6 +102,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     openResetDialog, 
     closeResetDialog, 
     addBrushStroke,
+    brush,
     setMaskGradient,
     setMaskRadial,
     setObjectPrompt,
@@ -126,9 +124,13 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   // Redraws the scene on demand (set by the render effect). Live brush painting
   // calls this after each stamp, since it changes no React state to react to.
   const drawRef = useRef<() => void>(() => {})
-  // Active brush stroke while painting: the accumulated points (image px) and
-  // the last one, or null when not painting.
-  const strokeRef = useRef<{ points: MaskPoint[]; last: MaskPoint } | null>(null)
+  // Active brush stroke while painting: the accumulated points (image px), the
+  // last one, and the brush it was started with — frozen at pointer-down so
+  // resizing mid-drag can't make the committed stroke differ from the strokes
+  // that were live-painted. Null when not painting.
+  const strokeRef = useRef<
+    { points: MaskPoint[]; last: MaskPoint; radius: number; hardness: number; mode: BrushMode } | null
+  >(null)
   // Anchor (full-effect point, image px) of the gradient being dragged, or null
   // when not dragging one.
   const gradientAnchorRef = useRef<MaskPoint | null>(null)
@@ -381,9 +383,9 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   const currentPrompt = (): ObjectPrompt =>
     masks.find((m) => m.id === objectMaskId)?.prompt ?? EMPTY_OBJECT_PROMPT
 
-  /** Brush radius in image pixels, scaled to the image's short side. */
+  /** Brush radius in image pixels, from the live tool size. */
   const brushRadius = (): number =>
-    image === null ? 0 : BRUSH_RADIUS_FRACTION * Math.min(image.width, image.height)
+    image === null ? 0 : brushRadiusPx(brush.size, image.width, image.height)
 
   // Updates the brush cursor ring: converts the image-space radius to CSS px via
   // the same display scale the painting uses, so the ring matches what it paints.
@@ -403,10 +405,11 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     if (brushMaskId !== null && image !== null) {
       const p = toImagePoint(e)
       if (p === null) return
-      strokeRef.current = { points: [p], last: p }
+      const started = { radius: brushRadius(), hardness: brush.hardness, mode: brush.mode }
+      strokeRef.current = { points: [p], last: p, ...started }
       updateBrushCursor(e)
       // Stamp a dot on press so a plain click still marks the mask.
-      rendererRef.current?.paintSegment(brushMaskId, p, p, brushRadius(), BRUSH_HARDNESS, 'add')
+      rendererRef.current?.paintSegment(brushMaskId, p, p, started.radius, started.hardness, started.mode)
       drawRef.current()
       e.currentTarget.setPointerCapture(e.pointerId)
       return
@@ -452,7 +455,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     if (stroke !== null && brushMaskId !== null) {
       const p = toImagePoint(e)
       if (p === null) return
-      rendererRef.current?.paintSegment(brushMaskId, stroke.last, p, brushRadius(), BRUSH_HARDNESS, 'add')
+      rendererRef.current?.paintSegment(brushMaskId, stroke.last, p, stroke.radius, stroke.hardness, stroke.mode)
       stroke.points.push(p)
       stroke.last = p
       drawRef.current()
@@ -519,9 +522,9 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       // from it on the next frame (reproducing exactly what was live-painted).
       addBrushStroke(brushMaskId, {
         points: stroke.points,
-        radius: brushRadius(),
-        hardness: BRUSH_HARDNESS,
-        mode: 'add',
+        radius: stroke.radius,
+        hardness: stroke.hardness,
+        mode: stroke.mode,
       })
       commit()
       strokeRef.current = null
@@ -616,7 +619,12 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
           height: brushCursor.d,
           transform: 'translate(-50%, -50%)',
           borderRadius: '50%',
-          border: '1px solid rgba(255,255,255,0.9)',
+          // Erasing is the one gesture that destroys work, so the ring says which
+          // mode is armed before the drag rather than after it: dashed and red.
+          border:
+            brush.mode === 'erase'
+              ? '1px dashed rgba(255,120,120,0.95)'
+              : '1px solid rgba(255,255,255,0.9)',
           boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
           pointerEvents: 'none',
         }}
