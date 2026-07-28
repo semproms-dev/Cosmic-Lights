@@ -627,8 +627,15 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
               : '1px solid rgba(255,255,255,0.9)',
           boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
           pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
-      />
+      >
+        <span style={{ color: 'black', fontSize: 25, lineHeight: 1 }}>
+          {brush.mode === 'add' ? '+' : '-'}
+        </span>
+      </div>
     )}
     {objectBand !== null && (
       <div
