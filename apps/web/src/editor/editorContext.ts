@@ -5,6 +5,7 @@ import type { CropRegion, ImageState, ImageStatus } from './image'
 import type {
   BrushSettings,
   BrushStroke,
+  DuplicateMaskOptions,
   GradientLine,
   Mask,
   MaskType,
@@ -91,6 +92,19 @@ export interface EditorState {
    * mask's id, or `null` if the cap blocked it.
    */
   addMask: (type: MaskType) => string | null
+  /**
+   * Copies an existing mask — geometry, prompt, adjustments and generated alpha
+   * alike — under a new id, appends it and selects it.
+   *
+   * Refuses (returns `null`) when the source is gone, when the cap is reached,
+   * or when an AI mask's alpha has not arrived yet: without it the copy would be
+   * permanently empty, since only the original's segmentation was ever run.
+   *
+   * @param id - The mask to copy.
+   * @param name - Display name for the copy; the caller translates it.
+   * @param options - Which parts to change on the way; a plain copy by default.
+   */
+  duplicateMask: (id: string, name: string, options?: DuplicateMaskOptions) => string | null
   /** Removes a mask by id; clears the selection if it was the active one. */
   removeMask: (id: string) => void
   /** Selects a mask (or clears the selection with `null`). */

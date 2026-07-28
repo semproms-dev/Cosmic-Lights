@@ -119,6 +119,7 @@ export class WebGLRenderer {
   private readonly uFrameAspect: WebGLUniformLocation | null
   private readonly uOverlayMask: WebGLUniformLocation | null
   private readonly uOverlay: WebGLUniformLocation | null
+  private readonly uOverlayInvert: WebGLUniformLocation | null
 
   // Third program: one 1D Gaussian pass, run twice (H then V) for a separable blur.
   private readonly blurProgram: WebGLProgram
@@ -295,6 +296,7 @@ export class WebGLRenderer {
     this.uClarityOffset = gl.getUniformLocation(this.clarityProgram, 'uOffset')
     this.uOverlayMask = gl.getUniformLocation(this.clarityProgram, 'uOverlayMask')
     this.uOverlay = gl.getUniformLocation(this.clarityProgram, 'uOverlay')
+    this.uOverlayInvert = gl.getUniformLocation(this.clarityProgram, 'uOverlayInvert')
 
     this.blurProgram = createProgram(gl, VERTEX_SHADER, BLUR_FRAGMENT_SHADER)
     this.uBlurScale = gl.getUniformLocation(this.blurProgram, 'uScale')
@@ -898,10 +900,12 @@ export class WebGLRenderer {
     // regardless of its adjustments. Bind its alpha (or the image as a harmless
     // stand-in when there's no overlay) and gate with uOverlay.
     const overlayEntry = overlayMaskId === null ? undefined : this.maskTargets.get(overlayMaskId)
+    const overlayMask = overlayMaskId === null ? undefined : masks.find((m) => m.id === overlayMaskId)
     gl.activeTexture(gl.TEXTURE3)
     gl.bindTexture(gl.TEXTURE_2D, overlayEntry?.target.texture ?? this.texture)
     gl.uniform1i(this.uOverlayMask, 3)
     gl.uniform1f(this.uOverlay, overlayEntry === undefined ? 0 : 1)
+    gl.uniform1f(this.uOverlayInvert, overlayMask !== undefined && overlayMask.invert ? 1 : 0)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     gl.bindVertexArray(null)
   }

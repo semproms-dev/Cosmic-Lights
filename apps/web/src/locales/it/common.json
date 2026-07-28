@@ -129,7 +129,11 @@
     "brushSize": "Dimensione del pennello",
     "brushHardness": "Durezza",
     "brushAdd": "Aggiungi",
-    "brushErase": "Cancella"
+    "brushErase": "Cancella",
+    "contextDuplicateInvert": "Duplica e inverti maschera",
+    "contextDuplicate": "Duplica maschera",
+    "contextRemoveMask": "Rimuovi maschera",
+    "copySuffix": "(copia)"
   },
   "curves": {
     "resetChannel": "Reimposta canale",

@@ -67,6 +67,7 @@ uniform mat2 uUvMatrix;         // crop size + 90° turns + flips, about the cen
 uniform vec2 uUvCenter;         // UV of the crop centre (0.5,0.5 = no crop)
 uniform sampler2D uOverlayMask; // active mask alpha, for the editing overlay
 uniform float uOverlay;         // 1 → tint the masked area red so it's visible
+uniform float uOverlayInvert;   // 1 → invert the overlay alpha (mask affects outside)
 uniform float uVignette;        // -100..100; negative darkens (Lightroom's sign)
 uniform float uVignetteMid;     // 0..100; where the falloff starts
 uniform float uVignetteFeather; // 0..100; how soft the transition is
@@ -125,7 +126,8 @@ void main() {
 
   // Mask-editing overlay: tint the painted area red so the user sees the mask
   // regardless of its adjustments. Off (uOverlay = 0) during normal viewing.
-  float mo = texture(uOverlayMask, uv).r * uOverlay;
+  float rawAlpha = texture(uOverlayMask, uv).r;
+  float mo = (uOverlayInvert > 0.5 ? 1.0 - rawAlpha : rawAlpha) * uOverlay;
   outRgb = mix(outRgb, vec3(0.95, 0.15, 0.15), mo * 0.5);
   fragColor = vec4(outRgb, base.a);
 }

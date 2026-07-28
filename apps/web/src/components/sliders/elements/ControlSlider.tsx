@@ -14,7 +14,16 @@ interface ControlSliderProps {
   max: number;
   step: number;
   onChange: (value: number) => void;
-  onChangeEnd: () => void;
+  onChangeEnd?: () => void;
+  /**
+   * Restores the control's default. Given by the owner, which is the only place
+   * that knows *which* value this row writes and what its default is — the label
+   * cannot say, since it is translated.
+   *
+   * Omit it (as the export quality slider does) and the label is inert: a row
+   * that resets nothing is better than one that resets the wrong thing.
+   */
+  onReset?: () => void;
 }
 
 /**
@@ -31,18 +40,12 @@ export function ControlSlider({
   step,
   onChange,
   onChangeEnd,
+  onReset,
 }: ControlSliderProps) {
   const { hovered, ref } = useHover();
-  const {setAdjustment, commit, image} = useEditor();
+  const { image } = useEditor();
   const { t } = useTranslation(['common']);
   const { preferences } = usePreferences();
-
-  // Resetting via the label is a discrete edit outside the slider's onChangeEnd,
-  // so it needs its own checkpoint.
-  const handleReset = () => {
-    setAdjustment(label.toLocaleLowerCase(), 0);
-    commit();
-  };
   return (
     <Stack gap={4} className={classes.control}>
       <Group justify="space-between" gap="xs">
@@ -52,7 +55,14 @@ export function ControlSlider({
               <IconInfoCircle size={16} stroke={2} color="var(--mantine-color-dimmed)"  />
             </Tooltip>: null
           }
-          <Text size="sm" onClick={handleReset} style={{cursor: 'pointer'}} ref={ref}>{hovered ? t('common.reset') : label}</Text>
+          <Text
+            size="sm"
+            onClick={onReset}
+            style={{ cursor: onReset === undefined ? 'default' : 'pointer' }}
+            ref={ref}
+          >
+            {hovered && onReset !== undefined ? t('common.reset') : label}
+          </Text>
         </Group> 
         <Text size="sm" c="dimmed">
           {value}

@@ -34,6 +34,58 @@ export interface ObjectPrompt {
   granularity?: MaskGranularity
 }
 
+/** How {@link duplicateMask} should differ from the mask it copies. */
+export interface DuplicateMaskOptions {
+  /** Overrides the copy's invert flag; defaults to the original's. */
+  invert?: boolean
+  /**
+   * Gives the copy the default adjustment values instead of the original's, so
+   * only the selection is carried over.
+   *
+   * Meant for the duplicate-and-invert gesture: a mask and its inverted copy
+   * cover the whole frame between them, so if the copy also inherits the tone
+   * changes, every pixel gets them from one mask or the other and the local
+   * adjustment silently becomes a global one.
+   */
+  resetAdjustments?: boolean
+}
+
+/**
+ * Copies a mask under a fresh id, with the differences in {@link options}.
+ *
+ * Every mutable field is cloned rather than shared: the copy and the original
+ * are independent edits from this point on, and a stroke array carried over by
+ * reference would make painting on one of them repaint the other.
+ *
+ * The **alpha map is not copied** — it lives outside the mask, keyed by id, in
+ * the provider's cache. Masks that rasterise from their own geometry (`brush`,
+ * `linear`, `radial`) rebuild it from the fields cloned here, but an AI mask
+ * (`subject`, `sky`, `object`) renders empty until the caller either copies the
+ * cached alpha across or re-runs its segmentation.
+ *
+ * @param mask - The mask to copy.
+ * @param name - Display name for the copy; callers pass a distinguishable one.
+ * @param options - Which parts to change on the way. Defaults to a plain copy.
+ * @returns The new mask. Not appended to the store — that is the caller's job.
+ */
+export const duplicateMask = (mask: Mask, name: string, options: DuplicateMaskOptions = {}): Mask => ({
+  ...mask,
+  id: crypto.randomUUID(),
+  name,
+  invert: options.invert ?? mask.invert,
+  adjustments: options.resetAdjustments === true
+    ? buildMaskAdjustments()
+    : { ...mask.adjustments },
+  strokes: mask.strokes.map(s => ({ ...s, points: [...s.points] })),
+  gradient: mask.gradient === null ? null : { ...mask.gradient },
+  radial:   mask.radial   === null ? null : { ...mask.radial },
+  prompt:   mask.prompt   === null ? null : {
+              ...mask.prompt,
+              points: [...mask.prompt.points],
+              box: mask.prompt.box === null ? null : { ...mask.prompt.box },
+            },
+})
+
 /** One foreground/background point of an {@link ObjectPrompt}. */
 export type PromptPoint = ObjectPrompt['points'][number]
 

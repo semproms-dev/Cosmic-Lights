@@ -9,7 +9,7 @@ import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
-import { createMask, DEFAULT_BRUSH, MASK_TYPE_LABEL, MAX_MASKS, type BrushSettings, type BrushStroke, type GradientLine, type MaskType, type ObjectPrompt, type RadialShape } from './masks'
+import { createMask, duplicateMask as cloneMask, DEFAULT_BRUSH, MASK_TYPE_LABEL, MAX_MASKS, type BrushSettings, type BrushStroke, type DuplicateMaskOptions, type GradientLine, type MaskType, type ObjectPrompt, type RadialShape } from './masks'
 import {
   TransformersSegmentationProvider,
   type SegmentationProvider,
@@ -339,6 +339,46 @@ export function EditorProvider({ children }: EditorProviderProps) {
   }
 
   /**
+   * Copies an existing mask, appends it and selects it.
+   *
+   * This lives here rather than beside the pure {@link cloneMask} because of the
+   * alpha: an AI mask's pixels are not in the mask at all, they are in
+   * `maskAlphas` keyed by id, and the copy has a new id. Carrying that entry
+   * across is what makes an `object` copy render — it has no way to rebuild
+   * itself, since its alpha came from a model run against a prompt, not from
+   * geometry. Copying it also spares `subject`/`sky` a second inference for
+   * pixels already in memory.
+   *
+   * A mask whose alpha has not arrived yet is not copied: the duplicate would be
+   * permanently empty (nothing would ever fill its cache entry), so the caller
+   * is told `null` rather than being handed a dead mask.
+   *
+   * @param id - The mask to copy. `null` if it is gone, still segmenting, or the
+   * cap is reached.
+   * @param name - Display name for the copy; the caller owns it, being the side
+   * that can translate.
+   * @param options - Passed straight to {@link cloneMask}.
+   * @returns The new mask's id, or `null` if nothing was added.
+   */
+  const duplicateMask = (id: string, name: string, options?: DuplicateMaskOptions): string | null => {
+    if (state.masks.length >= MAX_MASKS) return null
+    const source = state.masks.find((mask) => mask.id === id)
+    if (source === undefined) return null
+    const alpha = maskAlphas.current.get(id)
+    const needsAlpha = source.type === 'subject' || source.type === 'sky' || source.type === 'object'
+    if (needsAlpha && alpha === undefined) return null
+
+    const copy = cloneMask(source, name, options)
+    if (alpha !== undefined) maskAlphas.current.set(copy.id, alpha)
+    // Inherit the source's status so the copy is not mistaken for a mask that
+    // never ran. No segmentation is started: its alpha is already in the cache.
+    const status = maskStatus.get(id)
+    if (status !== undefined) setMaskStatus((current) => new Map(current).set(copy.id, status))
+    dispatch({ type: 'ADD_MASK', mask: copy })
+    return copy.id
+  }
+
+  /**
    * Runs a mask's segmentation again after a failure. Reads the mask's current
    * version from state — safe here, because this is called from an event
    * handler, where `state` is the freshly rendered snapshot.
@@ -443,6 +483,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
         masks: state.masks,
         activeMaskId: state.activeMaskId,
         addMask,
+        duplicateMask,
         removeMask,
         setActiveMask,
         setMaskAdjustment,

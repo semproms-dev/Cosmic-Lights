@@ -129,7 +129,11 @@
     "brushSize": "Brush size",
     "brushHardness": "Hardness",
     "brushAdd": "Add",
-    "brushErase": "Erase"
+    "brushErase": "Erase",
+    "contextDuplicateInvert": "Duplicate and invert mask",
+    "contextDuplicate": "Duplicate mask",
+    "contextRemoveMask": "Remove mask",
+    "copySuffix": "(copy)"
   },
   "curves": {
     "resetChannel": "Reset channel",

@@ -18,6 +18,20 @@ export function AdjustmentsPanel() {
   const { t } = useTranslation(['common']);
   const { adjustments, setAdjustment, commit } = useEditor();
   const colorsByGroup = Object.entries(groupBy(colorAdjustement, i => i.group))
+
+  /**
+   * Restores one slider to its default, for the click-the-label reset.
+   *
+   * Keyed by the adjustment's own `key` and its own `defaultValue`. The row
+   * cannot work either out for itself: its label is translated (so "Exposición"
+   * is not a key) and not every default is 0 (the vignette's midpoint and
+   * feather rest at 50). Resetting is a discrete edit outside the slider's
+   * `onChangeEnd`, so it takes its own checkpoint.
+   */
+  const resetOption = (option: { key: string; defaultValue: number }) => () => {
+    setAdjustment(option.key, option.defaultValue);
+    commit();
+  };
   return (
     <Accordion multiple defaultValue={['basic']}>
       <Accordion.Item value="basic">
@@ -35,6 +49,7 @@ export function AdjustmentsPanel() {
                 step={option.step}
                 onChangeEnd={() => commit()}
                 onChange={(value) => setAdjustment(option.key, value)}
+                onReset={resetOption(option)}
               />
             ))}
           </Stack>
@@ -71,6 +86,7 @@ export function AdjustmentsPanel() {
                       step={option.step}
                       onChangeEnd={() => commit()}
                       onChange={(value) => setAdjustment(option.key, value)}
+                      onReset={resetOption(option)}
                     />
                   ),
                 )}
@@ -94,6 +110,7 @@ export function AdjustmentsPanel() {
                 step={option.step}
                 onChangeEnd={() => commit()}
                 onChange={(value) => setAdjustment(option.key, value)}
+                onReset={resetOption(option)}
               />
             ))}
           </Stack>
@@ -114,6 +131,7 @@ export function AdjustmentsPanel() {
                 step={option.step}
                 onChangeEnd={() => commit()}
                 onChange={(value) => setAdjustment(option.key, value)}
+                onReset={resetOption(option)}
               />
             ))}
           </Stack>

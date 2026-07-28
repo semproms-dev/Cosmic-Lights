@@ -6,6 +6,7 @@ import {
   buildMaskAdjustments,
   createMask,
   DEFAULT_BRUSH,
+  duplicateMask,
   stepBrushSize,
   EMPTY_OBJECT_PROMPT,
   isPromptEmpty,
@@ -19,7 +20,7 @@ import {
   withoutPromptPoint,
   withPromptGranularity,
 } from './masks'
-import type { ObjectPrompt } from './masks'
+import type { Mask, ObjectPrompt } from './masks'
 
 describe('mask helpers', () => {
   it('builds an all-zero adjustment map covering the mask keys', () => {
@@ -196,5 +197,77 @@ describe('brush tool settings', () => {
     // Same setting, landscape and portrait: the short side decides both times.
     expect(brushRadiusPx(0.1, 4000, 3000)).toBe(300)
     expect(brushRadiusPx(0.1, 3000, 4000)).toBe(300)
+  })
+})
+
+describe('duplicateMask', () => {
+  /** A mask with something in every field a copy has to carry across. */
+  function paintedMask(): Mask {
+    return {
+      ...createMask('object', 'Select object 1'),
+      adjustments: { ...buildMaskAdjustments(), exposure: 1.5, contrast: -20 },
+      strokes: [{ points: [{ x: 0.1, y: 0.2 }], radius: 40, hardness: 0.5, mode: 'add' }],
+      prompt: { points: [{ x: 0.5, y: 0.5, label: 1 }], box: { x0: 0, y0: 0, x1: 1, y1: 1 } },
+      version: 3,
+    }
+  }
+
+  it('copies the mask under a new id, keeping the rest', () => {
+    const source = paintedMask()
+
+    const copy = duplicateMask(source, 'Select object 1 (copy)')
+
+    expect(copy.id).not.toBe(source.id)
+    expect(copy.name).toBe('Select object 1 (copy)')
+    expect(copy.type).toBe(source.type)
+    expect(copy.invert).toBe(source.invert)
+    expect(copy.version).toBe(source.version)
+    expect(copy.adjustments).toEqual(source.adjustments)
+    expect(copy.prompt).toEqual(source.prompt)
+  })
+
+  it('flips the invert flag when asked, and leaves it alone otherwise', () => {
+    const source = { ...paintedMask(), invert: true }
+
+    expect(duplicateMask(source, 'a', { invert: false }).invert).toBe(false)
+    expect(duplicateMask(source, 'b').invert).toBe(true)
+  })
+
+  it('starts the copy from the default adjustments when asked', () => {
+    // Duplicate-and-invert: the two masks are complements and cover the whole
+    // frame, so inheriting the tone changes would apply them everywhere and
+    // quietly turn a local adjustment into a global one.
+    const source = paintedMask()
+
+    const copy = duplicateMask(source, 'copy', { invert: true, resetAdjustments: true })
+
+    expect(copy.adjustments).toEqual(buildMaskAdjustments())
+    // The selection itself still comes across — that is the point of the gesture.
+    expect(copy.prompt).toEqual(source.prompt)
+    expect(copy.strokes).toEqual(source.strokes)
+  })
+
+  it('deep-copies, so editing one mask leaves the other alone', () => {
+    const source = paintedMask()
+
+    const copy = duplicateMask(source, 'copy')
+    copy.strokes.push({ points: [{ x: 0.9, y: 0.9 }], radius: 100, hardness: 1, mode: 'erase' })
+    copy.strokes[0].points.push({ x: 0.3, y: 0.3 })
+    copy.adjustments.exposure = -2
+    copy.prompt?.points.push({ x: 0.2, y: 0.2, label: 0 })
+
+    expect(source.strokes).toHaveLength(1)
+    expect(source.strokes[0].points).toHaveLength(1)
+    expect(source.adjustments.exposure).toBe(1.5)
+    expect(source.prompt?.points).toHaveLength(1)
+  })
+
+  it('does not carry the alpha across: it is keyed by id, outside the mask', () => {
+    // The copy has a new id, so nothing in the cache answers to it. Only the
+    // store knows how to fill that gap — see EditorProvider's duplicateMask.
+    const copy = duplicateMask(paintedMask(), 'copy')
+
+    expect(copy.id).not.toBe(paintedMask().id)
+    expect(Object.keys(copy)).not.toContain('alpha')
   })
 })

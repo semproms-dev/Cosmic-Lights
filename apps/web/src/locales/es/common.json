@@ -129,7 +129,11 @@
     "brushSize": "Tamaño del pincel",
     "brushHardness": "Dureza",
     "brushAdd": "Añadir",
-    "brushErase": "Borrar"
+    "brushErase": "Borrar",
+    "contextDuplicateInvert": "Duplicar e invertir máscara",
+    "contextDuplicate": "Duplicar máscara",
+    "contextRemoveMask": "Eliminar máscara",
+    "copySuffix": "(copia)"
   },
   "curves": {
     "resetChannel": "Restablecer canal",

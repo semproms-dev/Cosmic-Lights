@@ -6,6 +6,8 @@ import {
   IconRefresh,
   IconTrash,
   IconUser,
+  IconDumpling,
+  IconCopy
 } from '@tabler/icons-react'
 import {
   ActionIcon,
@@ -15,7 +17,6 @@ import {
   SegmentedControl,
   Slider,
   Stack,
-  Switch,
   Text,
   Tooltip,
   UnstyledButton,
@@ -37,6 +38,7 @@ import {
   type MaskGranularity,
   type MaskType,
 } from '../../editor/masks'
+import { useContextMenu } from 'mantine-contextmenu'
 
 /** Slider metadata (label/range/step) for every mask-adjustment key. */
 const ADJ_META = new Map(
@@ -71,9 +73,15 @@ function awaitingPrompt(mask: Mask): boolean {
 
 /**
  * Masks tool panel: recreates Lightroom's "Add New Mask" menu, lists the current
- * masks and — for the selected mask — exposes its local adjustment sliders and
- * an invert toggle. Brush, Subject, both gradients and the promptable object
- * mask are wired; the range tools are shown disabled until they are built.
+ * masks and — for the selected mask — exposes its local adjustment sliders, plus
+ * the brush settings when the mask is painted by hand.
+ *
+ * Each row carries a right-click menu for the per-mask operations that do not
+ * deserve permanent buttons: duplicating it (with or without flipping its
+ * invert) and removing it.
+ *
+ * Brush, Subject, both gradients and the promptable object mask are wired; the
+ * range tools are not built yet and have no entry.
  */
 export function MasksPanel() {
   const { t } = useTranslation()
@@ -82,10 +90,10 @@ export function MasksPanel() {
     masks,
     activeMaskId,
     addMask,
+    duplicateMask,
     removeMask,
     setActiveMask,
     setMaskAdjustment,
-    setMaskInvert,
     setObjectPrompt,
     brush,
     setBrush,
@@ -98,6 +106,7 @@ export function MasksPanel() {
 
   const disabled = image === null
   const atCap = masks.length >= MAX_MASKS
+  const { showContextMenu } = useContextMenu();
   const active = masks.find((m) => m.id === activeMaskId) ?? null
   // A mask with no alpha yet has nothing to adjust: its sliders would silently
   // do nothing, which reads as a broken control rather than as "not ready".
@@ -146,7 +155,43 @@ export function MasksPanel() {
                     style={{ flex: 1, padding: '4px 8px', borderRadius: 'var(--mantine-radius-sm)', minWidth: 0 }}
                     data-active={mask.id === activeMaskId || undefined}
                   >
-                    <Text size="sm" fw={mask.id === activeMaskId ? 700 : 400} truncate>{mask.name}</Text>
+                    <Text onContextMenu={showContextMenu(
+                      [
+                        {
+                          key: 'duplicateandinvert',
+                          icon: <IconDumpling/>,
+                          title: t('masks.contextDuplicateInvert'),
+                          onClick: () => {
+                            // Only the selection is copied. Carrying the tone
+                            // changes over would spread them across the whole
+                            // frame, since the two masks are complements.
+                            duplicateMask(mask.id, `${mask.name} ${t('masks.copySuffix')}`, {
+                              invert: !mask.invert,
+                              resetAdjustments: true,
+                            });
+                            commit();
+                          }
+                        },
+                        {
+                          key: 'delete',
+                          icon: <IconTrash/>,
+                          title: t('masks.contextRemoveMask'),
+                          onClick: () => {removeMask(mask.id); commit();}
+                        },
+                        {
+                          key: 'duplicate',
+                          icon: <IconCopy/>,
+                          title: t('masks.contextDuplicate'),
+                          onClick: () => {
+                            // No invert override: a plain copy keeps whatever the
+                            // original was set to.
+                            duplicateMask(mask.id, `${mask.name} ${t('masks.copySuffix')}`);
+                            commit();
+                          }
+                        }
+                      ]
+                    )} size="sm" fw={mask.id === activeMaskId ? 700 : 400} truncate>{mask.name}
+                  </Text>
                     {status === 'loading' && (
                       // The two waits look identical to the user but are not: the
                       // download is slow once and has a real percentage, while
@@ -259,12 +304,6 @@ export function MasksPanel() {
               />
             </Stack>
           )}
-          <Switch
-            label={t('masks.invert')}
-            checked={active.invert}
-            disabled={activeBusy}
-            onChange={(e) => { setMaskInvert(active.id, e.currentTarget.checked); commit() }}
-          />
           <Stack gap="md">
             {MASK_ADJUSTMENT_KEYS.map((key) => {
               const meta = ADJ_META.get(key)

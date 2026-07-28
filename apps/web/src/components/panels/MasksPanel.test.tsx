@@ -54,6 +54,22 @@ function renderPanel(): void {
   })
 }
 
+/**
+ * The probe for the `activeBusy` gating: the first of the active mask's local
+ * adjustment sliders.
+ *
+ * Any of them would do — they are all gated by the same flag — but a real
+ * control is the point: it is what the user actually reaches for, so it is what
+ * has to be dead while the mask has no alpha to act on.
+ *
+ * Mantine's slider thumb is a `div` with `role="slider"`, not a form control, so
+ * "disabled" is carried by `aria-disabled` (`"true"`/`"false"`, always present)
+ * rather than by the `disabled` attribute that `toBeDisabled()` looks for.
+ */
+function adjustmentSlider(): HTMLElement {
+  return screen.getByRole('slider', { name: 'Exposure' })
+}
+
 describe('MasksPanel', () => {
   beforeEach(() => {
     retryMask.mockClear()
@@ -183,7 +199,7 @@ describe('MasksPanel', () => {
 
     // Sliders with nothing to act on would silently do nothing, which reads as
     // a broken control rather than as "not ready yet".
-    expect(screen.getByRole('switch', { name: 'Invert' })).toBeDisabled()
+    expect(adjustmentSlider()).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('enables the sliders once the mask is ready', () => {
@@ -194,7 +210,7 @@ describe('MasksPanel', () => {
 
     renderPanel()
 
-    expect(screen.getByRole('switch', { name: 'Invert' })).not.toBeDisabled()
+    expect(adjustmentSlider()).toHaveAttribute('aria-disabled', 'false')
   })
 
   it('tells the user to point at something when an object mask has no prompt', () => {
@@ -207,7 +223,7 @@ describe('MasksPanel', () => {
     renderPanel()
 
     expect(screen.getByText(/Click the object/)).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Invert' })).toBeDisabled()
+    expect(adjustmentSlider()).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('drops the hint and enables the controls once the object has been pointed at', () => {
@@ -222,7 +238,7 @@ describe('MasksPanel', () => {
     renderPanel()
 
     expect(screen.queryByText(/Click the object/)).not.toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Invert' })).not.toBeDisabled()
+    expect(adjustmentSlider()).toHaveAttribute('aria-disabled', 'false')
   })
 
   it('keeps the object mask disabled while its first segmentation runs', () => {
@@ -237,7 +253,7 @@ describe('MasksPanel', () => {
     renderPanel()
 
     expect(screen.getByText('Segmenting…')).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Invert' })).toBeDisabled()
+    expect(adjustmentSlider()).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('lets the user pick which reading of the click to keep', () => {
