@@ -4,7 +4,8 @@ import {
   IconCrop,
   IconKeyboard,
   IconFileExport,
-  IconMask
+  IconMask,
+  IconGift
 } from '@tabler/icons-react';
 import { Stack, Tooltip, UnstyledButton } from '@mantine/core';
 import classes from '../styles/LateralNavBar.module.css';
@@ -27,6 +28,7 @@ const getLateralNavBarButtons = (t: (key: string) => string): ToolLink[] => [
   { icon: IconMask, label: t('nav.masks'), navKey: 'masks' },
   { icon: IconCrop, label: t('nav.crop'), navKey: 'crop' },
   { icon: IconKeyboard, label: t('nav.shortcuts'), navKey: 'shortcuts' },
+  { icon: IconGift, label: t('nav.presets'), navKey: 'presets'},
   { icon: IconFileExport, label: t('nav.export'), navKey: 'export' }
 ];
 

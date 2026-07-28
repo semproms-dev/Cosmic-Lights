@@ -9,6 +9,7 @@ import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
 import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask, type ObjectPrompt, type RadialShape } from './masks'
+import { presetAdjustments, presetCurves, type Preset } from './presets'
 import { IDENTITY_ORIENTATION, turn, type Orientation } from './rotation'
 
 /**
@@ -75,6 +76,7 @@ export type EditorAction =
   | { type: 'RESET_ORIENTATION'}
   | { type: 'SET_MASK_RADIAL',  id: string; radial: RadialShape}
   | { type: 'SET_MASK_PROMPT'; id: string; prompt: ObjectPrompt }
+  | { type: 'APPLY_PRESET'; preset: Preset }
 
 /**
  * Construye el mapa inicial de sliders a partir de los cuatro grupos (Basic,
@@ -192,6 +194,17 @@ export function editorReducer(
       return { ...state, image: null }
     case 'RESET_ADJUSTEMENTS':
       return { ...state, adjustments: buildInitialAdjustments(), imageDirty: false }
+    // Reemplazo, no acumulación: sembrar desde los valores por defecto es lo que
+    // hace que el resultado coincida con la miniatura del panel de presets. El
+    // recorte, la orientación y las máscaras se conservan — son trabajo sobre
+    // *esta* foto, no parte de la receta.
+    case 'APPLY_PRESET':
+      return {
+        ...state,
+        adjustments: presetAdjustments(buildInitialAdjustments(), action.preset),
+        curves: presetCurves(action.preset),
+        imageDirty: true,
+      }
     case 'SET_CROP':
       return { ...state, cropRegion: action.cropRegion, imageDirty: true}
     case 'CLEAR_CROP':

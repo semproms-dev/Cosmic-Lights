@@ -32,6 +32,7 @@
     "masks": "Masks",
     "crop": "Crop",
     "shortcuts": "Shortcuts",
+    "presets": "Presets",
     "export": "Export"
   },
   "topNav": {
@@ -134,6 +135,18 @@
     "contextDuplicate": "Duplicate mask",
     "contextRemoveMask": "Remove mask",
     "copySuffix": "(copy)"
+  },
+  "presets": {
+    "title": "Presets",
+    "kind": {
+      "style": "Style",
+      "color": "Color",
+      "bw": "B&W",
+      "lights": "Lights",
+      "movies": "Movies"
+    },
+    "empty": "Open an image to preview the presets.",
+    "apply": "Apply {{name}}"
   },
   "curves": {
     "resetChannel": "Reset channel",

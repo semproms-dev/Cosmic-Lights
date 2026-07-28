@@ -12,6 +12,7 @@ import type {
   ObjectPrompt,
   RadialShape,
 } from './masks'
+import type { Preset } from './presets'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
 import type { Orientation, TurnDirection } from './rotation'
 
@@ -52,6 +53,13 @@ export interface EditorState {
   resetCurves: () => void
   /** Resets all the adjustements */
   resetAdjustements: () => void
+  /**
+   * Replaces the global develop (sliders + curves) with a preset's. Every slider
+   * the preset does not name goes back to its default, so the result matches the
+   * panel's thumbnail whatever was set before. Crop, orientation and masks are
+   * left alone.
+   */
+  applyPreset: (preset: Preset) => void
   /** Current crop region in image pixels, or `null` for the full frame. */
   cropRegion: CropRegion | null
   /** Sets (or replaces) the crop region; `null` clears it. */

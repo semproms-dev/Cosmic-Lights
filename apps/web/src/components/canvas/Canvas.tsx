@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEditor } from '../../editor/editorContext'
 import { compileCurveTexture } from '../../editor/curvesMath'
 import { WebGLRenderer } from '../../editor/gl/renderer'
+import { toRenderAdjustments } from '../../editor/renderAdjustments'
 import { logger } from '../../logger'
 import { useContextMenu } from 'mantine-contextmenu'
 import { IconZoomReset } from '@tabler/icons-react'
@@ -218,26 +219,14 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
         renderer.setOrientation(orientation);
       }
       renderer.setView(view.scale, view.offsetX, view.offsetY)
-      renderer.render({
-        exposure: adjustments.exposure ?? 0,
-        contrast: adjustments.contrast ?? 0,
-        highlights: adjustments.highlights ?? 0,
-        shadows: adjustments.shadows ?? 0,
-        whites: adjustments.whites ?? 0,
-        blacks: adjustments.blacks ?? 0,
-        temperature: adjustments.temperature ?? 0,
-        tint: adjustments.tint ?? 0,
-        vibrance: adjustments.vibrance ?? 0,
-        saturation: adjustments.saturation ?? 0,
-        sharpness: adjustments.sharpness ?? 0,
-        threshold: adjustments.threshold ?? 0,
-        clarity: adjustments.clarity ?? 0,
-        dehaze: adjustments.dehaze ?? 0,
-        texture: adjustments.texture ?? 0,
-        vignette: adjustments.vignette ?? 0,
-        vignetteMidpoint: adjustments.vignetteMidpoint ?? 50,
-        vignetteFeather: adjustments.vignetteFeather ?? 50,
-      }, masks, maskAlphas.current, overlayMaskId, width, height)
+      renderer.render(
+        toRenderAdjustments(adjustments),
+        masks,
+        maskAlphas.current,
+        overlayMaskId,
+        width,
+        height,
+      )
     }
     // Expose the latest draw so live brush painting can force a redraw (painting
     // changes no React state, so the effect alone wouldn't re-run).

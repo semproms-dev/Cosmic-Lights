@@ -9,6 +9,7 @@ import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
+import type { Preset } from './presets'
 import { createMask, duplicateMask as cloneMask, DEFAULT_BRUSH, MASK_TYPE_LABEL, MAX_MASKS, type BrushSettings, type BrushStroke, type DuplicateMaskOptions, type GradientLine, type MaskType, type ObjectPrompt, type RadialShape } from './masks'
 import {
   TransformersSegmentationProvider,
@@ -126,6 +127,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const resetAdjustements = () => {
     dispatch({ type: 'RESET_ADJUSTEMENTS' })
+  }
+
+  const applyPreset = (preset: Preset) => {
+    dispatch({ type: 'APPLY_PRESET', preset })
   }
 
   const setCrop = (region: CropRegion | null) => {
@@ -466,6 +471,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
         setCurve,
         resetCurves,
         resetAdjustements,
+        applyPreset,
         loadImage,
         cropRegion: state.cropRegion,
         setCrop,

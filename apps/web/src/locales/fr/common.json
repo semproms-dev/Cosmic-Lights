@@ -32,6 +32,7 @@
     "masks": "Masques",
     "crop": "Recadrer",
     "shortcuts": "Raccourcis",
+    "presets": "Préréglages",
     "export": "Exporter"
   },
   "topNav": {
@@ -134,6 +135,18 @@
     "contextDuplicate": "Dupliquer le masque",
     "contextRemoveMask": "Supprimer le masque",
     "copySuffix": "(copie)"
+  },
+  "presets": {
+    "title": "Préréglages",
+    "kind": {
+      "style": "Style",
+      "color": "Couleur",
+      "bw": "N&B",
+      "lights": "Lumière",
+      "movies": "Cinéma"
+    },
+    "empty": "Ouvrez une image pour prévisualiser les préréglages.",
+    "apply": "Appliquer {{name}}"
   },
   "curves": {
     "resetChannel": "Réinitialiser le canal",

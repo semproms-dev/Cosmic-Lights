@@ -9,6 +9,7 @@ import { CropPanel } from '../components/panels/CropPanel'
 import { ExportPanel } from '../components/panels/ExportPanel'
 import { ShortcutsPanel } from '../components/panels/ShortcutsPanel'
 import { MasksPanel } from '../components/panels/MasksPanel'
+import { Presets } from '../components/panels/Presets'
 import { OpenImageButton } from '../components/canvas/OpenImageButton'
 import { Canvas } from '../components/canvas/Canvas'
 import classes from './index.module.css'
@@ -34,6 +35,7 @@ const PANELS: Record<string, ComponentType> = {
   masks: MasksPanel,
   crop: CropPanel,
   shortcuts: ShortcutsPanel,
+  presets: Presets,
   export: ExportPanel,
 }
 

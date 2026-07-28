@@ -8,6 +8,7 @@ import {
   type EditorStoreState,
 } from './editorReducer'
 import { createMask, MAX_MASKS, type BrushStroke, type Mask } from './masks'
+import type { Preset } from './presets'
 import { IDENTITY_ORIENTATION } from './rotation'
 
 /** Builds a fresh store state, letting a test override individual slices. */
@@ -136,6 +137,57 @@ describe('editorReducer — effects slice (vignette)', () => {
 
     expect(next.adjustments.vignette).toBe(0)
     expect(next.adjustments.vignetteMidpoint).toBe(50)
+  })
+})
+
+describe('editorReducer — presets', () => {
+  /** A preset that touches two sliders and the master curve. */
+  const preset: Preset = {
+    id: 'test',
+    name: 'Test',
+    kind: 'style',
+    adjustments: { contrast: 25, vignette: -20 },
+    curves: { rgb: [{ x: 0, y: 0 }, { x: 128, y: 150 }, { x: 255, y: 255 }] },
+  }
+
+  it('APPLY_PRESET writes the preset values and its curve', () => {
+    const next = editorReducer(createState(), { type: 'APPLY_PRESET', preset })
+
+    expect(next.adjustments.contrast).toBe(25)
+    expect(next.adjustments.vignette).toBe(-20)
+    expect(next.curves.rgb).toEqual(preset.curves?.rgb)
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('APPLY_PRESET resets the sliders the preset does not name', () => {
+    // Otherwise the same preset would land differently depending on what was
+    // set before, and the panel's thumbnail would be a lie.
+    const state = createState({
+      adjustments: { ...buildInitialAdjustments(), exposure: 2, saturation: 40 },
+      curves: { ...buildDefaultCurves(), red: [{ x: 0, y: 40 }, { x: 255, y: 255 }] },
+    })
+
+    const next = editorReducer(state, { type: 'APPLY_PRESET', preset })
+
+    expect(next.adjustments.exposure).toBe(0)
+    expect(next.adjustments.saturation).toBe(0)
+    expect(next.curves.red).toEqual(buildDefaultCurves().red)
+  })
+
+  it('APPLY_PRESET leaves crop, orientation and masks alone', () => {
+    const mask = createMask('brush', 'Brush 1')
+    const state = createState({
+      cropRegion: fakeRegion,
+      masks: [mask],
+      activeMaskId: mask.id,
+    })
+
+    const next = editorReducer(state, { type: 'APPLY_PRESET', preset })
+
+    expect(next.cropRegion).toEqual(fakeRegion)
+    expect(next.masks).toEqual([mask])
+    expect(next.activeMaskId).toBe(mask.id)
+    expect(next.orientation).toEqual(IDENTITY_ORIENTATION)
   })
 })
 

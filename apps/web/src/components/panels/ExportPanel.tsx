@@ -4,6 +4,7 @@ import { ControlSlider } from '../sliders/elements/ControlSlider';
 import { useEditor } from '../../editor/editorContext';
 import { WebGLRenderer } from '../../editor/gl/renderer';
 import { compileCurveTexture } from '../../editor/curvesMath';
+import { toRenderAdjustments } from '../../editor/renderAdjustments';
 import { logger } from '../../logger';
 import { FORMAT_CAPS, type ExportFormat } from '../../editor/exportFormats';
 import {
@@ -99,26 +100,7 @@ export function ExportPanel() {
     renderer.setCrop(cropRegion, image.width, image.height);
     renderer.setOrientation(orientation);
     renderer.render(
-      {
-        exposure: adjustments.exposure ?? 0,
-        contrast: adjustments.contrast ?? 0,
-        highlights: adjustments.highlights ?? 0,
-        shadows: adjustments.shadows ?? 0,
-        whites: adjustments.whites ?? 0,
-        blacks: adjustments.blacks ?? 0,
-        temperature: adjustments.temperature ?? 0,
-        tint: adjustments.tint ?? 0,
-        vibrance: adjustments.vibrance ?? 0,
-        saturation: adjustments.saturation ?? 0,
-        sharpness: adjustments.sharpness ?? 0,
-        threshold: adjustments.threshold ?? 0,
-        clarity: adjustments.clarity ?? 0,
-        dehaze: adjustments.dehaze ?? 0,
-        texture: adjustments.texture ?? 0,
-        vignette: adjustments.vignette ?? 0,
-        vignetteMidpoint: adjustments.vignetteMidpoint ?? 50,
-        vignetteFeather: adjustments.vignetteFeather ?? 50,
-      },
+      toRenderAdjustments(adjustments),
       masks,
       maskAlphas.current,
       null, // no editing overlay in the exported image

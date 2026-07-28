@@ -32,6 +32,7 @@
     "masks": "Máscaras",
     "crop": "Recortar",
     "shortcuts": "Atajos",
+    "presets": "Presets",
     "export": "Exportar"
   },
   "topNav": {
@@ -134,6 +135,18 @@
     "contextDuplicate": "Duplicar máscara",
     "contextRemoveMask": "Eliminar máscara",
     "copySuffix": "(copia)"
+  },
+  "presets": {
+    "title": "Presets",
+    "kind": {
+      "style": "Estilo",
+      "color": "Color",
+      "bw": "B/N",
+      "lights": "Luz",
+      "movies": "Cine"
+    },
+    "empty": "Abre una imagen para previsualizar los presets.",
+    "apply": "Aplicar {{name}}"
   },
   "curves": {
     "resetChannel": "Restablecer canal",
