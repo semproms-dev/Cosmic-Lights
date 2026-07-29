@@ -17,7 +17,7 @@ import {
 } from '../../editor/masks'
 import type { BrushMode, MaskPoint, NormalizedPoint, ObjectPrompt } from '../../editor/masks'
 import { DropOverlay } from './DropOverlay'
-import { isRawFile } from './rawFormats'
+import { isSupportedFile } from './rawFormats'
 
 /** Per wheel notch, the fitted image grows/shrinks by this factor. */
 const ZOOM_STEP = 1.1
@@ -150,10 +150,10 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   // encloses on screen is exactly what the box encloses in the image.
   const [objectBand, setObjectBand] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
-  // A file dropped or picked via the DropOverlay; ignore anything that is not a
-  // recognised RAW photo.
+  // A file dropped or picked via the DropOverlay; ignore anything the app cannot
+  // open (a RAW it does not know, or any non-photo).
   const handleDropFile = (file: File) => {
-    if (!isRawFile(file)) return
+    if (!isSupportedFile(file)) return
     void loadImage(file)
   }
 
@@ -575,7 +575,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   {/* Outer box clips the quarter-turn overshoot so the spin never spills over
       the surrounding panels; the inner wrapper is what actually rotates. */}
   <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
-    <div ref={spinRef} style={{ width: '100%', height: '100%' }}>
+      <div ref={spinRef} style={{ width: '100%', height: '100%' }}>
      <canvas onContextMenu={showContextMenu([
       {
         key: 'reset',

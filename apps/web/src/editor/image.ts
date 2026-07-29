@@ -5,7 +5,13 @@ export interface LoadedImage {
     width: number,
     height: number,
     fileName: string,
-    metadata: Metadata,
+    /**
+     * Camera metadata, or `null` for an already-developed file (JPEG): those are
+     * decoded by the browser, which hands over pixels and nothing else. Every
+     * reader must cope with its absence — the Info panel shows blanks and the
+     * export skips the EXIF block.
+     */
+    metadata: Metadata | null,
 }
 
 export type ImageState = LoadedImage | null;

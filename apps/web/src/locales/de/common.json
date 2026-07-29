@@ -172,8 +172,8 @@
     "discardMessage": "Das Öffnen eines neuen Bildes verwirft alle nicht gespeicherten Anpassungen. Fortfahren?"
   },
   "dropzone": {
-    "title": "Ziehe ein RAW-Foto hierher oder klicke zum Öffnen",
-    "hint": "Unterstützt: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2"
+    "title": "Ziehe ein Foto hierher oder klicke zum Öffnen",
+    "hint": "Unterstützt: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2, JPG"
   },
   "about": {
     "tagline": "Professionelle RAW-Fotobearbeitung in Ihrem Browser",

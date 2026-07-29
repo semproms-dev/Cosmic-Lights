@@ -137,7 +137,10 @@ export function ExportPanel() {
       // JPEG is the only native format with an EXIF container; when the user
       // opted into metadata, rebuild it from the source RAW and embed it (the
       // canvas re-encode dropped all of it). Every other case saves as-is.
-      if (formatKey === 'jpeg' && includeMetadata) {
+      // `image.metadata` is null when the source was already developed (a JPEG
+      // opened straight from disk): there is no camera block to rebuild, so the
+      // export just carries none.
+      if (formatKey === 'jpeg' && includeMetadata && image.metadata !== null) {
         const dict = buildExifDict(image.metadata, { includeMetadata, includeGPS });
         out = await embedExif(out, dict);
       }
@@ -179,7 +182,9 @@ export function ExportPanel() {
           onChange={setFormat}
           data={nativeFormats.map((f) => ({ value: f.format, label: f.format }))}
         />
-        {currentFormat && currentFormat.hasMetadata && (
+        {/* No camera block to offer when the source was a plain JPEG: the
+            checkboxes would promise metadata the export cannot carry. */}
+        {currentFormat && currentFormat.hasMetadata && image?.metadata != null && (
           <>
             <Text size='sm'>Metadata</Text>
             <Checkbox

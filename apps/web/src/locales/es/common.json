@@ -172,8 +172,8 @@
     "discardMessage": "Abrir una nueva imagen descartará todos los ajustes no guardados. ¿Continuar?"
   },
   "dropzone": {
-    "title": "Arrastra una foto RAW aquí o haz clic para abrir",
-    "hint": "Compatibles: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2"
+    "title": "Arrastra una foto aquí o haz clic para abrir",
+    "hint": "Compatibles: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2, JPG"
   },
   "about": {
     "tagline": "Procesamiento profesional de fotos RAW en tu navegador",

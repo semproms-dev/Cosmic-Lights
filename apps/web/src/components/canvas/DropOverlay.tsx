@@ -4,7 +4,7 @@ import { Text } from '@mantine/core'
 import { IconPhoto, IconUpload } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import classes from './DropOverlay.module.css'
-import { RAW_ACCEPT } from './rawFormats'
+import { SUPPORTED_ACCEPT } from './rawFormats'
 
 interface DropOverlayProps {
   /** Whether an image is currently open (hides the persistent empty state). */
@@ -103,7 +103,7 @@ export function DropOverlay({ imageLoaded, onDropFile }: DropOverlayProps) {
       <input
         ref={inputRef}
         type="file"
-        accept={RAW_ACCEPT}
+        accept={SUPPORTED_ACCEPT}
         hidden
         onChange={handlePick}
       />

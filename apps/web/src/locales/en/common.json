@@ -172,8 +172,8 @@
     "discardMessage": "Opening a new picture will discard all unsaved adjustments. Continue?"
   },
   "dropzone": {
-    "title": "Drag a RAW photo here or click to open",
-    "hint": "Supported: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2"
+    "title": "Drag a photo here or click to open",
+    "hint": "Supported: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2, JPG"
   },
   "about": {
     "tagline": "Professional RAW photo processing in your browser",

@@ -172,8 +172,8 @@
     "discardMessage": "Aprendo una nuova immagine verranno scartate tutte le regolazioni non salvate. Continuare?"
   },
   "dropzone": {
-    "title": "Trascina qui una foto RAW o fai clic per aprire",
-    "hint": "Supportati: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2"
+    "title": "Trascina qui una foto o fai clic per aprire",
+    "hint": "Supportati: ARW, CR2, CR3, NEF, DNG, RAF, ORF, RW2, JPG"
   },
   "about": {
     "tagline": "Elaborazione professionale di foto RAW nel tuo browser",

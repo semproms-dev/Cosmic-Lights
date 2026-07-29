@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { useDisclosure } from '@mantine/hooks'
 import { useEditor } from '../../editor/editorContext'
 import { ConfirmDialog } from '../window/ConfirmDialog'
-import { RAW_ACCEPT } from './rawFormats'
+import { SUPPORTED_ACCEPT } from './rawFormats'
 
 interface OpenImageButtonProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -53,7 +53,7 @@ export function OpenImageButton({ fileInputRef }: OpenImageButtonProps) {
     <>
       <input
         type="file"
-        accept={RAW_ACCEPT}
+        accept={SUPPORTED_ACCEPT}
         ref={fileInputRef}
         hidden={true}
         disabled={imageStatus === 'loading'}
