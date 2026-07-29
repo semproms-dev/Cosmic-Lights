@@ -224,7 +224,13 @@
     "contextDuplicateInvert": "Dupliquer et inverser le masque",
     "contextDuplicate": "Dupliquer le masque",
     "contextRemoveMask": "Supprimer le masque",
-    "copySuffix": "(copie)"
+    "copySuffix": "(copie)",
+    "detectSubject": "Oiseau",
+    "speciesSearching": "Identification de l'espèce…",
+    "speciesConfidence": "{{value}} % de confiance",
+    "speciesNone": "Aucun oiseau identifié sur cette photo",
+    "speciesError": "Le service d'identification n'a pas répondu",
+    "speciesRetry": "Réessayer"
   },
   "presets": {
     "title": "Préréglages",

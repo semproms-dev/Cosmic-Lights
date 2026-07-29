@@ -224,7 +224,13 @@
     "contextDuplicateInvert": "Duplicate and invert mask",
     "contextDuplicate": "Duplicate mask",
     "contextRemoveMask": "Remove mask",
-    "copySuffix": "(copy)"
+    "copySuffix": "(copy)",
+    "detectSubject": "Bird",
+    "speciesSearching": "Identifying species…",
+    "speciesConfidence": "{{value}}% confidence",
+    "speciesNone": "No bird identified in this photo",
+    "speciesError": "The identification service did not answer",
+    "speciesRetry": "Try again"
   },
   "presets": {
     "title": "Presets",

@@ -224,7 +224,13 @@
     "contextDuplicateInvert": "Duplicar e invertir máscara",
     "contextDuplicate": "Duplicar máscara",
     "contextRemoveMask": "Eliminar máscara",
-    "copySuffix": "(copia)"
+    "copySuffix": "(copia)",
+    "detectSubject": "Aves",
+    "speciesSearching": "Identificando especie…",
+    "speciesConfidence": "{{value}}% de confianza",
+    "speciesNone": "No se ha identificado ningún ave en esta foto",
+    "speciesError": "El servicio de identificación no respondió",
+    "speciesRetry": "Reintentar"
   },
   "presets": {
     "title": "Presets",

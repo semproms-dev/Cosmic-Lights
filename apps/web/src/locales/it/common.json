@@ -224,7 +224,13 @@
     "contextDuplicateInvert": "Duplica e inverti maschera",
     "contextDuplicate": "Duplica maschera",
     "contextRemoveMask": "Rimuovi maschera",
-    "copySuffix": "(copia)"
+    "copySuffix": "(copia)",
+    "detectSubject": "Uccello",
+    "speciesSearching": "Identificazione della specie…",
+    "speciesConfidence": "{{value}}% di affidabilità",
+    "speciesNone": "Nessun uccello identificato in questa foto",
+    "speciesError": "Il servizio di identificazione non ha risposto",
+    "speciesRetry": "Riprova"
   },
   "presets": {
     "title": "Preset",

@@ -7,7 +7,8 @@ import {
   IconTrash,
   IconUser,
   IconDumpling,
-  IconCopy
+  IconCopy,
+  IconCanary
 } from '@tabler/icons-react'
 import {
   ActionIcon,
@@ -39,6 +40,7 @@ import {
   type MaskType,
 } from '../../editor/masks'
 import { useContextMenu } from 'mantine-contextmenu'
+import { formatConfidence, speciesDisplayName } from '../../editor/birds/identifyBird'
 
 /**
  * Slider metadata (label/range/step) for every mask-adjustment key. `details` is
@@ -64,6 +66,7 @@ const ADD_OPTIONS: AddOption[] = [
   { type: 'linear', labelKey: 'linearGradient', icon: IconLine },
   { type: 'radial', labelKey: 'radialGradient', icon: IconCircleDot },
   { type: 'object', labelKey: 'selectObject', icon: IconClick },
+  { type: 'identify', labelKey: 'detectSubject', icon: IconCanary}
 ]
 
 /**
@@ -106,6 +109,8 @@ export function MasksPanel() {
     maskStatus,
     modelProgress,
     retryMask,
+    birdSpecies,
+    birdStatus,
   } = useEditor()
 
   const disabled = image === null
@@ -266,6 +271,50 @@ export function MasksPanel() {
               />
             </Stack>
           )}
+          {active.type === 'identify' && (
+            // The whole point of this mask type: it paints nothing, so its
+            // result has to be *read* here or it may as well not have run.
+            <Stack gap={4}>
+              {birdStatus === 'loading' && (
+                <Group gap="xs">
+                  <Loader size="xs" />
+                  <Text size="xs" c="dimmed">{t('masks.speciesSearching')}</Text>
+                </Group>
+              )}
+              {birdStatus === 'ready' && birdSpecies !== null && (
+                <>
+                  {/* Italic, and never translated: it is a scientific name. */}
+                  <Text size="sm" fs="italic">{speciesDisplayName(birdSpecies.label)}</Text>
+                  <Text size="xs" c="dimmed">
+                    {t('masks.speciesConfidence', {
+                      value: formatConfidence(birdSpecies.confidence),
+                    })}
+                  </Text>
+                </>
+              )}
+              {/* An answer ("no bird in this photo"), worded as such… */}
+              {birdStatus === 'ready' && birdSpecies === null && (
+                <Text size="xs" c="dimmed">{t('masks.speciesNone')}</Text>
+              )}
+              {/* …and a failure, which must not be mistaken for the above: the
+                  service being down says nothing about what is in the photo. */}
+              {birdStatus === 'error' && (
+                <Group gap="xs" wrap="nowrap">
+                  <Text size="xs" c="red">{t('masks.speciesError')}</Text>
+                  <Tooltip label={t('masks.speciesRetry')}>
+                    <ActionIcon
+                      variant="subtle"
+                      color="yellow"
+                      aria-label={t('masks.speciesRetry')}
+                      onClick={() => retryMask(active.id)}
+                    >
+                      <IconRefresh size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
+              )}
+            </Stack>
+          )}
           {active.type === 'brush' && (
             // Tool settings, not mask settings: they seed the *next* stroke and
             // leave the strokes already painted exactly as they are.
@@ -308,39 +357,44 @@ export function MasksPanel() {
               />
             </Stack>
           )}
-          <Stack gap="md">
-            {MASK_ADJUSTMENT_KEYS.map((key) => {
-              const meta = ADJ_META.get(key)
-              if (meta === undefined) return null
-              const label = t(`lateralNavBar.${key}`)
-              return (
-                <Stack key={key} gap={4}>
-                  <Group justify="space-between" gap="xs">
-                    <Text size="sm">{label}</Text>
-                    <Text size="sm" c="dimmed">{active.adjustments[key]}</Text>
-                  </Group>
-                  <Slider
-                    value={active.adjustments[key]}
-                    disabled={activeBusy}
-                    onChange={(v) => {
-                      // Hide the red overlay while dragging so the change shows.
-                      setMaskOverlayHidden(true)
-                      setMaskAdjustment(active.id, key, v)
-                    }}
-                    onChangeEnd={() => {
-                      setMaskOverlayHidden(false)
-                      commit()
-                    }}
-                    min={meta.min}
-                    max={meta.max}
-                    step={meta.step}
-                    label={null}
-                    thumbLabel={label}
-                  />
-                </Stack>
-              )
-            })}
-          </Stack>
+          {/* An identify mask never gets an alpha, so its sliders would move
+              with nothing to apply them to — dead controls that read as broken
+              rather than as "not for this tool". */}
+          {active.type !== 'identify' && (
+            <Stack gap="md">
+              {MASK_ADJUSTMENT_KEYS.map((key) => {
+                const meta = ADJ_META.get(key)
+                if (meta === undefined) return null
+                const label = t(`lateralNavBar.${key}`)
+                return (
+                  <Stack key={key} gap={4}>
+                    <Group justify="space-between" gap="xs">
+                      <Text size="sm">{label}</Text>
+                      <Text size="sm" c="dimmed">{active.adjustments[key]}</Text>
+                    </Group>
+                    <Slider
+                      value={active.adjustments[key]}
+                      disabled={activeBusy}
+                      onChange={(v) => {
+                        // Hide the red overlay while dragging so the change shows.
+                        setMaskOverlayHidden(true)
+                        setMaskAdjustment(active.id, key, v)
+                      }}
+                      onChangeEnd={() => {
+                        setMaskOverlayHidden(false)
+                        commit()
+                      }}
+                      min={meta.min}
+                      max={meta.max}
+                      step={meta.step}
+                      label={null}
+                      thumbLabel={label}
+                    />
+                  </Stack>
+                )
+              })}
+            </Stack>
+          )}
         </>
       )}
     </Stack>

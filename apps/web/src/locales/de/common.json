@@ -224,7 +224,13 @@
     "contextDuplicateInvert": "Maske duplizieren und invertieren",
     "contextDuplicate": "Maske duplizieren",
     "contextRemoveMask": "Maske entfernen",
-    "copySuffix": "(Kopie)"
+    "copySuffix": "(Kopie)",
+    "detectSubject": "Vogel",
+    "speciesSearching": "Art wird bestimmt…",
+    "speciesConfidence": "{{value}} % Konfidenz",
+    "speciesNone": "Auf diesem Foto wurde kein Vogel erkannt",
+    "speciesError": "Der Bestimmungsdienst hat nicht geantwortet",
+    "speciesRetry": "Erneut versuchen"
   },
   "presets": {
     "title": "Presets",
