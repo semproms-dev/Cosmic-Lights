@@ -2,8 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MantineProvider } from '@mantine/core'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { BUILTIN_PRESETS } from '../../editor/presets'
+import { BUILTIN_PRESETS, PRESET_KINDS, type PresetKind } from '../../editor/presets'
 import '../../i18n'
+
+/** Etiqueta inglesa de cada familia; los tests corren con el locale `en`. */
+const KIND_LABEL: Record<PresetKind, string> = {
+  style: 'Style',
+  color: 'Color',
+  bw: 'B&W',
+  lights: 'Lights',
+  movies: 'Movies',
+}
 
 // Controlled editor store: the test drives whether an image is open and spies on
 // the actions the panel triggers. `vi.hoisted` keeps the refs reachable from the
@@ -55,20 +64,23 @@ describe('Presets', () => {
   it('opens one folder per family, in order and with its count', () => {
     renderPanel()
 
+    // Se derivan del catálogo en vez de escribirse a mano: añadir un preset no
+    // debe poner en rojo un test que va del *reparto*, no de cuántos hay.
+    const expected = PRESET_KINDS.map((kind) => ({
+      label: KIND_LABEL[kind],
+      count: BUILTIN_PRESETS.filter((preset) => preset.kind === kind).length,
+    }))
+      .filter(({ count }) => count > 0)
+      .map(({ label, count }) => `${label}${count}`)
+
     // Las carpetas son los únicos botones con estado de despliegue; buscarlas
     // por nombre pescaría también la fila «Dramatic B&W».
     const folders = screen.getAllByRole('button', { expanded: true })
-    expect(folders.map((folder) => folder.textContent)).toEqual([
-      'Style2',
-      'Color2',
-      'B&W2',
-      'Lights3',
-      'Movies3',
-    ])
+
     // El orden es el de PRESET_KINDS, no el del catálogo: `Cinematic` abre el
-    // catálogo y es Style, pero `Black & White` va antes que los de cine
-    // aunque en el array esté después.
-    expect(folders).toHaveLength(new Set(BUILTIN_PRESETS.map((p) => p.kind)).size)
+    // array y es Style, pero `Black & White` sale antes que los de cine aunque
+    // esté después.
+    expect(folders.map((folder) => folder.textContent)).toEqual(expected)
   })
 
   it('applies the clicked preset and checkpoints it as one undo step', () => {
