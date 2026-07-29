@@ -3,7 +3,8 @@ import type { RenderAdjustments } from './gl/renderer'
 /**
  * Valor neutro de cada uniform del shader. No todos son 0: el punto medio y el
  * difuminado del viñeteado valen 50, y sembrarlos a 0 pinta un viñeteado duro
- * que nadie ha pedido.
+ * que nadie ha pedido. Igual con el tamaño y la irregularidad del grano — son
+ * la *forma* del grano, no su cantidad; quien lo apaga es `grain = 0`.
  */
 const RENDER_DEFAULTS: RenderAdjustments = {
   exposure: 0,
@@ -24,6 +25,9 @@ const RENDER_DEFAULTS: RenderAdjustments = {
   vignette: 0,
   vignetteMidpoint: 50,
   vignetteFeather: 50,
+  grain: 0,
+  grainSize: 50,
+  grainRoughness: 50,
 }
 
 /**

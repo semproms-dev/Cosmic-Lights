@@ -15,7 +15,10 @@
     "texture": "Feine Details und Oberflächenmuster verstärken oder weichzeichnen",
     "vignette": "Die Bildränder abdunkeln oder aufhellen, zentriert auf den Ausschnitt",
     "vignetteMidpoint": "Wie weit von der Mitte entfernt die Abschattung beginnt",
-    "vignetteFeather": "Wie weich der Übergang zu den abgeschatteten Rändern verläuft"
+    "vignetteFeather": "Wie weich der Übergang zu den abgeschatteten Rändern verläuft",
+    "grain": "Filmkorn über das Bild legen, am stärksten in den Mitteltönen",
+    "grainSize": "Wie groß ein Korn ist, im Verhältnis zum Bildausschnitt",
+    "grainRoughness": "Wie klumpig und unregelmäßig das Korn ist statt gleichmäßig"
   },
   "groups": {
     "basic": "Grundlegend",
@@ -59,7 +62,10 @@
     "dehaze": "Schlieren entfernen",
     "vignette": "Vignettierung",
     "vignetteMidpoint": "Mittelpunkt",
-    "vignetteFeather": "Weiche Kante"
+    "vignetteFeather": "Weiche Kante",
+    "grain": "Korn",
+    "grainSize": "Größe",
+    "grainRoughness": "Rauheit"
   },
   "settings": {
     "general": "Allgemein",

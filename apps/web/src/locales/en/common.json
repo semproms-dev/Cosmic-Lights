@@ -15,7 +15,10 @@
     "texture": "Enhance or soften fine details and surface patterns",
     "vignette": "Darken or lighten the edges of the frame, recentred on the crop",
     "vignetteMidpoint": "How far from the centre the edge shading starts",
-    "vignetteFeather": "How soft the transition into the shaded edges is"
+    "vignetteFeather": "How soft the transition into the shaded edges is",
+    "grain": "Add film grain over the frame, strongest in the midtones",
+    "grainSize": "How big each grain particle is, as a fraction of the frame",
+    "grainRoughness": "How clumped and irregular the grain is, instead of even"
   },
   "groups": {
     "basic": "Basic",
@@ -59,7 +62,10 @@
     "dehaze": "Dehaze",
     "vignette": "Vignette",
     "vignetteMidpoint": "Midpoint",
-    "vignetteFeather": "Feather"
+    "vignetteFeather": "Feather",
+    "grain": "Grain",
+    "grainSize": "Size",
+    "grainRoughness": "Roughness"
   },
   "settings": {
     "general": "General",

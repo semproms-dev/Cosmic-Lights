@@ -15,7 +15,10 @@
     "texture": "Mejorar o suavizar los detalles finos y los patrones de superficie",
     "vignette": "Oscurece o aclara los bordes del encuadre, recentrado sobre el recorte",
     "vignetteMidpoint": "A qué distancia del centro empieza el sombreado de los bordes",
-    "vignetteFeather": "Cómo de suave es la transición hacia los bordes sombreados"
+    "vignetteFeather": "Cómo de suave es la transición hacia los bordes sombreados",
+    "grain": "Añade grano de película sobre el encuadre, más marcado en los medios tonos",
+    "grainSize": "Cómo de grande es cada partícula de grano, en proporción al encuadre",
+    "grainRoughness": "Cómo de apelmazado e irregular es el grano, en vez de uniforme"
   },
   "groups": {
     "basic": "Básico",
@@ -59,7 +62,10 @@
     "dehaze": "Desempañar",
     "vignette": "Viñeteado",
     "vignetteMidpoint": "Punto medio",
-    "vignetteFeather": "Suavizado"
+    "vignetteFeather": "Suavizado",
+    "grain": "Grano",
+    "grainSize": "Tamaño",
+    "grainRoughness": "Irregularidad"
   },
   "settings": {
     "general": "General",

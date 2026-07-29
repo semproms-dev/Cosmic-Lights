@@ -161,6 +161,13 @@ export const BUILTIN_PRESETS: Preset[] = [
       vignette: -28,
       vignetteMidpoint: 45,
       vignetteFeather: 60,
+      // El grano más marcado de las tres: subexponer y forzar el revelado es
+      // precisamente lo que engorda y apelmaza el grano del negativo, así que
+      // aquí la textura no es un adorno — es la consecuencia de la exposición
+      // que define el look.
+      grain: 38,
+      grainSize: 50,
+      grainRoughness: 65,
     },
     curves: {
       // Pie hundido y hombro rebajado: nada llega a blanco, pero el pie no se
@@ -207,6 +214,13 @@ export const BUILTIN_PRESETS: Preset[] = [
       vignette: -10,
       vignetteMidpoint: 55,
       vignetteFeather: 70,
+      // Grano medio: la mitad terrestre se rodó en 35 mm anamórfico, negativo
+      // mucho más pequeño que el de la otra mitad, y encima con el polvo
+      // encima. Irregularidad moderada, que el grano se vea sin competir con
+      // el velo.
+      grain: 24,
+      grainSize: 40,
+      grainRoughness: 45,
     },
     curves: {
       rgb: [
@@ -247,6 +261,13 @@ export const BUILTIN_PRESETS: Preset[] = [
       vignette: -20,
       vignetteMidpoint: 50,
       vignetteFeather: 65,
+      // Poco y fino, al revés que su gemelo: el espacio va en IMAX 65 mm y un
+      // negativo de ese tamaño casi no muestra grano. Que las dos mitades del
+      // díptico se distingan también por la textura, no solo por el color, es
+      // parte de la imitación.
+      grain: 14,
+      grainSize: 22,
+      grainRoughness: 35,
     },
     curves: {
       rgb: [

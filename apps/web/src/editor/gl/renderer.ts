@@ -59,6 +59,12 @@ export interface RenderAdjustments {
   vignetteMidpoint: number
   /** Vignette feather in [0, 100]; softness of the falloff (0 = hard edge). */
   vignetteFeather: number
+  /** Grain in [0, 100]; film-grain amount (0 = off, and the pass skips it). */
+  grain: number
+  /** Grain size in [0, 100]; cell size as a fraction of the frame (0 = fine). */
+  grainSize: number
+  /** Grain roughness in [0, 100]; how clumped the grain is (0 = even). */
+  grainRoughness: number
 }
 
 /**
@@ -117,6 +123,9 @@ export class WebGLRenderer {
   private readonly uVignetteMid: WebGLUniformLocation | null
   private readonly uVignetteFeather: WebGLUniformLocation | null
   private readonly uFrameAspect: WebGLUniformLocation | null
+  private readonly uGrain: WebGLUniformLocation | null
+  private readonly uGrainSize: WebGLUniformLocation | null
+  private readonly uGrainRoughness: WebGLUniformLocation | null
   private readonly uOverlayMask: WebGLUniformLocation | null
   private readonly uOverlay: WebGLUniformLocation | null
   private readonly uOverlayInvert: WebGLUniformLocation | null
@@ -291,6 +300,9 @@ export class WebGLRenderer {
     this.uVignetteMid = gl.getUniformLocation(this.clarityProgram, 'uVignetteMid')
     this.uVignetteFeather = gl.getUniformLocation(this.clarityProgram, 'uVignetteFeather')
     this.uFrameAspect = gl.getUniformLocation(this.clarityProgram, 'uFrameAspect')
+    this.uGrain = gl.getUniformLocation(this.clarityProgram, 'uGrain')
+    this.uGrainSize = gl.getUniformLocation(this.clarityProgram, 'uGrainSize')
+    this.uGrainRoughness = gl.getUniformLocation(this.clarityProgram, 'uGrainRoughness')
     this.uUvMatrix = gl.getUniformLocation(this.clarityProgram, 'uUvMatrix')
     this.uUvCenter = gl.getUniformLocation(this.clarityProgram, 'uUvCenter')
     this.uClarityOffset = gl.getUniformLocation(this.clarityProgram, 'uOffset')
@@ -887,6 +899,13 @@ export class WebGLRenderer {
     gl.uniform1f(this.uVignetteMid, adjustments.vignetteMidpoint)
     gl.uniform1f(this.uVignetteFeather, adjustments.vignetteFeather)
     gl.uniform1f(this.uFrameAspect, imageAspect)
+    // Film grain. No extra pass and no size to compute here: the shader sizes
+    // the cells as a fraction of the frame (and squares them with the same
+    // `imageAspect`), which is what keeps the preview, the export and the preset
+    // thumbnails looking alike no matter what resolution each one renders at.
+    gl.uniform1f(this.uGrain, adjustments.grain)
+    gl.uniform1f(this.uGrainSize, adjustments.grainSize)
+    gl.uniform1f(this.uGrainRoughness, adjustments.grainRoughness)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, finalDeveloped.texture)
     gl.uniform1i(this.uClarityDeveloped, 0)

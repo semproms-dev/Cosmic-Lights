@@ -57,6 +57,9 @@ export const effectsAdjustement: ColorOption[] = [
   { key: 'vignette', label: 'Vignette', min: -100, max: 100, step: 1, defaultValue: 0, group: '' },
   { key: 'vignetteMidpoint', label: 'Midpoint', min: 0, max: 100, step: 1, defaultValue: 50, group: '' },
   { key: 'vignetteFeather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 50, group: '' },
+  { key: 'grain', label: 'Grain', min: 0, max: 100, step: 1, defaultValue: 0, group: '' },
+  { key: 'grainSize', label: 'Size', min: 0, max: 100, step: 1, defaultValue: 50, group: '' },
+  { key: 'grainRoughness', label: 'Roughness', min: 0, max: 100, step: 1, defaultValue: 50, group: '' },
 ]
 
 /**

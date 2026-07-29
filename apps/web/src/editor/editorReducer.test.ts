@@ -104,7 +104,7 @@ describe('editorReducer — image slice', () => {
   })
 })
 
-describe('editorReducer — effects slice (vignette)', () => {
+describe('editorReducer — effects slice (vignette + grain)', () => {
   it('seeds every effects key, so none reaches the shader as NaN', () => {
     const adjustments = buildInitialAdjustments()
 
@@ -137,6 +137,33 @@ describe('editorReducer — effects slice (vignette)', () => {
 
     expect(next.adjustments.vignette).toBe(0)
     expect(next.adjustments.vignetteMidpoint).toBe(50)
+  })
+
+  it('starts with the grain off but its size and roughness centred', () => {
+    const adjustments = buildInitialAdjustments()
+
+    expect(adjustments.grain).toBe(0)
+    expect(adjustments.grainSize).toBe(50)
+    expect(adjustments.grainRoughness).toBe(50)
+  })
+
+  it('SET stores the grain amount', () => {
+    const next = editorReducer(createState(), { type: 'SET', key: 'grain', value: 35 })
+
+    expect(next.adjustments.grain).toBe(35)
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('RESET_ADJUSTEMENTS returns the grain to its defaults', () => {
+    const state = createState({
+      adjustments: { ...buildInitialAdjustments(), grain: 80, grainSize: 5, grainRoughness: 90 },
+    })
+
+    const next = editorReducer(state, { type: 'RESET_ADJUSTEMENTS' })
+
+    expect(next.adjustments.grain).toBe(0)
+    expect(next.adjustments.grainSize).toBe(50)
+    expect(next.adjustments.grainRoughness).toBe(50)
   })
 })
 

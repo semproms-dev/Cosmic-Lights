@@ -50,6 +50,9 @@ void main() {
  * - Vignette: post-crop shading of the frame's edges. It rides here (and not in
  *   FRAGMENT_SHADER) because this is the only pass that knows `vUv`, the
  *   displayed frame — which is what makes it post-crop at no cost.
+ * - Grain: film grain, for the same reason and one more (see the block below):
+ *   its cell size is a fraction of the FRAME, so `vUv` is the coordinate it
+ *   needs.
  */
 export const CLARITY_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
@@ -72,8 +75,39 @@ uniform float uVignette;        // -100..100; negative darkens (Lightroom's sign
 uniform float uVignetteMid;     // 0..100; where the falloff starts
 uniform float uVignetteFeather; // 0..100; how soft the transition is
 uniform float uFrameAspect;     // width/height of the DISPLAYED frame
+uniform float uGrain;           // 0..100; film-grain amount (0 = off)
+uniform float uGrainSize;       // 0..100; grain cell size (0 = fine, 100 = chunky)
+uniform float uGrainRoughness;  // 0..100; how clumped/irregular the grain is
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+/**
+ * Deterministic hash of a lattice point → 0..1 (Hoskins' hash12). Deterministic
+ * is the point: the grain must be *frozen* to the frame, or it would crawl on
+ * every re-render and the export would not match what was on screen.
+ */
+float hash21(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+
+/**
+ * Value noise: a hash per lattice cell, smoothly interpolated. Smooth (not raw
+ * white noise) so that shrinking the frame — the fit-to-window preview, a preset
+ * thumbnail — averages the grain down instead of aliasing it into a crawling
+ * checkerboard.
+ */
+float valueNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);   // smoothstep ease, so cells meet with no seam
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
 
 void main() {
   // Non-destructive crop + orientation: remap the quad onto the selected region,
@@ -123,6 +157,45 @@ void main() {
   outRgb = vAmount < 0.0
     ? outRgb * (1.0 + vAmount * v)
     : outRgb + (1.0 - outRgb) * (vAmount * v);
+
+  // Film grain. Applied last (after the vignette, as in Lightroom's Effects
+  // panel): the grain sits on the print, so the shaded corners keep theirs.
+  //
+  // THE DECISION THAT DEFINES IT: the cell size is a fraction of the FRAME, not
+  // a count of image pixels and not a count of canvas pixels. Grain is a
+  // property of the negative's area, so this is what makes one recipe look the
+  // same on a 12 MP and a 45 MP file, and the export look like the preview.
+  // Anchoring to canvas pixels instead would let the grain slide over the image
+  // while panning; anchoring to image pixels would make it invisible in a
+  // fit-to-window preview and only show up in the JPG.
+  if (uGrain > 0.0) {
+    // Cells across the frame's width, log-mapped so the slider feels even:
+    // 1500 (fine) → 150 (chunky). Dividing the vertical count by the frame
+    // aspect keeps the cells square on any crop or quarter turn.
+    float cells = 1500.0 * pow(0.1, uGrainSize / 100.0);
+    vec2 gp = vUv * vec2(cells, cells / max(uFrameAspect, 1e-4));
+    float n = valueNoise(gp);
+    // Roughness = clumping: a much coarser second octave modulates the fine
+    // one's amplitude, so the density wanders instead of reading as even sand.
+    // The modulator averages exactly 1 (clump averages 0.5 → 0.3 + 0.7), so
+    // roughness changes the grain's *character* and not how loud it is. An
+    // off-centre modulator makes the roughness slider double as a second amount
+    // slider, which is what made the film presets read as too grainy.
+    float clump = valueNoise(gp * 0.15 + 17.3);
+    float rough = uGrainRoughness / 100.0;
+    float g = (n - 0.5) * 2.0 * mix(1.0, 0.3 + 1.4 * clump, rough);
+    // Grain lives in the midtones: none in clipped white, little in pure black.
+    // Cubic, so the falloff only bites near the extremes.
+    float gLuma = dot(outRgb, LUMA);
+    float gWeight = 1.0 - pow(abs(2.0 * gLuma - 1.0), 3.0);
+    // Monochrome — the same delta in all three channels. Per-channel noise
+    // reads as digital colour noise, not as film.
+    //
+    // 0.085 = the peak luma swing at grain 100. THIS is the one knob for "the
+    // whole feature is too strong / too weak": it rescales every slider value
+    // and every preset at once, so calibrate here before touching any recipe.
+    outRgb = clamp(outRgb + g * (uGrain / 100.0) * 0.085 * gWeight, 0.0, 1.0);
+  }
 
   // Mask-editing overlay: tint the painted area red so the user sees the mask
   // regardless of its adjustments. Off (uOverlay = 0) during normal viewing.

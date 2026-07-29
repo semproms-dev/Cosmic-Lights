@@ -49,6 +49,17 @@ describe('BUILTIN_PRESETS', () => {
       expect(PRESET_KINDS).toContain(preset.kind)
     }
   })
+
+  it('gives every MOVIES preset some grain', () => {
+    // Buena parte de lo que se reconoce como "look de película" es el grano del
+    // negativo, y ningún ajuste de color lo finge: una receta de esta familia
+    // sin grano se queda a medias por construcción.
+    const movies = BUILTIN_PRESETS.filter((preset) => preset.kind === 'movies')
+    expect(movies.length).toBeGreaterThan(0)
+    for (const preset of movies) {
+      expect(preset.adjustments.grain).toBeGreaterThan(0)
+    }
+  })
 })
 
 describe('groupPresets', () => {

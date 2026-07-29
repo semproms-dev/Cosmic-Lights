@@ -15,7 +15,10 @@
     "texture": "Esaltare o ammorbidire i dettagli fini e i motivi di superficie",
     "vignette": "Scurire o schiarire i bordi dell'inquadratura, ricentrato sul ritaglio",
     "vignetteMidpoint": "A che distanza dal centro inizia l'ombreggiatura dei bordi",
-    "vignetteFeather": "Quanto è morbida la transizione verso i bordi ombreggiati"
+    "vignetteFeather": "Quanto è morbida la transizione verso i bordi ombreggiati",
+    "grain": "Aggiunge grana della pellicola sull'inquadratura, più forte nei mezzitoni",
+    "grainSize": "Quanto è grande ogni particella di grana, in proporzione all'inquadratura",
+    "grainRoughness": "Quanto la grana è aggregata e irregolare invece che uniforme"
   },
   "groups": {
     "basic": "Base",
@@ -59,7 +62,10 @@
     "dehaze": "Rimozione foschia",
     "vignette": "Vignettatura",
     "vignetteMidpoint": "Punto medio",
-    "vignetteFeather": "Sfumatura"
+    "vignetteFeather": "Sfumatura",
+    "grain": "Grana",
+    "grainSize": "Dimensione",
+    "grainRoughness": "Irregolarità"
   },
   "settings": {
     "general": "Generale",

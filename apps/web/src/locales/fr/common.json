@@ -15,7 +15,10 @@
     "texture": "Rehausser ou adoucir les détails fins et les motifs de surface",
     "vignette": "Assombrir ou éclaircir les bords du cadre, recentré sur le recadrage",
     "vignetteMidpoint": "À quelle distance du centre commence l'assombrissement",
-    "vignetteFeather": "Douceur de la transition vers les bords assombris"
+    "vignetteFeather": "Douceur de la transition vers les bords assombris",
+    "grain": "Ajouter du grain argentique sur le cadre, surtout dans les tons moyens",
+    "grainSize": "Taille de chaque particule de grain, en proportion du cadre",
+    "grainRoughness": "À quel point le grain est aggloméré et irrégulier plutôt qu'uniforme"
   },
   "groups": {
     "basic": "Basique",
@@ -59,7 +62,10 @@
     "dehaze": "Correction du voile",
     "vignette": "Vignettage",
     "vignetteMidpoint": "Point médian",
-    "vignetteFeather": "Contour progressif"
+    "vignetteFeather": "Contour progressif",
+    "grain": "Grain",
+    "grainSize": "Taille",
+    "grainRoughness": "Rugosité"
   },
   "settings": {
     "general": "Général",

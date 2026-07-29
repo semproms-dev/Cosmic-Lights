@@ -45,6 +45,11 @@ describe('mask helpers', () => {
     expect(MASK_ADJUSTMENT_KEYS).not.toContain('vignette')
     expect(MASK_ADJUSTMENT_KEYS).not.toContain('vignetteMidpoint')
     expect(MASK_ADJUSTMENT_KEYS).not.toContain('vignetteFeather')
+    // Same for the grain: it is sized as a fraction of the frame, so a per-mask
+    // grain would be a different grain inside the selection.
+    expect(MASK_ADJUSTMENT_KEYS).not.toContain('grain')
+    expect(MASK_ADJUSTMENT_KEYS).not.toContain('grainSize')
+    expect(MASK_ADJUSTMENT_KEYS).not.toContain('grainRoughness')
   })
 
   it('includes the core tone and colour sliders', () => {
