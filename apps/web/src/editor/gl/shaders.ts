@@ -10,6 +10,81 @@
  * samples neighbouring texels (see `uTexel`).
  */
 
+/**
+ * Exposure, shared verbatim by the two shaders that develop pixels: the pipeline
+ * pass and the per-mask pass. Interpolated into both rather than copied, because
+ * their tone blocks are already twin copies and a fix that lands in only one of
+ * them means a mask that exposes differently from the global slider.
+ *
+ * **Why this is not a multiply.** `decodeRaw` takes libraw's 8-bit output, which
+ * already carries its display gamma (≈2.2). Scaling those numbers directly — what
+ * `rgb * exp2(ev)` used to do — is wrong twice over:
+ *
+ * 1. It over-delivers by the gamma. Doubling a gamma-encoded value multiplies the
+ *    LIGHT by 2^2.2 ≈ 4.6, so "+1 stop" on the slider was really ~2.2 stops and
+ *    the ±5 range spanned ±11 stops of exposure. Nobody needs 11.
+ * 2. It clips almost immediately. A midtone at 0.5 hit pure white at +1.0 on the
+ *    slider and a highlight at 0.8 at +0.32, which left barely a fifth of the
+ *    travel usable before the frame went white.
+ *
+ * So: undo the gamma, scale in linear light, roll the highlights off, put the
+ * gamma back. There is still no headroom to *recover* — the file arrives already
+ * clipped at 8 bits — but the slider now means what it says and degrades softly.
+ */
+const EXPOSURE_GLSL = `
+// libraw's default output curve is Rec.709-ish rather than exactly sRGB, so 2.2
+// is an approximation either way; the residual error is far below the 2.2x the
+// old gamma-space multiply was off by.
+const float EXPOSURE_GAMMA = 2.2;
+// Where the highlight rolloff starts, in LINEAR light. Below this, exposure is a
+// plain multiply and nothing is touched. 0.9 per the table in
+// docs/exposure-response.technical.md: high enough that an already-blown white
+// only settles to 249/255, low enough to leave real compression room.
+const float EXPOSURE_KNEE = 0.9;
+// How fast the shoulder fades in with the lift (full strength at 1/this stops).
+const float EXPOSURE_ROLL_IN = 2.0;
+
+/**
+ * Soft shoulder: identity up to the knee, then an asymptote at 1.0, so bright
+ * areas keep their gradients instead of flattening into one white blob.
+ *
+ * The hyperbola is chosen for being **C¹ at the knee** — it passes through
+ * exactly (k, k) with a slope of exactly 1 — so no seam shows where compression
+ * starts. That seam is what betrays a naive soft clip, and it shows up as a band
+ * across a sky's gradient. Reinhard's x/(1+x) is the tempting alternative and is
+ * wrong here: it is the identity nowhere, so it would restyle every photo.
+ */
+float shoulderCurve(float x) {
+  if (x <= EXPOSURE_KNEE) { return x; }
+  float head = 1.0 - EXPOSURE_KNEE;
+  return 1.0 - head * head / (x + 1.0 - 2.0 * EXPOSURE_KNEE);
+}
+
+/** Exposure in stops, applied in linear light with a highlight rolloff. */
+vec3 applyExposure(vec3 c, float ev) {
+  // Exact identity at rest — and the early out also skips two pow() per pixel on
+  // every frame where the slider has not been touched.
+  if (ev == 0.0) { return c; }
+  vec3 lin = pow(max(c, 0.0), vec3(EXPOSURE_GAMMA)) * exp2(ev);
+  float peak = max(lin.r, max(lin.g, lin.b));
+  if (peak > EXPOSURE_KNEE) {
+    // Scale all three channels by the SAME factor. Compressing them
+    // independently is what sends a blown sky cyan: the channels reach the
+    // shoulder at different points and the hue drifts as they do.
+    //
+    // Faded in with the lift over the first half stop, which is where this
+    // diverges from the doc: there the shoulder is always on, and the price is
+    // that a blown white drops to 249/255 even with exposure at 0. Ramping it
+    // instead keeps rest EXACTLY untouched — no restyling of saved edits, the
+    // same rule the noise defaults follow — and the ramp is short enough that
+    // full protection is in place well before anything is near clipping.
+    float rolled = mix(peak, shoulderCurve(peak), clamp(ev * EXPOSURE_ROLL_IN, 0.0, 1.0));
+    lin *= rolled / peak;
+  }
+  return pow(max(lin, 0.0), vec3(1.0 / EXPOSURE_GAMMA));
+}
+`
+
 /** Full-screen quad; `uScale` letterboxes the image to preserve its aspect. */
 export const VERTEX_SHADER = `#version 300 es
 // Pin the location so a single shared VAO works for every program that uses
@@ -75,6 +150,9 @@ uniform float uVignette;        // -100..100; negative darkens (Lightroom's sign
 uniform float uVignetteMid;     // 0..100; where the falloff starts
 uniform float uVignetteFeather; // 0..100; how soft the transition is
 uniform float uFrameAspect;     // width/height of the DISPLAYED frame
+uniform sampler2D uAmountMap;   // per-pixel texture amount (see AMOUNT_MAP_FRAGMENT_SHADER)
+uniform float uUseAmountMap;    // 1 → read texture's amount per pixel instead of uTexture
+uniform float uAmountRange;     // the amount map's full scale, so decoding matches encoding
 uniform float uGrain;           // 0..100; film-grain amount (0 = off)
 uniform float uGrainSize;       // 0..100; grain cell size (0 = fine, 100 = chunky)
 uniform float uGrainRoughness;  // 0..100; how clumped/irregular the grain is
@@ -117,7 +195,14 @@ void main() {
   vec4 base = texture(uDeveloped, uv);
   vec3 rgb = base.rgb;
   float clarityAmt = uClarity * 0.2;              // slider → strength (k, tunable)
-  float textureAmt = uTexture * 0.2;              // slider → strength (k, tunable)
+  // Texture's amount is per-pixel whenever a mask carries one: the map holds the
+  // global slider plus each mask's own, split by sign across .r/.g (see
+  // AMOUNT_MAP_FRAGMENT_SHADER). With no such mask the map is not even built and
+  // this falls back to the plain uniform, so the common path is unchanged.
+  float textureSlider = uUseAmountMap > 0.5
+    ? (texture(uAmountMap, uv).r - texture(uAmountMap, uv).g) * uAmountRange
+    : uTexture;
+  float textureAmt = textureSlider * 0.2;         // slider → strength (k, tunable)
   float d = uDehaze * 0.15;                        // slider → strength (k, tunable)
 
   // Local contrast in two frequency bands: clarity/dehaze on the large blur,
@@ -416,11 +501,12 @@ uniform float uVibrance;
 uniform float uSaturation;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+${EXPOSURE_GLSL}
 
 void main() {
   vec4 texel = texture(uImage, vUv);
   vec3 base = texel.rgb;
-  vec3 rgb = base * exp2(uExposure);
+  vec3 rgb = applyExposure(base, uExposure);
   float k = 1.0 + uContrast / 100.0;
   float hi = uHighlights / 100.0;
   float sh = uShadows / 100.0;
@@ -450,6 +536,61 @@ void main() {
   float w = clamp(texture(uMask, vUv).r, 0.0, 1.0);
   w = mix(w, 1.0 - w, uInvert);
   fragColor = vec4(mix(base, rgb, w), texel.a);
+}
+`
+
+/**
+ * Local-contrast amount map: turns "how much texture" from a single uniform into
+ * a per-pixel value, so masks can carry it.
+ *
+ * The idea rests on one property of the composite: texture enters it **linearly
+ * in its amount** (`Lp = L + w * (… + textureAmt * Ds)`). Nothing requires
+ * `textureAmt` to be a uniform — a texel works just as well. So this pass builds
+ * `global + Σ (maskAlpha_i × maskTexture_i)` once, and the composite reads it.
+ *
+ * That is what keeps the cost flat. The alternative — blurring the image again
+ * per mask so each mask pass could do its own unsharp mask — would add two
+ * full-resolution passes per mask; this adds one trivial draw per mask and no
+ * neighbourhood sampling at all. And because the composite still works off the
+ * blur of the FINAL developed image, the result is the one you want.
+ *
+ * **Signed values in an RGBA8 target.** Amounts run -5..5 and a normalised
+ * target cannot hold negatives, so positive and negative contributions
+ * accumulate in SEPARATE channels (`.r` and `.g`) under additive blending, and
+ * the composite takes `r - g`. Two things fall out of that for free: the clamp
+ * to ±`RANGE` is the framebuffer's own saturation, and each channel keeps the
+ * full 8 bits over 0..RANGE instead of splitting them around a 0.5 midpoint.
+ */
+export const AMOUNT_MAP_RANGE = 5
+
+export const AMOUNT_MAP_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uMask;   // this mask's alpha (weight in .r); ignored when uUseMask = 0
+uniform float uAmount;     // this contribution's slider value, -5..5
+uniform float uInvert;     // 1 → the mask affects the area outside the selection
+uniform float uUseMask;    // 0 → the global slider: full weight everywhere
+
+// The encoding's full scale, and therefore the cap on the accumulated amount.
+// Matches the sliders' own range: stacking a global +5 with a mask's +5 saturates
+// here rather than running off to +10, where the effect is meaningless anyway.
+// Interpolated from AMOUNT_MAP_RANGE so the decode in the composite cannot drift
+// away from the encode here.
+const float RANGE = ${AMOUNT_MAP_RANGE.toFixed(1)};
+
+void main() {
+  float weight = 1.0;
+  if (uUseMask > 0.5) {
+    weight = clamp(texture(uMask, vUv).r, 0.0, 1.0);
+    weight = mix(weight, 1.0 - weight, uInvert);
+  }
+  float value = weight * uAmount / RANGE;   // -1..1
+  // Split by sign; the caller draws these additively, one draw per contribution.
+  // Alpha contributes 0 so repeated draws cannot saturate a channel nobody reads.
+  fragColor = vec4(max(value, 0.0), max(-value, 0.0), 0.0, 0.0);
 }
 `
 
@@ -624,10 +765,11 @@ float applyCurve(float v, float row) {
   float u = clamp(v, 0.0, 1.0) * (255.0 / 256.0) + (0.5 / 256.0);
   return texture(uCurveLut, vec2(u, (row + 0.5) / 4.0)).r;
 }
+${EXPOSURE_GLSL}
 
 void main() {
   vec4 texel = texture(uImage, vUv);
-  vec3 rgb = texel.rgb * exp2(uExposure);
+  vec3 rgb = applyExposure(texel.rgb, uExposure);
   float k = 1.0 + uContrast / 100.0;
   float hi = uHighlights / 100.0;
   float sh = uShadows / 100.0;

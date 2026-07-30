@@ -11,6 +11,8 @@ import {
   EMPTY_OBJECT_PROMPT,
   isPromptEmpty,
   MASK_ADJUSTMENT_KEYS,
+  MASK_LOCAL_CONTRAST_KEYS,
+  MASK_TONE_KEYS,
   MASK_TYPE_LABEL,
   MAX_MASKS,
   MASK_GRANULARITIES,
@@ -32,11 +34,22 @@ describe('mask helpers', () => {
     expect(Object.keys(adjustments).sort()).toEqual([...MASK_ADJUSTMENT_KEYS].sort())
   })
 
-  it('excludes the global blur-based sliders from mask adjustments', () => {
-    // clarity/dehaze/texture stay global and must not be per-mask.
+  it('carries texture, but keeps it out of what the mask shader applies', () => {
+    // A mask CAN raise texture: it reaches the composite through the amount map.
+    expect(MASK_ADJUSTMENT_KEYS).toContain('texture')
+    // But the mask pass itself is point-wise and cannot apply it. The two lists
+    // must stay apart, because the renderer drives its uniforms from the tone
+    // one — and a key it does not declare yields a null location, which
+    // `gl.uniform1f` accepts in silence.
+    expect(MASK_TONE_KEYS).not.toContain('texture')
+    expect(MASK_LOCAL_CONTRAST_KEYS).toContain('texture')
+  })
+
+  it('still excludes clarity and dehaze, which have no amount map yet', () => {
+    // They would work the same way, but nothing builds their channel of the map,
+    // so listing them would print sliders that paint nothing.
     expect(MASK_ADJUSTMENT_KEYS).not.toContain('clarity')
     expect(MASK_ADJUSTMENT_KEYS).not.toContain('dehaze')
-    expect(MASK_ADJUSTMENT_KEYS).not.toContain('texture')
   })
 
   it('excludes the frame effects from mask adjustments', () => {

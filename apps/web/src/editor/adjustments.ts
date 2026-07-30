@@ -36,7 +36,7 @@ export interface DetailOption {
 
 /** Basic tone adjustments shown in the Adjustments panel. */
 export const basicAdjustments: SliderOption[] = [
-  { key: 'exposure', label: 'Exposure', min: -5, max: 5, step: 0.1, defaultValue: 0 },
+  { key: 'exposure', label: 'Exposure', min: -1, max: 1, step: 0.05, defaultValue: 0 },
   { key: 'contrast', label: 'Contrast', min: -100, max: 100, step: 1, defaultValue: 0 },
   { key: 'highlights', label: 'Highlights', min: -100, max: 100, step: 1, defaultValue: 0 },
   { key: 'shadows', label: 'Shadows', min: -100, max: 100, step: 1, defaultValue: 0 },

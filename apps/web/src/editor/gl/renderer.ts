@@ -4,6 +4,8 @@ import {
   BLUR_FRAGMENT_SHADER,
   BRUSH_FRAGMENT_SHADER,
   BRUSH_VERTEX_SHADER,
+  AMOUNT_MAP_FRAGMENT_SHADER,
+  AMOUNT_MAP_RANGE,
   CLARITY_FRAGMENT_SHADER,
   DENOISE_FRAGMENT_SHADER,
   FRAGMENT_SHADER,
@@ -16,7 +18,7 @@ import {
 import type { CropRegion } from '../image'
 import { CHROMA_EDGE_SIGMA, denoiseParams, type DenoiseParams } from '../noise'
 import { IDENTITY_ORIENTATION, uvTransform, type Orientation } from '../rotation'
-import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint, type RadialShape } from '../masks'
+import { MASK_TONE_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint, type RadialShape } from '../masks'
 import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
 
 /**
@@ -137,6 +139,9 @@ export class WebGLRenderer {
   private readonly uOverlayMask: WebGLUniformLocation | null
   private readonly uOverlay: WebGLUniformLocation | null
   private readonly uOverlayInvert: WebGLUniformLocation | null
+  private readonly uAmountMapTex: WebGLUniformLocation | null
+  private readonly uUseAmountMap: WebGLUniformLocation | null
+  private readonly uAmountRange: WebGLUniformLocation | null
 
   // Third program: one 1D Gaussian pass, run twice (H then V) for a separable blur.
   private readonly blurProgram: WebGLProgram
@@ -174,14 +179,24 @@ export class WebGLRenderer {
   private readonly uMaskInvert: WebGLUniformLocation | null
   private readonly maskAdjLoc: Record<string, WebGLUniformLocation | null>
 
-  // Sixth program: the brush stamp. Draws soft discs into a mask's alpha target,
+  // Sixth program: the local-contrast amount map. Accumulates the global texture
+  // slider plus each mask's own into a per-pixel value the composite reads.
+  private readonly amountProgram: WebGLProgram
+  private readonly uAmountScale: WebGLUniformLocation | null
+  private readonly uAmountFlipV: WebGLUniformLocation | null
+  private readonly uAmountMaskTex: WebGLUniformLocation | null
+  private readonly uAmountValue: WebGLUniformLocation | null
+  private readonly uAmountInvert: WebGLUniformLocation | null
+  private readonly uAmountUseMask: WebGLUniformLocation | null
+
+  // Seventh program: the brush stamp. Draws soft discs into a mask's alpha target,
   // union-blended to paint or reverse-blended to erase.
   private readonly brushProgram: WebGLProgram
   private readonly uBrushCenter: WebGLUniformLocation | null
   private readonly uBrushRadius: WebGLUniformLocation | null
   private readonly uBrushHardness: WebGLUniformLocation | null
 
-  // Seventh program: the linear-gradient rasteriser. Fills a mask's alpha target
+  // Eighth program: the linear-gradient rasteriser. Fills a mask's alpha target
   // with a ramp described by two image-space points (full-effect and zero-effect
   // lines). Shares the full-screen quad VAO; no vertex uniforms.
   private readonly gradientProgram: WebGLProgram
@@ -189,7 +204,7 @@ export class WebGLRenderer {
   private readonly uGradP2: WebGLUniformLocation | null
   private readonly uGradImageSize: WebGLUniformLocation | null
 
-  // Eighth program: the radial-gradient rasteriser. Fills a mask's alpha target
+  // Ninth program: the radial-gradient rasteriser. Fills a mask's alpha target
   // with an elliptical falloff (centre, semi-axes, rotation). Shares the
   // full-screen quad VAO and the gradient vertex shader; no vertex uniforms.
   private readonly radialProgram: WebGLProgram
@@ -230,6 +245,10 @@ export class WebGLRenderer {
   // `blurA` as its horizontal scratch, which is free at that point because the
   // clarity blurs do not run until later in the frame.
   private denoised: RenderTarget | null = null
+  // Per-pixel local-contrast amount (currently just texture), built only when a
+  // mask actually carries one. Positive contributions accumulate in .r and
+  // negative ones in .g; the composite takes the difference.
+  private amountMap: RenderTarget | null = null
   // Which parameters `denoised` currently holds the result for, or null when it
   // holds nothing usable. The denoise is the one pass whose output depends solely
   // on its own sliders, so this key is all it takes to skip it on every frame
@@ -344,6 +363,9 @@ export class WebGLRenderer {
     this.uOverlayMask = gl.getUniformLocation(this.clarityProgram, 'uOverlayMask')
     this.uOverlay = gl.getUniformLocation(this.clarityProgram, 'uOverlay')
     this.uOverlayInvert = gl.getUniformLocation(this.clarityProgram, 'uOverlayInvert')
+    this.uAmountMapTex = gl.getUniformLocation(this.clarityProgram, 'uAmountMap')
+    this.uUseAmountMap = gl.getUniformLocation(this.clarityProgram, 'uUseAmountMap')
+    this.uAmountRange = gl.getUniformLocation(this.clarityProgram, 'uAmountRange')
 
     this.blurProgram = createProgram(gl, VERTEX_SHADER, BLUR_FRAGMENT_SHADER)
     this.uBlurScale = gl.getUniformLocation(this.blurProgram, 'uScale')
@@ -374,11 +396,19 @@ export class WebGLRenderer {
     this.uMaskInvert = gl.getUniformLocation(this.maskProgram, 'uInvert')
     // One uniform per mask-adjustment key: store key → shader uniform.
     this.maskAdjLoc = Object.fromEntries(
-      MASK_ADJUSTMENT_KEYS.map((key) => [
+      MASK_TONE_KEYS.map((key) => [
         key,
         gl.getUniformLocation(this.maskProgram, `u${key[0].toUpperCase()}${key.slice(1)}`),
       ]),
     )
+
+    this.amountProgram = createProgram(gl, VERTEX_SHADER, AMOUNT_MAP_FRAGMENT_SHADER)
+    this.uAmountScale = gl.getUniformLocation(this.amountProgram, 'uScale')
+    this.uAmountFlipV = gl.getUniformLocation(this.amountProgram, 'uFlipV')
+    this.uAmountMaskTex = gl.getUniformLocation(this.amountProgram, 'uMask')
+    this.uAmountValue = gl.getUniformLocation(this.amountProgram, 'uAmount')
+    this.uAmountInvert = gl.getUniformLocation(this.amountProgram, 'uInvert')
+    this.uAmountUseMask = gl.getUniformLocation(this.amountProgram, 'uUseMask')
 
     this.brushProgram = createProgram(gl, BRUSH_VERTEX_SHADER, BRUSH_FRAGMENT_SHADER)
     this.uBrushCenter = gl.getUniformLocation(this.brushProgram, 'uCenter')
@@ -437,6 +467,10 @@ export class WebGLRenderer {
     if (this.denoised !== null) {
       deleteRenderTarget(gl, this.denoised)
     }
+    if (this.amountMap !== null) {
+      deleteRenderTarget(gl, this.amountMap)
+    }
+    this.amountMap = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.denoised = createRenderTarget(gl, bitmap.width, bitmap.height)
     // The cached denoise belongs to the previous image; the sliders may not have
     // moved, but the pixels underneath them have.
@@ -629,6 +663,67 @@ export class WebGLRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.uniform1i(this.uDenoiseOriginal, 1)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+  }
+
+  /**
+   * Builds the per-pixel texture-amount map: the global slider, plus each mask's
+   * own texture weighted by that mask's alpha.
+   *
+   * One trivial draw per contribution, accumulated with additive blending, and
+   * no neighbourhood sampling anywhere — that is what keeps a local Texture from
+   * costing two extra full-resolution blur passes per mask.
+   *
+   * Signs are split across two channels because the target is RGBA8 and a
+   * normalised target cannot hold a negative: positives land in `.r`, negatives
+   * in `.g`, and the composite subtracts. The framebuffer's own saturation at 1.0
+   * is then exactly the ±`AMOUNT_MAP_RANGE` clamp, for free.
+   *
+   * @param masks - The mask stack, in draw order.
+   * @param globalTexture - The global Texture slider, which is the map's base.
+   * @param target - The map to fill.
+   */
+  private buildAmountMap(masks: Mask[], globalTexture: number, target: RenderTarget): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    // Start from nothing: every contribution below is added onto this. Set
+    // explicitly rather than trusting the context-wide clear colour, since this
+    // pass is the one place where a non-zero one would silently bias the result.
+    gl.clearColor(0, 0, 0, 0)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+
+    gl.useProgram(this.amountProgram)
+    gl.bindVertexArray(this.vao)
+    gl.uniform2f(this.uAmountScale, 1, 1)
+    // Alphas are stored in the same orientation as `developed`, and this map is
+    // read by the composite alongside it, so no flip on either side.
+    gl.uniform1f(this.uAmountFlipV, 0)
+    gl.enable(gl.BLEND)
+    gl.blendEquation(gl.FUNC_ADD)
+    gl.blendFunc(gl.ONE, gl.ONE)
+
+    // The global slider first, at full weight everywhere.
+    gl.uniform1f(this.uAmountUseMask, 0)
+    gl.uniform1f(this.uAmountValue, globalTexture)
+    gl.uniform1f(this.uAmountInvert, 0)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+    // Then one draw per mask that actually carries a texture delta.
+    gl.uniform1f(this.uAmountUseMask, 1)
+    gl.activeTexture(gl.TEXTURE0)
+    for (const mask of masks) {
+      const amount = mask.adjustments.texture ?? 0
+      if (amount === 0) continue
+      const entry = this.maskTargets.get(mask.id)
+      if (entry === undefined) continue
+      gl.uniform1f(this.uAmountValue, amount)
+      gl.uniform1f(this.uAmountInvert, mask.invert ? 1 : 0)
+      gl.bindTexture(gl.TEXTURE_2D, entry.target.texture)
+      gl.uniform1i(this.uAmountMaskTex, 0)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    }
+
+    gl.disable(gl.BLEND)
   }
 
   /** Frees every per-mask alpha target and empties the map. */
@@ -868,7 +963,7 @@ export class WebGLRenderer {
 
   render(adjustments: RenderAdjustments, masks: Mask[], maskAlphas: MaskAlphaCache, overlayMaskId: string | null, canvasWidth: number, canvasHeight: number): void {
     const gl = this.gl
-    if (!this.hasImage || this.developed === null || this.developed2 === null || this.blurA === null || this.blurB === null || this.blurC === null || this.denoised === null || canvasWidth === 0 || canvasHeight === 0) {
+    if (!this.hasImage || this.developed === null || this.developed2 === null || this.blurA === null || this.blurB === null || this.blurC === null || this.denoised === null || this.amountMap === null || canvasWidth === 0 || canvasHeight === 0) {
       // Nothing to draw: just clear the canvas.
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
       gl.viewport(0, 0, canvasWidth, canvasHeight)
@@ -880,6 +975,7 @@ export class WebGLRenderer {
     const blurB = this.blurB
     const blurC = this.blurC
     const denoised = this.denoised
+    const amountMap = this.amountMap
 
     // ── Pass 0: noise reduction, feeding the pipeline instead of the uploaded
     // texture. It runs FIRST because everything downstream amplifies noise:
@@ -964,7 +1060,10 @@ export class WebGLRenderer {
         gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer)
         gl.viewport(0, 0, dst.width, dst.height)
         gl.uniform1f(this.uMaskInvert, mask.invert ? 1 : 0)
-        for (const key of MASK_ADJUSTMENT_KEYS) {
+        // Tone keys only: `texture` is a mask adjustment too, but this shader
+        // cannot apply it (it needs a blur). It rides to the composite instead,
+        // through the amount map built below.
+        for (const key of MASK_TONE_KEYS) {
           gl.uniform1f(this.maskAdjLoc[key], mask.adjustments[key] ?? 0)
         }
         gl.activeTexture(gl.TEXTURE0)
@@ -982,12 +1081,17 @@ export class WebGLRenderer {
       finalDeveloped = src
     }
 
+    // A mask carrying its own Texture needs the same small blur the global
+    // slider does, so it has to count towards the skip below — otherwise the
+    // composite would sample a `blurC` left over from an earlier frame.
+    const hasMaskTexture = masks.some((mask) => (mask.adjustments.texture ?? 0) !== 0)
+
     // ── Passes 2-5: two separable Gaussian blurs of the developed image. ──
     // Large (clarity/dehaze) → blurB; small (texture) → blurC. blurA is the
     // shared H-pass scratch, reused once the large blur has consumed it.
     // Skipped when no local-contrast slider is active: the composite is then the
     // identity regardless of the (unused) blur textures, so 4 passes are saved.
-    if (adjustments.clarity !== 0 || adjustments.dehaze !== 0 || adjustments.texture !== 0) {
+    if (adjustments.clarity !== 0 || adjustments.dehaze !== 0 || adjustments.texture !== 0 || hasMaskTexture) {
       const texelX = 1 / this.imageWidth
       const texelY = 1 / this.imageHeight
       const largeRadius = 40 // mid-sized structures (clarity/dehaze)
@@ -996,6 +1100,13 @@ export class WebGLRenderer {
       this.blur1D(blurA.texture, blurB, 0, texelY, largeRadius)
       this.blur1D(finalDeveloped.texture, blurA, texelX, 0, smallRadius)
       this.blur1D(blurA.texture, blurC, 0, texelY, smallRadius)
+    }
+
+    // ── Amount map: only when a mask carries a Texture of its own. With none,
+    // the composite keeps reading the plain `uTexture` uniform and this whole
+    // branch — a target and one draw per contribution — never happens. ──
+    if (hasMaskTexture) {
+      this.buildAmountMap(masks, adjustments.texture, amountMap)
     }
 
     // ── Pass 4: clarity composite (developed + blur) → canvas, letterboxed. ──
@@ -1021,6 +1132,12 @@ export class WebGLRenderer {
     gl.viewport(0, 0, canvasWidth, canvasHeight)
     gl.clear(gl.COLOR_BUFFER_BIT)
     gl.useProgram(this.clarityProgram)
+    // Bind the quad explicitly instead of inheriting whatever the previous pass
+    // left bound. It used to come for free from pass 1, which made inserting a
+    // pass in between (the amount map) enough to blank the canvas: no vertex
+    // array means no attributes, nothing rasterised, and only the clear colour
+    // reaches the screen — with no GL error to point at it.
+    gl.bindVertexArray(this.vao)
     // Fold the interactive zoom into the letterbox scale and pan via uOffset, so
     // the fitted image scales around the canvas centre before being translated.
     gl.uniform2f(this.uClarityScale, scaleX * this.viewScale, scaleY * this.viewScale)
@@ -1068,6 +1185,14 @@ export class WebGLRenderer {
     gl.uniform1i(this.uOverlayMask, 3)
     gl.uniform1f(this.uOverlay, overlayEntry === undefined ? 0 : 1)
     gl.uniform1f(this.uOverlayInvert, overlayMask !== undefined && overlayMask.invert ? 1 : 0)
+    // Local Texture. The map already folds the global slider in, so `uTexture`
+    // above is ignored while it is in use; bind the image as a harmless
+    // stand-in otherwise, exactly as the overlay does.
+    gl.activeTexture(gl.TEXTURE4)
+    gl.bindTexture(gl.TEXTURE_2D, hasMaskTexture ? amountMap.texture : this.texture)
+    gl.uniform1i(this.uAmountMapTex, 4)
+    gl.uniform1f(this.uUseAmountMap, hasMaskTexture ? 1 : 0)
+    gl.uniform1f(this.uAmountRange, AMOUNT_MAP_RANGE)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     gl.bindVertexArray(null)
   }
@@ -1093,6 +1218,9 @@ export class WebGLRenderer {
     if (this.denoised !== null) {
       deleteRenderTarget(gl, this.denoised)
     }
+    if (this.amountMap !== null) {
+      deleteRenderTarget(gl, this.amountMap)
+    }
     this.disposeMaskTargets()
     gl.deleteTexture(this.texture)
     gl.deleteTexture(this.curveLut)
@@ -1103,6 +1231,7 @@ export class WebGLRenderer {
     gl.deleteProgram(this.blurProgram)
     gl.deleteProgram(this.denoiseProgram)
     gl.deleteProgram(this.maskProgram)
+    gl.deleteProgram(this.amountProgram)
     gl.deleteProgram(this.brushProgram)
   }
 }

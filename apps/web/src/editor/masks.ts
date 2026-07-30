@@ -1,4 +1,4 @@
-import { basicAdjustments, buildDefaults, colorAdjustement } from './adjustments'
+import { basicAdjustments, buildDefaults, colorAdjustement, detailsAdjustement } from './adjustments'
 import type { MaskGranularity } from './segmentation/types'
 
 export type { MaskGranularity }
@@ -322,13 +322,39 @@ export interface Mask {
 export const MAX_MASKS = 5
 
 /**
- * The adjustment keys a mask may carry: the single-pass tone and colour sliders
- * (Basic + Color). The blur-based local-contrast sliders (clarity/dehaze/
- * texture) are deliberately excluded — they stay global, applied after masks.
+ * The keys `MASK_FRAGMENT_SHADER` itself implements: the point-wise tone and
+ * colour sliders (Basic + Color). One texel in, one texel out.
+ *
+ * The renderer drives its per-mask uniforms from THIS list, not from
+ * {@link MASK_ADJUSTMENT_KEYS}, and the difference matters: a key the shader does
+ * not declare gets a `null` uniform location, and `gl.uniform1f(null, …)` is a
+ * silent no-op. A slider that saves, undoes and exports while painting nothing
+ * is worse than no slider at all.
  */
-export const MASK_ADJUSTMENT_KEYS: readonly string[] = [
+export const MASK_TONE_KEYS: readonly string[] = [
   ...basicAdjustments.map((o) => o.key),
   ...colorAdjustement.map((o) => o.key),
+]
+
+/**
+ * Local-contrast keys a mask may carry. They are NOT applied by the mask pass:
+ * they need a blur of the developed image, which only exists further down the
+ * pipeline, so they ride to the composite as a per-pixel amount map (see
+ * `AMOUNT_MAP_FRAGMENT_SHADER` and `renderer.buildAmountMap`).
+ *
+ * Only `texture` so far. Clarity and dehaze work the same way and could join by
+ * taking another channel of the same map, but they are not wired yet — and a key
+ * listed here without that wiring paints nothing.
+ */
+export const MASK_LOCAL_CONTRAST_KEYS: readonly string[] = ['texture']
+
+/**
+ * Every adjustment key a mask may carry, whichever pass ends up applying it.
+ * This is the list the UI and `buildMaskAdjustments` work from.
+ */
+export const MASK_ADJUSTMENT_KEYS: readonly string[] = [
+  ...MASK_TONE_KEYS,
+  ...MASK_LOCAL_CONTRAST_KEYS,
 ]
 
 export interface RadialShape {
@@ -358,6 +384,10 @@ export function buildMaskAdjustments(): Record<string, number> {
   return {
     ...buildDefaults(basicAdjustments),
     ...buildDefaults(colorAdjustement),
+    // Taken from the Details options rather than seeded with 0, so a mask key
+    // whose neutral value is not 0 (as `luminanceDetail` would be, should it
+    // ever become local) cannot quietly start life wrong.
+    ...buildDefaults(detailsAdjustement.filter((o) => MASK_LOCAL_CONTRAST_KEYS.includes(o.key))),
   }
 }
 

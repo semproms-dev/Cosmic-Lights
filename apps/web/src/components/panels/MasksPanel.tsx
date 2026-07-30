@@ -23,7 +23,7 @@ import {
 } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { useEditor } from '../../editor/editorContext'
-import { basicAdjustments, colorAdjustement } from '../../editor/adjustments'
+import { basicAdjustments, colorAdjustement, detailsAdjustement } from '../../editor/adjustments'
 import {
   BRUSH_SIZE_MAX,
   BRUSH_SIZE_MIN,
@@ -40,9 +40,13 @@ import {
 } from '../../editor/masks'
 import { useContextMenu } from 'mantine-contextmenu'
 
-/** Slider metadata (label/range/step) for every mask-adjustment key. */
+/**
+ * Slider metadata (label/range/step) for every mask-adjustment key. `details` is
+ * in here for `texture`, which a mask may carry even though the mask pass cannot
+ * apply it — it reaches the composite through the amount map instead.
+ */
 const ADJ_META = new Map(
-  [...basicAdjustments, ...colorAdjustement].map((o) => [o.key, o]),
+  [...basicAdjustments, ...colorAdjustement, ...detailsAdjustement].map((o) => [o.key, o]),
 )
 
 /** One "Add New Mask" entry. Disabled entries are the not-yet-built tools. */
