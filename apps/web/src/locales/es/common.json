@@ -13,6 +13,9 @@
     "clarity": "Añadir o quitar contraste de tonos medios para un aspecto más definido o suave",
     "dehaze": "Eliminar o añadir bruma atmosférica a la imagen",
     "texture": "Mejorar o suavizar los detalles finos y los patrones de superficie",
+    "colorNoise": "Elimina las manchas de color del ISO alto sin tocar el detalle. Júzgalo al 100 % de zoom",
+    "luminanceNoise": "Suaviza el granulado monocromo del ISO alto. Pasarse convierte la piel y la tela en plástico",
+    "luminanceDetail": "Cuánto detalle fino se devuelve tras suavizar la luminancia. Súbelo si la foto parece una acuarela",
     "vignette": "Oscurece o aclara los bordes del encuadre, recentrado sobre el recorte",
     "vignetteMidpoint": "A qué distancia del centro empieza el sombreado de los bordes",
     "vignetteFeather": "Cómo de suave es la transición hacia los bordes sombreados",
@@ -26,6 +29,8 @@
     "presence": "Presencia",
     "color": "Color",
     "details": "Detalles",
+    "localContrast": "Contraste local",
+    "noise": "Reducción de ruido",
     "curves": "Curvas",
     "effects": "Efectos"
   },
@@ -60,12 +65,18 @@
     "saturation": "Saturación",
     "clarity": "Claridad",
     "dehaze": "Desempañar",
+    "texture": "Textura",
+    "colorNoise": "Color",
+    "luminanceNoise": "Luminancia",
+    "luminanceDetail": "Detalle",
     "vignette": "Viñeteado",
     "vignetteMidpoint": "Punto medio",
     "vignetteFeather": "Suavizado",
     "grain": "Grano",
     "grainSize": "Tamaño",
-    "grainRoughness": "Irregularidad"
+    "grainRoughness": "Irregularidad",
+    "noIso": "El fichero no guarda el ISO de la toma",
+    "denoiseButton": "Auto denoising"
   },
   "settings": {
     "general": "General",

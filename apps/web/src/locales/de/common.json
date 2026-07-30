@@ -13,6 +13,9 @@
     "clarity": "Mitteltönigen Kontrast hinzufügen oder entfernen für einen knackigeren oder weicheren Look",
     "dehaze": "Atmosphärischen Dunst aus dem Bild entfernen oder hinzufügen",
     "texture": "Feine Details und Oberflächenmuster verstärken oder weichzeichnen",
+    "colorNoise": "Entfernt die Farbflecken von High-ISO-Aufnahmen, ohne Details anzutasten. Bei 100 % Zoom beurteilen",
+    "luminanceNoise": "Glättet das körnige Graurauschen von High-ISO-Aufnahmen. Zu viel lässt Haut und Stoff plastikartig wirken",
+    "luminanceDetail": "Wie viel Feindetail nach der Luminanzglättung zurückgegeben wird. Erhöhen, wenn das Foto wie ein Aquarell aussieht",
     "vignette": "Die Bildränder abdunkeln oder aufhellen, zentriert auf den Ausschnitt",
     "vignetteMidpoint": "Wie weit von der Mitte entfernt die Abschattung beginnt",
     "vignetteFeather": "Wie weich der Übergang zu den abgeschatteten Rändern verläuft",
@@ -26,6 +29,8 @@
     "presence": "Präsenz",
     "color": "Farbe",
     "details": "Details",
+    "localContrast": "Lokaler Kontrast",
+    "noise": "Rauschreduzierung",
     "curves": "Kurven",
     "effects": "Effekte"
   },
@@ -60,12 +65,18 @@
     "saturation": "Sättigung",
     "clarity": "Klarheit",
     "dehaze": "Schlieren entfernen",
+    "texture": "Struktur",
+    "colorNoise": "Farbe",
+    "luminanceNoise": "Luminanz",
+    "luminanceDetail": "Details",
     "vignette": "Vignettierung",
     "vignetteMidpoint": "Mittelpunkt",
     "vignetteFeather": "Weiche Kante",
     "grain": "Korn",
     "grainSize": "Größe",
-    "grainRoughness": "Rauheit"
+    "grainRoughness": "Rauheit",
+    "noIso": "Die Datei enthält keinen ISO-Wert der Aufnahme",
+    "denoiseButton": "Auto-Rauschunterdrückung"
   },
   "settings": {
     "general": "Allgemein",

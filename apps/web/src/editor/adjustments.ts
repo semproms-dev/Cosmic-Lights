@@ -21,6 +21,17 @@ export interface ColorOption {
   group: string
 }
 
+export interface DetailOption {
+  key: string
+  label: string
+  min: number
+  max: number
+  step: number
+  defaultValue: number
+  group: string
+  type: string
+}
+
 
 
 /** Basic tone adjustments shown in the Adjustments panel. */
@@ -40,11 +51,29 @@ export const colorAdjustement: ColorOption[] = [
   { key: 'saturation', label: 'Saturation', min: -100, max: 100, step: 1, defaultValue: 0, group: 'Presence' },
 ]
 
-export const detailsAdjustement: ColorOption[] = [
-  /*{ key: 'sharpness', label: 'Sharpness', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },*/
-  { key: 'clarity', label: 'Clarity', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
-  { key: 'dehaze', label: 'Dehaze', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
-  { key: 'texture', label: 'Texture', min: -5, max: 5, step: 0.1, defaultValue: 0, group: '' },
+/**
+ * Details panel. `group` splits it in two, and the split is not cosmetic: the
+ * first three ADD local contrast and the noise ones REMOVE detail, so they pull
+ * against each other. Seeing them apart is what stops the user from fighting one
+ * with the other. `group` is a translation key under `groups.*`, not a label.
+ */
+export const detailsAdjustement: DetailOption[] = [
+  /*{ key: 'sharpness', label: 'Sharpness', min: -5, max: 5, step: 0.1, defaultValue: 0, group: 'localContrast' },*/
+  { key: 'clarity', label: 'Clarity', min: -5, max: 5, step: 0.1, defaultValue: 0, group: 'localContrast', type: 'slider' },
+  { key: 'dehaze', label: 'Dehaze', min: -5, max: 5, step: 0.1, defaultValue: 0, group: 'localContrast', type: 'slider' },
+  { key: 'texture', label: 'Texture', min: -5, max: 5, step: 0.1, defaultValue: 0, group: 'localContrast', type: 'slider' },
+  // Noise reduction. 0..100 rather than the -5..5 of its neighbours: there is no
+  // meaningful "negative" noise reduction, and the ISO-driven Auto mapping is
+  // expressed in that range. Default 0, unlike Lightroom, which ships colour NR
+  // at 25 — this map also feeds the presets and the export, so a non-zero default
+  // would silently restyle edits saved before the slider existed.
+  { key: 'colorNoise', label: 'Color Noise', min: 0, max: 100, step: 1, defaultValue: 0, group: 'noise', type: 'slider' },
+  { key: 'luminanceNoise', label: 'Luminance Noise', min: 0, max: 100, step: 1, defaultValue: 0, group: 'noise', type: 'slider' },
+  // Detail is the *shape* of the luminance filter, not its amount — like the
+  // grain's size and roughness. Hence a neutral value of 50 rather than 0: what
+  // turns the effect off is `luminanceNoise = 0`.
+  { key: 'luminanceDetail', label: 'Luminance Detail', min: 0, max: 100, step: 1, defaultValue: 50, group: 'noise', type: 'slider' },
+  { key: 'denoiseRemove', label: 'Auto denoise removal', step: 0, min: 0, max: 0, defaultValue: 0, group: 'noise', type: 'button' },
 ]
 
 /**

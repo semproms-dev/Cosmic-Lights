@@ -1,10 +1,17 @@
 import type { Metadata } from "libraw-wasm";
+import type { ImageSource } from "./decodeImage";
 
 export interface LoadedImage {
     bitmap: ImageBitmap,
     width: number,
     height: number,
     fileName: string,
+    /**
+     * Which decoder produced these pixels. Ask this, never the file name: the
+     * name is what the user's disk claims, this is what actually worked — a JPEG
+     * renamed to `.nef` still lands here as `'developed'`.
+     */
+    source: ImageSource,
     /**
      * Camera metadata, or `null` for an already-developed file (JPEG): those are
      * decoded by the browser, which hands over pixels and nothing else. Every

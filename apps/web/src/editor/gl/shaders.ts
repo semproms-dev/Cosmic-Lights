@@ -244,6 +244,147 @@ void main() {
 `
 
 /**
+ * Noise reduction — one 1D pass, run twice (H then V) like the Gaussian above.
+ *
+ * It runs BEFORE the pixel pipeline (see the pass order in `renderer.ts`), because
+ * exposure and the shadow sliders amplify whatever noise reaches them, and clarity
+ * and the sharpen amplify it again at the other end. Denoise-then-sharpen is also
+ * the only order that works: sharpening first turns noise into "detail" that no
+ * filter can tell from the real thing.
+ *
+ * Digital noise is really two problems, and this shader runs a different filter on
+ * each half of the same decomposition:
+ *
+ * - **Chroma** (the coloured blotches of high-ISO shots): a wide Gaussian on the
+ *   two colour channels with an edge guard. Nearly free, because the eye resolves
+ *   colour far worse than brightness — a radius that would smear the picture to
+ *   mush leaves no visible trace, while the blotches disappear.
+ * - **Luminance** (the gritty monochrome speckle): a bilateral, whose range term
+ *   is what tells noise from detail. Expensive to get right, and the half that can
+ *   flatten a photo into plastic, which is what `uDetail` exists to undo.
+ *
+ * Both filters share ONE set of texture fetches. That is the reason they live in
+ * a single shader instead of two chained passes: with both sliders up, fusing
+ * them halves the sampling, and sampling is the scarce resource here.
+ */
+export const DENOISE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uSource;      // H pass: the image; V pass: the H pass's output
+uniform sampler2D uOriginal;    // the untouched image, for uDetail
+uniform vec2 uDirection;        // per-texel step along this pass's axis
+uniform float uColorRadius;     // chroma blur radius in texels (0 = off)
+uniform float uLumaRadius;      // luminance bilateral radius in texels (0 = off)
+uniform float uEdgeSigma;       // chroma: luma difference that counts as an edge
+uniform float uLumaSigmaRange;  // luminance: the bilateral's range sigma
+uniform float uDetail;          // 0..1; luminance detail mixed back in
+uniform float uFinal;           // 1 on the V pass, where uDetail is applied
+
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+// Hard cap on taps per side (compile-time loop bound), as in the Gaussian pass.
+// 24 comfortably covers COLOR_NOISE_MAX_RADIUS (noise.ts).
+const int MAX_TAPS = 24;
+
+/**
+ * RGB → (Y, Cb, Cr). Not BT.601: this is the minimal opponent pair, and it is
+ * chosen for two properties the filter depends on.
+ *
+ * 1. It is EXACTLY reversible. The horizontal pass recomposes to RGB to write its
+ *    FBO and the vertical pass decomposes again; a lossy round trip would show up
+ *    as a colour cast rather than as noise reduction.
+ * 2. Green is not stored — toRgb() solves it back out of the luma definition. So
+ *    luminance is preserved by construction: touching Cb/Cr *cannot* change how
+ *    bright a pixel is. That invariant is what makes a huge chroma radius safe.
+ */
+vec3 toYcc(vec3 rgb) {
+  float y = dot(rgb, LUMA);
+  return vec3(y, rgb.b - y, rgb.r - y);
+}
+
+/** (Y, Cb, Cr) → RGB; green is solved from the luma definition, not stored. */
+vec3 toRgb(vec3 ycc) {
+  float r = ycc.x + ycc.z;
+  float b = ycc.x + ycc.y;
+  float g = (ycc.x - 0.2126 * r - 0.0722 * b) / 0.7152;
+  return vec3(r, g, b);
+}
+
+void main() {
+  vec4 texel = texture(uSource, vUv);
+  vec3 centre = toYcc(texel.rgb);
+
+  // Same sigma convention as BLUR_FRAGMENT_SHADER: decayed to ~1% at the radius.
+  float maxRadius = max(uColorRadius, uLumaRadius);
+  float sigmaC = max(uColorRadius / 3.0, 1e-4);
+  float sigmaL = max(uLumaRadius / 3.0, 1e-4);
+  float twoSigmaC2 = 2.0 * sigmaC * sigmaC;
+  float twoSigmaL2 = 2.0 * sigmaL * sigmaL;
+  float twoSigmaE2 = 2.0 * max(uEdgeSigma, 1e-4) * max(uEdgeSigma, 1e-4);
+  float twoSigmaR2 = 2.0 * max(uLumaSigmaRange, 1e-4) * max(uLumaSigmaRange, 1e-4);
+
+  vec2 chromaSum = vec2(0.0);
+  float chromaWeight = 0.0;
+  float lumaSum = 0.0;
+  float lumaWeight = 0.0;
+
+  for (int i = -MAX_TAPS; i <= MAX_TAPS; i++) {
+    float fi = float(i);
+    if (abs(fi) > maxRadius) { continue; }
+    // ONE fetch, TWO filters: this is why they are fused into one shader.
+    vec3 s = toYcc(texture(uSource, vUv + uDirection * fi).rgb);
+    float dy = s.x - centre.x;
+
+    if (abs(fi) <= uColorRadius) {
+      // Edge guard: a neighbour on the far side of a luma edge is a different
+      // subject, and averaging its colour in is what bleeds red past a lip or a
+      // sign. Weighing by luma difference keeps the blur inside one surface.
+      // uEdgeSigma is deliberately loose — see CHROMA_EDGE_SIGMA in noise.ts.
+      float w = exp(-(fi * fi) / twoSigmaC2) * exp(-(dy * dy) / twoSigmaE2);
+      chromaSum += s.yz * w;
+      chromaWeight += w;
+    }
+
+    if (abs(fi) <= uLumaRadius) {
+      // Bilateral: spatial term × RANGE term. The range term is the whole idea —
+      // inside a flat area neighbours differ only by the noise, so they all count
+      // and the average cancels it; across an edge the difference is large, the
+      // weight collapses and the filter refuses to average over it. That is what
+      // separates a denoiser from a blur.
+      float w = exp(-(fi * fi) / twoSigmaL2) * exp(-(dy * dy) / twoSigmaR2);
+      lumaSum += s.x * w;
+      lumaWeight += w;
+    }
+  }
+
+  // The centre tap has fi = 0 and dy = 0, so its weight is exactly 1 in both
+  // filters: neither denominator can be 0, and neither divide needs a guard.
+  vec3 result = centre;
+  if (uColorRadius > 0.0) { result.yz = chromaSum / chromaWeight; }
+  if (uLumaRadius > 0.0) { result.x = lumaSum / lumaWeight; }
+
+  // Detail recovery. Any denoiser takes real detail with it; rather than filter
+  // more weakly (which leaves the noise), filter fully and give a fraction of the
+  // original luminance back. This is what keeps skin and fabric from going
+  // plastic, and it costs a single extra fetch.
+  //
+  // Applied only on the final pass and against the ORIGINAL image, not against
+  // uSource, which on that pass is already filtered in the horizontal direction.
+  // Both textures share a coordinate mapping — pass 0 is orientation-preserving
+  // (see chromaDenoise1D in renderer.ts) — so the same vUv reads both correctly.
+  if (uFinal > 0.5 && uDetail > 0.0 && uLumaRadius > 0.0) {
+    float originalLuma = dot(texture(uOriginal, vUv).rgb, LUMA);
+    result.x = mix(result.x, originalLuma, uDetail);
+  }
+
+  fragColor = vec4(clamp(toRgb(result), 0.0, 1.0), texel.a);
+}
+`
+
+/**
  * Local-adjustment mask pass. Reads the current developed image (`uImage`),
  * applies this mask's own tone+colour adjustments (the same Basic+Color maths as
  * the main pipeline — no curves, no sharpen: those stay global), then blends the

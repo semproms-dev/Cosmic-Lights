@@ -13,6 +13,9 @@
     "clarity": "Aggiungere o rimuovere contrasto dei mezzitoni per un aspetto più deciso o più morbido",
     "dehaze": "Rimuovere o aggiungere foschia atmosferica all'immagine",
     "texture": "Esaltare o ammorbidire i dettagli fini e i motivi di superficie",
+    "colorNoise": "Rimuove le macchie di colore degli scatti ad ISO alti senza toccare il dettaglio. Da valutare allo zoom 100%",
+    "luminanceNoise": "Attenua la grana monocromatica degli scatti ad ISO alti. Esagerare rende pelle e tessuti plastici",
+    "luminanceDetail": "Quanto dettaglio fine viene restituito dopo l'attenuazione della luminanza. Alzalo se la foto sembra un acquerello",
     "vignette": "Scurire o schiarire i bordi dell'inquadratura, ricentrato sul ritaglio",
     "vignetteMidpoint": "A che distanza dal centro inizia l'ombreggiatura dei bordi",
     "vignetteFeather": "Quanto è morbida la transizione verso i bordi ombreggiati",
@@ -26,6 +29,8 @@
     "presence": "Presenza",
     "color": "Colore",
     "details": "Dettagli",
+    "localContrast": "Contrasto locale",
+    "noise": "Riduzione del rumore",
     "curves": "Curve",
     "effects": "Effetti"
   },
@@ -60,12 +65,18 @@
     "saturation": "Saturazione",
     "clarity": "Nitidezza",
     "dehaze": "Rimozione foschia",
+    "texture": "Texture",
+    "colorNoise": "Colore",
+    "luminanceNoise": "Luminanza",
+    "luminanceDetail": "Dettaglio",
     "vignette": "Vignettatura",
     "vignetteMidpoint": "Punto medio",
     "vignetteFeather": "Sfumatura",
     "grain": "Grana",
     "grainSize": "Dimensione",
-    "grainRoughness": "Irregolarità"
+    "grainRoughness": "Irregolarità",
+    "noIso": "Il file non registra l'ISO dello scatto",
+    "denoiseButton": "Riduzione rumore auto"
   },
   "settings": {
     "general": "Generale",

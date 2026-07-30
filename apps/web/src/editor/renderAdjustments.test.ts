@@ -16,6 +16,14 @@ describe('toRenderAdjustments', () => {
     expect(result.grain).toBe(0)
     expect(result.grainSize).toBe(50)
     expect(result.grainRoughness).toBe(50)
+    // Noise reduction is neutral at 0 on purpose, unlike Lightroom's colour NR
+    // at 25: this map also feeds presets and export, so a non-zero default would
+    // restyle edits saved before the slider existed.
+    expect(result.colorNoise).toBe(0)
+    expect(result.luminanceNoise).toBe(0)
+    // Detail is the shape of the luminance filter, not its amount — same reason
+    // grainSize sits at 50. What turns it off is luminanceNoise = 0.
+    expect(result.luminanceDetail).toBe(50)
   })
 
   it('carries the values that are set through', () => {

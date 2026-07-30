@@ -1,11 +1,13 @@
-import { Accordion, Group, Stack, Text } from '@mantine/core';
+import { Accordion, Button, Group, Stack, Text, Tooltip } from '@mantine/core';
 import { basicAdjustments, colorAdjustement, detailsAdjustement, effectsAdjustement } from '../../../editor/adjustments';
 import { useEditor } from '../../../editor/editorContext';
+import { autoDenoiseSliders } from '../../../editor/noise';
 import { ControlSlider } from './ControlSlider';
 import { GradientSlider } from './GradientSlider';
 import { CurvesPanel } from '../../panels/CurvesPanel/CurvesPanel';
 import { groupBy } from '../../../utils';
 import { useTranslation } from 'react-i18next';
+
 
 const TEMPERATURE_GRADIENT = 'linear-gradient(to right, #2690f0, #ffffff, #f5c542)';
 const TINT_GRADIENT = 'linear-gradient(to right, #00FF00, #ffffff, #8A2BE2)'
@@ -16,8 +18,15 @@ const TINT_GRADIENT = 'linear-gradient(to right, #00FF00, #ffffff, #8A2BE2)'
  */
 export function AdjustmentsPanel() {
   const { t } = useTranslation(['common']);
-  const { adjustments, setAdjustment, commit } = useEditor();
+  const { adjustments, setAdjustment, commit, image } = useEditor();
   const colorsByGroup = Object.entries(groupBy(colorAdjustement, i => i.group))
+  const detailsByGroup = Object.entries(groupBy(detailsAdjustement, i => i.group));
+  // Auto denoise asks the shot's ISO how noisy the sensor was, so what gates it
+  // is having that ISO — not the file being RAW. A JPEG carries it in its EXIF
+  // just as well, and the denoise pass is the same shader either way; what
+  // changes for an already-developed file is the dose, inside the mapping.
+  const iso = image?.metadata?.iso_speed ?? 0;
+  const canAutoDenoise = iso > 0;
 
   /**
    * Restores one slider to its default, for the click-the-label reset.
@@ -30,6 +39,25 @@ export function AdjustmentsPanel() {
    */
   const resetOption = (option: { key: string; defaultValue: number }) => () => {
     setAdjustment(option.key, option.defaultValue);
+    commit();
+  };
+
+  /**
+   * Fills the three noise sliders from the shot's ISO.
+   *
+   * It writes the sliders rather than flipping a hidden "auto" flag, so the
+   * result stays visible and draggable, and the single `commit()` at the end
+   * makes the three writes one undo step instead of three.
+   *
+   * Guards on its own: the button is only *aria*-disabled (see below), so unlike
+   * a natively disabled one it does fire this handler.
+   */
+  const applyAutoDenoise = () => {
+    if (!image || !canAutoDenoise) return;
+    const auto = autoDenoiseSliders(iso, image.source);
+    setAdjustment('colorNoise', auto.colorNoise);
+    setAdjustment('luminanceNoise', auto.luminanceNoise);
+    setAdjustment('luminanceDetail', auto.luminanceDetail);
     commit();
   };
   return (
@@ -99,19 +127,43 @@ export function AdjustmentsPanel() {
         <Accordion.Control><Text fw={700}>{t('groups.details')}</Text></Accordion.Control>
         <Accordion.Panel>
           <Stack gap="md">
-              {detailsAdjustement.map((option) => (
-              <ControlSlider
-                key={option.key}
-                label={option.label}
-                description={t(`labels.${option.key}`)}
-                value={adjustments[option.key]}
-                min={option.min}
-                max={option.max}
-                step={option.step}
-                onChangeEnd={() => commit()}
-                onChange={(value) => setAdjustment(option.key, value)}
-                onReset={resetOption(option)}
-              />
+            {detailsByGroup.map(([group, options]) => (
+              <Group key={group}>
+                <Text fw={500} size="sm">{t(`groups.${group}`)}</Text>
+                {options.map((option) => option.type === 'slider' ? (
+                  <ControlSlider
+                    key={option.key}
+                    label={t(`lateralNavBar.${option.key}`)}
+                    description={t(`labels.${option.key}`)}
+                    value={adjustments[option.key]}
+                    min={option.min}
+                    max={option.max}
+                    step={option.step}
+                    onChangeEnd={() => commit()}
+                    onChange={(value) => setAdjustment(option.key, value)}
+                    onReset={resetOption(option)}
+                  />
+                ): (
+                  // Disabled through ARIA rather than the `disabled` attribute, and
+                  // that is the whole reason the tooltip works: a natively disabled
+                  // button emits no pointer events, so the explanation of *why* it
+                  // is unavailable would never reach the person who needs it. This
+                  // way it stays focusable and hoverable — announced as unavailable,
+                  // able to say so — with `data-disabled` doing the greying out and
+                  // `applyAutoDenoise` refusing to act.
+                  <Tooltip key={option.key} label={t('lateralNavBar.noIso')} disabled={canAutoDenoise}>
+                    <Button
+                      data-disabled={!canAutoDenoise || undefined}
+                      aria-disabled={!canAutoDenoise}
+                      onClick={applyAutoDenoise}
+                    >
+                      {t('lateralNavBar.denoiseButton')}
+                    </Button>
+                  </Tooltip>
+
+                ))}
+                
+              </Group>
             ))}
           </Stack>
         </Accordion.Panel>

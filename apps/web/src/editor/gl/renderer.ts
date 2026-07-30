@@ -5,6 +5,7 @@ import {
   BRUSH_FRAGMENT_SHADER,
   BRUSH_VERTEX_SHADER,
   CLARITY_FRAGMENT_SHADER,
+  DENOISE_FRAGMENT_SHADER,
   FRAGMENT_SHADER,
   GRADIENT_FRAGMENT_SHADER,
   GRADIENT_VERTEX_SHADER,
@@ -13,6 +14,7 @@ import {
   VERTEX_SHADER,
 } from './shaders'
 import type { CropRegion } from '../image'
+import { CHROMA_EDGE_SIGMA, denoiseParams, type DenoiseParams } from '../noise'
 import { IDENTITY_ORIENTATION, uvTransform, type Orientation } from '../rotation'
 import { MASK_ADJUSTMENT_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint, type RadialShape } from '../masks'
 import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
@@ -53,6 +55,12 @@ export interface RenderAdjustments {
   dehaze: number
   /** Texture in [-5, 5]; small-radius fine-detail local-contrast (negatives soften). */
   texture: number
+  /** Colour noise in [0, 100]; chroma denoise before the pipeline (0 = off, and the pass skips). */
+  colorNoise: number
+  /** Luminance noise in [0, 100]; edge-preserving bilateral on luma (0 = off). */
+  luminanceNoise: number
+  /** Luminance detail in [0, 100]; how much detail the luma filter gives back (100 = all of it). */
+  luminanceDetail: number
   /** Vignette in [-100, 100]; post-crop edge shading. Negative darkens, as in Lightroom. */
   vignette: number
   /** Vignette midpoint in [0, 100]; where the falloff starts (0 = near the centre). */
@@ -138,7 +146,23 @@ export class WebGLRenderer {
   private readonly uBlurDirection: WebGLUniformLocation | null
   private readonly uBlurRadius: WebGLUniformLocation | null
 
-  // Fourth program: the per-mask local-adjustment pass. Reads the current
+  // Fourth program: noise reduction, one 1D pass run twice (H then V). A sibling
+  // of the blur, but it runs two filters off one set of fetches: a wide Gaussian
+  // on chroma and an edge-preserving bilateral on luma.
+  private readonly denoiseProgram: WebGLProgram
+  private readonly uDenoiseScale: WebGLUniformLocation | null
+  private readonly uDenoiseFlipV: WebGLUniformLocation | null
+  private readonly uDenoiseSource: WebGLUniformLocation | null
+  private readonly uDenoiseOriginal: WebGLUniformLocation | null
+  private readonly uDenoiseDirection: WebGLUniformLocation | null
+  private readonly uDenoiseColorRadius: WebGLUniformLocation | null
+  private readonly uDenoiseLumaRadius: WebGLUniformLocation | null
+  private readonly uDenoiseEdgeSigma: WebGLUniformLocation | null
+  private readonly uDenoiseLumaSigmaRange: WebGLUniformLocation | null
+  private readonly uDenoiseDetail: WebGLUniformLocation | null
+  private readonly uDenoiseFinal: WebGLUniformLocation | null
+
+  // Fifth program: the per-mask local-adjustment pass. Reads the current
   // developed image + a mask's alpha and blends the mask's tone/colour delta
   // over it. Shares the pipeline VAO (full-screen quad) and vertex shader.
   private readonly maskProgram: WebGLProgram
@@ -150,14 +174,14 @@ export class WebGLRenderer {
   private readonly uMaskInvert: WebGLUniformLocation | null
   private readonly maskAdjLoc: Record<string, WebGLUniformLocation | null>
 
-  // Fifth program: the brush stamp. Draws soft discs into a mask's alpha target,
+  // Sixth program: the brush stamp. Draws soft discs into a mask's alpha target,
   // union-blended to paint or reverse-blended to erase.
   private readonly brushProgram: WebGLProgram
   private readonly uBrushCenter: WebGLUniformLocation | null
   private readonly uBrushRadius: WebGLUniformLocation | null
   private readonly uBrushHardness: WebGLUniformLocation | null
 
-  // Sixth program: the linear-gradient rasteriser. Fills a mask's alpha target
+  // Seventh program: the linear-gradient rasteriser. Fills a mask's alpha target
   // with a ramp described by two image-space points (full-effect and zero-effect
   // lines). Shares the full-screen quad VAO; no vertex uniforms.
   private readonly gradientProgram: WebGLProgram
@@ -165,7 +189,7 @@ export class WebGLRenderer {
   private readonly uGradP2: WebGLUniformLocation | null
   private readonly uGradImageSize: WebGLUniformLocation | null
 
-  // Seventh program: the radial-gradient rasteriser. Fills a mask's alpha target
+  // Eighth program: the radial-gradient rasteriser. Fills a mask's alpha target
   // with an elliptical falloff (centre, semi-axes, rotation). Shares the
   // full-screen quad VAO and the gradient vertex shader; no vertex uniforms.
   private readonly radialProgram: WebGLProgram
@@ -201,6 +225,17 @@ export class WebGLRenderer {
   private blurA: RenderTarget | null = null
   private blurB: RenderTarget | null = null
   private blurC: RenderTarget | null = null
+  // Output of the noise-reduction pass, which feeds the pipeline in place of the
+  // uploaded texture. Only one new target is needed: the separable pass borrows
+  // `blurA` as its horizontal scratch, which is free at that point because the
+  // clarity blurs do not run until later in the frame.
+  private denoised: RenderTarget | null = null
+  // Which parameters `denoised` currently holds the result for, or null when it
+  // holds nothing usable. The denoise is the one pass whose output depends solely
+  // on its own sliders, so this key is all it takes to skip it on every frame
+  // driven by any other control. Cleared in `uploadImage` — a new image is the
+  // one input to the pass that the key itself does not describe.
+  private denoiseKey: string | null = null
 
   private imageWidth = 0
   private imageHeight = 0
@@ -317,6 +352,19 @@ export class WebGLRenderer {
     this.uBlurDirection = gl.getUniformLocation(this.blurProgram, 'uDirection')
     this.uBlurRadius = gl.getUniformLocation(this.blurProgram, 'uRadius')
 
+    this.denoiseProgram = createProgram(gl, VERTEX_SHADER, DENOISE_FRAGMENT_SHADER)
+    this.uDenoiseScale = gl.getUniformLocation(this.denoiseProgram, 'uScale')
+    this.uDenoiseFlipV = gl.getUniformLocation(this.denoiseProgram, 'uFlipV')
+    this.uDenoiseSource = gl.getUniformLocation(this.denoiseProgram, 'uSource')
+    this.uDenoiseOriginal = gl.getUniformLocation(this.denoiseProgram, 'uOriginal')
+    this.uDenoiseDirection = gl.getUniformLocation(this.denoiseProgram, 'uDirection')
+    this.uDenoiseColorRadius = gl.getUniformLocation(this.denoiseProgram, 'uColorRadius')
+    this.uDenoiseLumaRadius = gl.getUniformLocation(this.denoiseProgram, 'uLumaRadius')
+    this.uDenoiseEdgeSigma = gl.getUniformLocation(this.denoiseProgram, 'uEdgeSigma')
+    this.uDenoiseLumaSigmaRange = gl.getUniformLocation(this.denoiseProgram, 'uLumaSigmaRange')
+    this.uDenoiseDetail = gl.getUniformLocation(this.denoiseProgram, 'uDetail')
+    this.uDenoiseFinal = gl.getUniformLocation(this.denoiseProgram, 'uFinal')
+
     this.maskProgram = createProgram(gl, VERTEX_SHADER, MASK_FRAGMENT_SHADER)
     this.uMaskScale = gl.getUniformLocation(this.maskProgram, 'uScale')
     this.uMaskOffset = gl.getUniformLocation(this.maskProgram, 'uOffset')
@@ -386,6 +434,13 @@ export class WebGLRenderer {
     if (this.developed2 !== null) {
       deleteRenderTarget(gl, this.developed2)
     }
+    if (this.denoised !== null) {
+      deleteRenderTarget(gl, this.denoised)
+    }
+    this.denoised = createRenderTarget(gl, bitmap.width, bitmap.height)
+    // The cached denoise belongs to the previous image; the sliders may not have
+    // moved, but the pixels underneath them have.
+    this.denoiseKey = null
     this.developed = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.developed2 = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurA = createRenderTarget(gl, bitmap.width, bitmap.height)
@@ -516,6 +571,63 @@ export class WebGLRenderer {
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, sourceTexture)
     gl.uniform1i(this.uBlurSource, 0)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+  }
+
+  /**
+   * Runs one 1D denoise pass: filters `sourceTexture` along `(dirX, dirY)` into
+   * `target`. Composed twice (H then V) it approximates a separable 2D chroma
+   * blur and luminance bilateral.
+   *
+   * A bilateral is not separable in the strict sense, so running it H-then-V is
+   * an approximation. At these radii (≤ 6 texels) the artefact is invisible, and
+   * it turns a cost of `(2r+1)²` taps into `2·(2r+1)`.
+   *
+   * Unlike {@link blur1D} this sets `uFlipV = 0` on both passes, which makes the
+   * pair an exact identity mapping of texture coordinates (`target[t]` comes from
+   * `source[t]`). That is deliberate, and it buys two things: `denoised` carries
+   * the *same* orientation as the uploaded texture it replaces, so the pipeline
+   * pass keeps `uFlipV = 0` whether or not the denoise ran; and `uOriginal` can be
+   * sampled at the very same `vUv` as `uSource` on the final pass, with no
+   * coordinate correction to get wrong.
+   *
+   * @param sourceTexture - The texture to filter.
+   * @param target - The render target to write the filtered result into.
+   * @param dirX - Per-texel step on X (1/width for a horizontal pass, else 0).
+   * @param dirY - Per-texel step on Y (1/height for a vertical pass, else 0).
+   * @param params - The frame's denoise parameters, from `denoiseParams`.
+   * @param isFinal - True on the vertical pass, the one that applies `detail`.
+   */
+  private denoise1D(
+    sourceTexture: WebGLTexture,
+    target: RenderTarget,
+    dirX: number,
+    dirY: number,
+    params: DenoiseParams,
+    isFinal: boolean,
+  ): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    gl.useProgram(this.denoiseProgram)
+    gl.uniform2f(this.uDenoiseScale, 1, 1)
+    gl.uniform1f(this.uDenoiseFlipV, 0) // identity mapping; see the note above
+    gl.uniform2f(this.uDenoiseDirection, dirX, dirY)
+    gl.uniform1f(this.uDenoiseColorRadius, params.colorRadius)
+    gl.uniform1f(this.uDenoiseLumaRadius, params.lumaRadius)
+    gl.uniform1f(this.uDenoiseEdgeSigma, CHROMA_EDGE_SIGMA)
+    gl.uniform1f(this.uDenoiseLumaSigmaRange, params.lumaSigmaRange)
+    gl.uniform1f(this.uDenoiseDetail, params.detail)
+    gl.uniform1f(this.uDenoiseFinal, isFinal ? 1 : 0)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, sourceTexture)
+    gl.uniform1i(this.uDenoiseSource, 0)
+    // The untouched image, for the detail mix. Bound on both passes even though
+    // only the final one reads it: leaving the sampler pointing at whatever unit
+    // was last used is how a "why is it sampling itself" bug gets written.
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.texture)
+    gl.uniform1i(this.uDenoiseOriginal, 1)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
   }
 
@@ -756,7 +868,7 @@ export class WebGLRenderer {
 
   render(adjustments: RenderAdjustments, masks: Mask[], maskAlphas: MaskAlphaCache, overlayMaskId: string | null, canvasWidth: number, canvasHeight: number): void {
     const gl = this.gl
-    if (!this.hasImage || this.developed === null || this.developed2 === null || this.blurA === null || this.blurB === null || this.blurC === null || canvasWidth === 0 || canvasHeight === 0) {
+    if (!this.hasImage || this.developed === null || this.developed2 === null || this.blurA === null || this.blurB === null || this.blurC === null || this.denoised === null || canvasWidth === 0 || canvasHeight === 0) {
       // Nothing to draw: just clear the canvas.
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
       gl.viewport(0, 0, canvasWidth, canvasHeight)
@@ -767,6 +879,35 @@ export class WebGLRenderer {
     const blurA = this.blurA
     const blurB = this.blurB
     const blurC = this.blurC
+    const denoised = this.denoised
+
+    // ── Pass 0: noise reduction, feeding the pipeline instead of the uploaded
+    // texture. It runs FIRST because everything downstream amplifies noise:
+    // exposure and shadows multiply it, clarity and the sharpen then lift
+    // whatever survived. Denoise-then-sharpen is also the only order that works —
+    // sharpening first turns noise into detail the filter can no longer tell
+    // apart. Skipped entirely at 0, exactly like the clarity blurs below. ──
+    const noise = denoiseParams(adjustments)
+    let pipelineSource = this.texture
+    if (noise.enabled) {
+      // CACHED, and this is what makes the feature usable rather than just
+      // correct. Alone in this pipeline, the denoise depends on nothing but its
+      // own three sliders — not exposure, not curves, not crop, not masks — so
+      // dragging any *other* slider reuses last frame's result and pays nothing.
+      // Only moving a noise slider (or loading an image, which clears the key)
+      // re-runs the passes. Without this, every frame would pay for the widest
+      // filter in the pipeline.
+      const key = `${noise.colorRadius}|${noise.lumaRadius}|${noise.lumaSigmaRange}|${noise.detail}`
+      if (this.denoiseKey !== key) {
+        // blur1D and the pipeline pass bind the VAO themselves further down, but
+        // this pass runs before either of them.
+        gl.bindVertexArray(this.vao)
+        this.denoise1D(this.texture, blurA, 1 / this.imageWidth, 0, noise, false)
+        this.denoise1D(blurA.texture, denoised, 0, 1 / this.imageHeight, noise, true)
+        this.denoiseKey = key
+      }
+      pipelineSource = denoised.texture
+    }
 
     // ── Pass 1: run the pixel pipeline into the developed target, at image
     // resolution and filling the whole quad (no letterbox here). ──
@@ -775,7 +916,9 @@ export class WebGLRenderer {
     gl.useProgram(this.program)
     gl.bindVertexArray(this.vao)
     gl.uniform2f(this.uScale, 1, 1)
-    gl.uniform1f(this.uFlipV, 0) // samples the RAW upload: no flip
+    // No flip either way: pass 0 preserves the uploaded texture's orientation, so
+    // this is correct whether `pipelineSource` is the upload or the denoised FBO.
+    gl.uniform1f(this.uFlipV, 0)
     gl.uniform1f(this.uExposure, adjustments.exposure)
     gl.uniform1f(this.uContrast, adjustments.contrast)
     gl.uniform1f(this.uHighlights, adjustments.highlights)
@@ -791,7 +934,7 @@ export class WebGLRenderer {
     gl.uniform1f(this.uSharpness, adjustments.sharpness)
     gl.uniform1f(this.uThreshold, adjustments.threshold)
     gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, this.texture)
+    gl.bindTexture(gl.TEXTURE_2D, pipelineSource)
     gl.uniform1i(this.uImage, 0)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, this.curveLut)
@@ -947,6 +1090,9 @@ export class WebGLRenderer {
     if (this.developed2 !== null) {
       deleteRenderTarget(gl, this.developed2)
     }
+    if (this.denoised !== null) {
+      deleteRenderTarget(gl, this.denoised)
+    }
     this.disposeMaskTargets()
     gl.deleteTexture(this.texture)
     gl.deleteTexture(this.curveLut)
@@ -955,6 +1101,7 @@ export class WebGLRenderer {
     gl.deleteProgram(this.program)
     gl.deleteProgram(this.clarityProgram)
     gl.deleteProgram(this.blurProgram)
+    gl.deleteProgram(this.denoiseProgram)
     gl.deleteProgram(this.maskProgram)
     gl.deleteProgram(this.brushProgram)
   }

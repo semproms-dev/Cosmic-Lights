@@ -13,6 +13,9 @@
     "clarity": "Ajouter ou retirer du contraste des tons moyens pour un rendu plus marqué ou plus doux",
     "dehaze": "Supprimer ou ajouter de la brume atmosphérique à l'image",
     "texture": "Rehausser ou adoucir les détails fins et les motifs de surface",
+    "colorNoise": "Supprime les taches colorées des prises à ISO élevé sans toucher aux détails. À juger au zoom 100 %",
+    "luminanceNoise": "Lisse le grain monochrome des prises à ISO élevé. Trop en mettre rend la peau et le tissu plastiques",
+    "luminanceDetail": "Quelle part du détail fin est rendue après le lissage de luminance. À monter si la photo vire à l'aquarelle",
     "vignette": "Assombrir ou éclaircir les bords du cadre, recentré sur le recadrage",
     "vignetteMidpoint": "À quelle distance du centre commence l'assombrissement",
     "vignetteFeather": "Douceur de la transition vers les bords assombris",
@@ -26,6 +29,8 @@
     "presence": "Présence",
     "color": "Couleur",
     "details": "Détails",
+    "localContrast": "Contraste local",
+    "noise": "Réduction du bruit",
     "curves": "Courbes",
     "effects": "Effets"
   },
@@ -60,12 +65,18 @@
     "saturation": "Saturation",
     "clarity": "Clarté",
     "dehaze": "Correction du voile",
+    "texture": "Texture",
+    "colorNoise": "Couleur",
+    "luminanceNoise": "Luminance",
+    "luminanceDetail": "Détail",
     "vignette": "Vignettage",
     "vignetteMidpoint": "Point médian",
     "vignetteFeather": "Contour progressif",
     "grain": "Grain",
     "grainSize": "Taille",
-    "grainRoughness": "Rugosité"
+    "grainRoughness": "Rugosité",
+    "noIso": "Le fichier n'enregistre pas la sensibilité ISO de la prise de vue",
+    "denoiseButton": "Débruitage auto"
   },
   "settings": {
     "general": "Général",

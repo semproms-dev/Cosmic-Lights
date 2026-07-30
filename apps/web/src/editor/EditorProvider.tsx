@@ -2,12 +2,9 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint } from './curves'
-import { rgbToRgba, type CropRegion } from './image'
+import { type CropRegion } from './image'
 import { IDENTITY_VIEW, type CanvasView } from './crop'
-import { decodeRaw } from './decodeRaw'
-import { isRawFile } from '../components/canvas/rawFormats'
-import { readJpegMetadata } from './jpegMetadata'
-import type { Metadata } from 'libraw-wasm'
+import { decodeImage } from './decodeImage'
 import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
 import { logger } from '../logger'
@@ -440,56 +437,32 @@ export function EditorProvider({ children }: EditorProviderProps) {
    * decode off the reducer (which stays pure); reports failures through
    * `imageStatus`.
    *
-   * Two ways in, one result. A RAW goes through LibRaw (which also yields the
-   * camera metadata); an already-developed file is decoded by the browser and
-   * its EXIF read separately. Both land as 8-bit sRGB pixels with metadata in
-   * the same shape, which is why nothing downstream — pipeline, Info panel,
-   * export — needs to know which branch produced the image. `metadata` stays
-   * null only when the file genuinely carries none.
+   * Which decoder runs, and how a mislabelled file is rescued, is `decodeImage`'s
+   * business; this only stores what came back. `metadata` stays null when the
+   * file genuinely carries none, and `source` records which decoder won, so
+   * nothing downstream has to guess from the file name.
    */
   const loadImage = async (file: File): Promise<void> => {
     try {
       dispatch({ type: 'SET_IMAGE_STATUS', status: 'loading' })
-      // Free the previous decode before replacing it (frames are large).
+      const decoded = await decodeImage(file)
+      // Only now is the previous frame safe to free (frames are large). Closing
+      // it before the decode would leave the canvas holding a closed bitmap on
+      // every failed open — and a file that no decoder accepts is a path that
+      // really happens.
       state.image?.bitmap.close()
-      let bitmap: ImageBitmap
-      let metadata: Metadata | null = null
-      if (isRawFile(file)) {
-        const buffer = await file.arrayBuffer()
-        const decoded = await decodeRaw(buffer)
-        const imageData = new ImageData(
-          rgbToRgba(decoded.data, decoded.width, decoded.height),
-          decoded.width,
-          decoded.height,
-        )
-        bitmap = await createImageBitmap(imageData)
-        metadata = decoded.metadata
-      } else {
-        // `from-image` applies the file's EXIF orientation here, at decode time,
-        // so a portrait shot does not come in lying on its side. It must be
-        // consumed here and never reach `orientation`: that one is the user's
-        // own rotation, and folding both in would turn the photo twice.
-        //
-        // Decode and EXIF run together: neither needs the other's answer, and
-        // the metadata read is pure parsing on a slice of the same file.
-        const [decoded, exif] = await Promise.all([
-          createImageBitmap(file, { imageOrientation: 'from-image' }),
-          readJpegMetadata(file),
-        ])
-        bitmap = decoded
-        metadata = exif
-      }
       // A different image invalidates the object model's cached encoding: reuse
       // it and every prompt would be decoded against the previous photo.
       imageId.current += 1
       dispatch({
         type: 'SET_IMAGE',
         image: {
-          bitmap,
-          width: bitmap.width,
-          height: bitmap.height,
+          bitmap: decoded.bitmap,
+          width: decoded.bitmap.width,
+          height: decoded.bitmap.height,
           fileName: file.name,
-          metadata,
+          metadata: decoded.metadata,
+          source: decoded.source,
         },
       })
     } catch (error) {

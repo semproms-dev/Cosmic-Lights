@@ -1,3 +1,5 @@
+import { logger } from '../../logger'
+
 /** RAW file extensions the app decodes with LibRaw. */
 export const RAW_EXTENSIONS = [
   '.arw',
@@ -9,6 +11,30 @@ export const RAW_EXTENSIONS = [
   '.orf',
   '.rw2',
 ] as const
+
+const JPEG_SIGNATURE = [0xff, 0xd8, 0xff] as const
+
+/**
+ * Whether the file's *bytes* say JPEG, whatever its name claims.
+ *
+ * Reads three bytes, so it costs nothing next to a decode. This is the one
+ * question `file.type` cannot answer: the browser derives the MIME type from the
+ * extension, so a renamed file lies there too.
+ *
+ * @param file - The file the user opened or dropped.
+ * @returns True when the file starts with the JPEG SOI marker; false if it does
+ *   not, and false on a read error — an unreadable file fails at decode anyway,
+ *   with a better message than this function could give.
+ */
+export async function isFileJpg(file: File): Promise<boolean> {
+  try {
+    const header = new Uint8Array(await file.slice(0, JPEG_SIGNATURE.length).arrayBuffer());
+    return JPEG_SIGNATURE.every((byte, index) => header[index] == byte);
+  } catch(error) {
+    logger.error(`could not read the header of ${file.name}`, error)
+    return false;
+  }
+}
 
 /**
  * Already-developed formats the browser itself decodes. They skip LibRaw

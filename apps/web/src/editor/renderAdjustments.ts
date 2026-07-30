@@ -22,6 +22,12 @@ const RENDER_DEFAULTS: RenderAdjustments = {
   clarity: 0,
   dehaze: 0,
   texture: 0,
+  colorNoise: 0,
+  luminanceNoise: 0,
+  // El detalle es la *forma* del filtro de luminancia, no su cantidad, igual que
+  // el tamaño y la irregularidad del grano: neutro en 50, y quien lo apaga es
+  // `luminanceNoise = 0`.
+  luminanceDetail: 50,
   vignette: 0,
   vignetteMidpoint: 50,
   vignetteFeather: 50,

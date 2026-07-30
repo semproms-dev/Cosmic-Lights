@@ -13,6 +13,9 @@
     "clarity": "Add or remove mid-tone contrast for a punchier or softer look",
     "dehaze": "Remove or add atmospheric haze from the image",
     "texture": "Enhance or soften fine details and surface patterns",
+    "colorNoise": "Remove the coloured blotches of high-ISO shots, leaving detail untouched. Judge it at 100% zoom",
+    "luminanceNoise": "Smooth the gritty monochrome speckle of high-ISO shots. Too much turns skin and fabric plastic",
+    "luminanceDetail": "How much fine detail is given back after the luminance smoothing. Raise it if the photo looks like a watercolour",
     "vignette": "Darken or lighten the edges of the frame, recentred on the crop",
     "vignetteMidpoint": "How far from the centre the edge shading starts",
     "vignetteFeather": "How soft the transition into the shaded edges is",
@@ -26,6 +29,8 @@
     "presence": "Presence",
     "color": "Color",
     "details": "Details",
+    "localContrast": "Local Contrast",
+    "noise": "Noise Reduction",
     "curves": "Curves",
     "effects": "Effects"
   },
@@ -60,12 +65,18 @@
     "saturation": "Saturation",
     "clarity": "Clarity",
     "dehaze": "Dehaze",
+    "texture": "Texture",
+    "colorNoise": "Color",
+    "luminanceNoise": "Luminance",
+    "luminanceDetail": "Detail",
     "vignette": "Vignette",
     "vignetteMidpoint": "Midpoint",
     "vignetteFeather": "Feather",
     "grain": "Grain",
     "grainSize": "Size",
-    "grainRoughness": "Roughness"
+    "grainRoughness": "Roughness",
+    "noIso": "The file does not record the shot's ISO",
+    "denoiseButton": "Auto denoise"
   },
   "settings": {
     "general": "General",
