@@ -21,7 +21,8 @@
     "vignetteFeather": "Cómo de suave es la transición hacia los bordes sombreados",
     "grain": "Añade grano de película sobre el encuadre, más marcado en los medios tonos",
     "grainSize": "Cómo de grande es cada partícula de grano, en proporción al encuadre",
-    "grainRoughness": "Cómo de apelmazado e irregular es el grano, en vez de uniforme"
+    "grainRoughness": "Cómo de apelmazado e irregular es el grano, en vez de uniforme",
+    "gradeLum": "Aclara u oscurece solo esta zona de tonos, sin tocar su tinte"
   },
   "groups": {
     "basic": "Básico",
@@ -32,7 +33,8 @@
     "localContrast": "Contraste local",
     "noise": "Reducción de ruido",
     "curves": "Curvas",
-    "effects": "Efectos"
+    "effects": "Efectos",
+    "grading": "Graduación"
   },
   "nav": {
     "info": "Info",
@@ -76,7 +78,11 @@
     "grainSize": "Tamaño",
     "grainRoughness": "Irregularidad",
     "noIso": "El fichero no guarda el ISO de la toma",
-    "denoiseButton": "Auto denoising"
+    "denoiseButton": "Auto denoising",
+    "gradeShadow": "Sombras",
+    "gradeMid": "Medios",
+    "gradeHigh": "Altas luces",
+    "gradeLum": "Luminosidad"
   },
   "settings": {
     "general": "General",

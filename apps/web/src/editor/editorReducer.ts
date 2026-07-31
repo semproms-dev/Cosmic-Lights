@@ -4,6 +4,7 @@ import {
   detailsAdjustement,
   effectsAdjustement,
   buildDefaults,
+  buildGradingDefaults,
 } from './adjustments'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
@@ -80,7 +81,7 @@ export type EditorAction =
 
 /**
  * Construye el mapa inicial de sliders a partir de los cuatro grupos (Basic,
- * Color, Details, Effects). Centralizarlo aquí evita el bug de sembrar solo
+ * Color, Details, Effects) más las ruedas de grading. Centralizarlo aquí evita el bug de sembrar solo
  * `basic`: una clave que falte llega al shader como `NaN` y tiñe de negro el
  * fotograma entero sin dar ningún error.
  */
@@ -90,6 +91,9 @@ export function buildInitialAdjustments(): Record<string, number> {
     ...buildDefaults(colorAdjustement),
     ...buildDefaults(detailsAdjustement),
     ...buildDefaults(effectsAdjustement),
+    // Las ruedas de grading no son `SliderOption`: cada una escribe dos claves
+    // (tono y saturación), así que trae las suyas.
+    ...buildGradingDefaults(),
   }
 }
 

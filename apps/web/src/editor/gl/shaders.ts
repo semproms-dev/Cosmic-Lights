@@ -1,3 +1,10 @@
+import {
+  GRADE_BALANCE_RANGE,
+  GRADE_BLEND_MAX,
+  GRADE_BLEND_MIN,
+  GRADE_LUM_RANGE,
+} from '../colorGrading'
+
 /**
  * GLSL sources for the editor pipeline. WebGL2 (`#version 300 es`).
  *
@@ -82,6 +89,88 @@ vec3 applyExposure(vec3 c, float ev) {
     lin *= rolled / peak;
   }
   return pow(max(lin, 0.0), vec3(1.0 / EXPOSURE_GAMMA));
+}
+`
+
+/**
+ * Colour grading: a tint per tonal zone, the three wheels of the Color panel.
+ *
+ * Only in the pipeline pass, not in the mask one. Grading is global for now (so
+ * is Lightroom's), and putting it in `MASK_FRAGMENT_SHADER` would mean eight more
+ * uniforms evaluated once per mask per pixel, plus eight more keys in
+ * `MASK_ADJUSTMENT_KEYS`. If it ever goes local it goes as this same shared
+ * chunk, interpolated into both — never copied.
+ *
+ * **Why a multiply and not an add.** `rgb * tint * 2` keeps black black: a
+ * multiply cannot lift a zero, so tinting the shadows colours what little light
+ * is there instead of fogging the frame. The ×2 is what recentres it — a
+ * zero-saturation tint is white (1,1,1), so without it every pixel would halve.
+ *
+ * The blending and balance constants come from `colorGrading.ts`, interpolated
+ * rather than retyped: the TypeScript twin of these weights is what the tests
+ * exercise, and a number that drifted between the two would be invisible here.
+ */
+const GRADING_GLSL = `
+const float GRADE_BLEND_MIN = ${GRADE_BLEND_MIN.toFixed(1)};
+const float GRADE_BLEND_MAX = ${GRADE_BLEND_MAX.toFixed(1)};
+const float GRADE_BALANCE_RANGE = ${GRADE_BALANCE_RANGE.toFixed(1)};
+const float GRADE_LUM_RANGE = ${GRADE_LUM_RANGE.toFixed(2)};
+
+/** Branchless HSV→RGB. h, s and v are all 0..1. */
+vec3 hsvToRgb(float h, float s, float v) {
+  vec3 p = abs(fract(vec3(h) + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+  return v * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), s);
+}
+
+/**
+ * Tints and brightens one zone. \`zone\` is what the panel stores: x = hue in
+ * degrees, y = saturation 0..100, z = luminance -100..100. Both halves scale with
+ * the zone's weight, so a zone at rest is an exact identity.
+ *
+ * The tint multiplies and the luminance ADDS, and the difference is deliberate:
+ * a multiply cannot lift a zero, which is what keeps a tinted black black — but
+ * it is also what would make a "brighten the shadows" slider do nothing to the
+ * darkest pixels, which is the one place it is asked for. The offset is scaled
+ * like the Basic zone sliders above (±0.25 at full travel).
+ */
+vec3 tintZone(vec3 rgb, vec3 zone, float weight) {
+  float sat = zone.y / 100.0;
+  vec3 tint = hsvToRgb(zone.x / 360.0, sat, 1.0);
+  vec3 tinted = mix(rgb, rgb * tint * 2.0, weight * sat);
+  return tinted + weight * (zone.z / 100.0) * GRADE_LUM_RANGE;
+}
+
+/** Splits the pixel between the three zones, then tints and brightens each one. */
+vec3 applyGrading(vec3 rgb, vec3 shadow, vec3 mid, vec3 high, float blending, float balance) {
+  // Exact identity — and an early out that skips a pow-heavy block on every
+  // frame where no zone has been touched, which is most of them. The luminances
+  // count too, and by absolute value: a zone darkened with no tint is a perfectly
+  // ordinary edit, and testing only the saturations would silently drop it.
+  float touched = shadow.y + mid.y + high.y
+    + abs(shadow.z) + abs(mid.z) + abs(high.z);
+  if (touched <= 0.0) { return rgb; }
+
+  // Clamped before the pow: after exposure a luma can exceed 1, and pow() of a
+  // negative base is NaN — which paints the whole frame black with no GL error.
+  float l = clamp(dot(rgb, LUMA), 0.0, 1.0);
+  // Balance as a gamma remap rather than an offset: nothing clips, and 0 and 1
+  // stay where they are.
+  float t = pow(l, exp2(-balance / 100.0 * GRADE_BALANCE_RANGE));
+  float k = mix(GRADE_BLEND_MIN, GRADE_BLEND_MAX, blending / 100.0);
+  float wS = pow(1.0 - t, k);
+  float wH = pow(t, k);
+  // By subtraction, so the three weights always sum to <= 1 with no normalising;
+  // the max() is what stops a low blending from making it negative, which would
+  // invert the midtone tint instead of dropping it.
+  float wM = max(1.0 - wS - wH, 0.0);
+
+  // Cascaded, but over ONE frozen set of weights taken from the incoming luma.
+  // Recomputing them per zone would let the shadow tint shift which pixels the
+  // midtone wheel considers midtones.
+  vec3 graded = tintZone(rgb, shadow, wS);
+  graded = tintZone(graded, mid, wM);
+  graded = tintZone(graded, high, wH);
+  return graded;
 }
 `
 
@@ -717,7 +806,7 @@ void main() {
 }
 `
 
-/** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation → curves → sharpness/threshold. */
+/** Pixel pipeline: exposure → highlights → shadows → whites → blacks → contrast → temp/tint → vibrance → saturation → colour grading → curves → sharpness/threshold. */
 export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 
@@ -739,6 +828,13 @@ uniform float uTemperature;
 uniform float uTint;
 uniform float uVibrance;
 uniform float uSaturation;
+// Colour grading: one zone each, packed as (hue in degrees, saturation 0..100,
+// luminance -100..100), plus the two shape controls of the zone split.
+uniform vec3 uGradeShadow;
+uniform vec3 uGradeMid;
+uniform vec3 uGradeHigh;
+uniform float uGradeBlending;
+uniform float uGradeBalance;
 // Details group: size of one texel in UV space (1/width, 1/height) so the
 // unsharp mask can reach its 8 neighbours, plus the two Details sliders.
 uniform vec2 uTexel;
@@ -766,6 +862,7 @@ float applyCurve(float v, float row) {
   return texture(uCurveLut, vec2(u, (row + 0.5) / 4.0)).r;
 }
 ${EXPOSURE_GLSL}
+${GRADING_GLSL}
 
 void main() {
   vec4 texel = texture(uImage, vUv);
@@ -802,6 +899,11 @@ void main() {
   float curSat = max(rgb.r, max(rgb.g, rgb.b)) - min(rgb.r, min(rgb.g, rgb.b));
   rgb = mix(vec3(lumaC), rgb, 1.0 + vib * (1.0 - curSat));
   rgb = mix(vec3(lumaC), rgb, 1.0 + sat);
+  // Colour grading, after saturation and before the curves. After, because a
+  // global saturation applied later would amplify the tint the wheels just laid
+  // down; before, because the curve is the last global shaper of tone and moving
+  // a point would otherwise redistribute which pixels each zone owns.
+  rgb = applyGrading(rgb, uGradeShadow, uGradeMid, uGradeHigh, uGradeBlending, uGradeBalance);
   // Tone curves. Per-channel red/green/blue first, then the master rgb curve on
   // every channel (Photoshop's order). Identity LUTs leave rgb untouched.
   rgb.r = applyCurve(rgb.r, 1.0);

@@ -21,6 +21,44 @@ export interface ColorOption {
   group: string
 }
 
+/**
+ * One colour-grading zone: the wheel that tints it, the slider that brightens
+ * it, and the three adjustment keys they write.
+ *
+ * The wheel is a single control but **three** scalars in the store, and they are
+ * flat keys like every other slider (`gradeShadowHue`, `gradeShadowSat`,
+ * `gradeShadowLum`) rather than a nested `{ shadows: { hue, sat, lum } }` object. Everything that walks the
+ * adjustment map — presets, undo history, the export, the preset thumbnails —
+ * reads `Record<string, number>`, so flat keys join all of it for free while a
+ * nested one would mean touching every one of those places.
+ *
+ * Hue is stored in degrees (0..360) and saturation as a percentage (0..100),
+ * never as the wheel's (x, y): the polar-to-angle conversion belongs to the UI,
+ * and a coordinate pair would bake the wheel's pixel radius into the data model.
+ */
+export interface GradingOption {
+  /** Zone id. Also the translation key under `lateralNavBar.*`. */
+  key: string
+  label: string
+  /** Adjustment key holding the tint's hue, in degrees 0..360. */
+  hueKey: string
+  /** Adjustment key holding the tint's strength, 0..100. */
+  satKey: string
+  /** Adjustment key holding the zone's brightness offset, -100..100. */
+  lumKey: string
+  group: string
+}
+
+export interface EffectOption {
+  key: string
+  label: string
+  min: number
+  max: number
+  step: number
+  defaultValue: number
+  group: string
+}
+
 export interface DetailOption {
   key: string
   label: string
@@ -45,11 +83,47 @@ export const basicAdjustments: SliderOption[] = [
 ]
 
 export const colorAdjustement: ColorOption[] = [
-  { key: 'temperature', label: 'Temperature', min: -100, max: 100, step: 1, defaultValue: 0, group: 'White Balance' },
-  { key: 'tint', label: 'Tint', min: -100, max: 100, step: 1, defaultValue: 0, group: 'White Balance' },
-  { key: 'vibrance', label: 'Vibrance', min: -100, max: 100, step: 1, defaultValue: 0, group: 'Presence' },
-  { key: 'saturation', label: 'Saturation', min: -100, max: 100, step: 1, defaultValue: 0, group: 'Presence' },
+  { key: 'temperature', label: 'Temperature', min: -100, max: 100, step: 1, defaultValue: 0, group: 'whiteBalance' },
+  { key: 'tint', label: 'Tint', min: -100, max: 100, step: 1, defaultValue: 0, group: 'whiteBalance' },
+  { key: 'vibrance', label: 'Vibrance', min: -100, max: 100, step: 1, defaultValue: 0, group: 'presence' },
+  { key: 'saturation', label: 'Saturation', min: -100, max: 100, step: 1, defaultValue: 0, group: 'presence' },
 ]
+
+/**
+ * Colour grading: one wheel per tonal zone, tinting shadows, midtones and
+ * highlights apart.
+ *
+ * Deliberately NOT part of {@link colorAdjustement}, which masks reuse for their
+ * own sliders (see `MASK_TONE_KEYS`): grading is global, and a key that reaches
+ * the mask pass without a uniform behind it saves, undoes and exports while
+ * painting nothing.
+ *
+ * Note the zone names do not collide with the Basic sliders' `shadows` and
+ * `highlights` — they share the store's one flat map, and a repeated key would
+ * make the wheel and the tone slider silently drag each other.
+ */
+export const gradingAdjustement: GradingOption[] = [
+  { key: 'gradeShadow', label: 'Shadows', hueKey: 'gradeShadowHue', satKey: 'gradeShadowSat', lumKey: 'gradeShadowLum', group: 'grading' },
+  { key: 'gradeMid', label: 'Midtones', hueKey: 'gradeMidHue', satKey: 'gradeMidSat', lumKey: 'gradeMidLum', group: 'grading' },
+  { key: 'gradeHigh', label: 'Highlights', hueKey: 'gradeHighHue', satKey: 'gradeHighSat', lumKey: 'gradeHighLum', group: 'grading' },
+]
+
+/** Neutral hue of a grading wheel. Irrelevant while its saturation is 0, but it still has to be a finite number. */
+export const GRADING_DEFAULT_HUE = 0
+
+/** Neutral saturation of a grading wheel. This is the one that turns the zone's *tint* off. */
+export const GRADING_DEFAULT_SAT = 0
+
+/**
+ * Neutral luminance of a grading zone: no brightening, no darkening.
+ *
+ * Its own control, not part of the wheel: the luminance works with the tint at 0,
+ * which is how a zone gets darkened without being coloured.
+ */
+export const GRADING_DEFAULT_LUM = 0
+
+/** Range of the zone luminance slider, symmetric around its neutral. */
+export const GRADING_LUM_RANGE = 100
 
 /**
  * Details panel. `group` splits it in two, and the split is not cosmetic: the
@@ -82,7 +156,7 @@ export const detailsAdjustement: DetailOption[] = [
  * turns with the image. Kept out of `MASK_ADJUSTMENT_KEYS` on purpose: a mask
  * with its own vignette means nothing.
  */
-export const effectsAdjustement: ColorOption[] = [
+export const effectsAdjustement: EffectOption[] = [
   { key: 'vignette', label: 'Vignette', min: -100, max: 100, step: 1, defaultValue: 0, group: '' },
   { key: 'vignetteMidpoint', label: 'Midpoint', min: 0, max: 100, step: 1, defaultValue: 50, group: '' },
   { key: 'vignetteFeather', label: 'Feather', min: 0, max: 100, step: 1, defaultValue: 50, group: '' },
@@ -96,4 +170,18 @@ export const effectsAdjustement: ColorOption[] = [
  */
 export function buildDefaults(options: SliderOption[]): Record<string, number> {
   return Object.fromEntries(options.map((option) => [option.key, option.defaultValue]))
+}
+
+/**
+ * Builds the initial value map for the grading zones: three keys each — the
+ * wheel's hue and saturation, and the zone's luminance.
+ */
+export function buildGradingDefaults(): Record<string, number> {
+  return Object.fromEntries(
+    gradingAdjustement.flatMap((option) => [
+      [option.hueKey, GRADING_DEFAULT_HUE],
+      [option.satKey, GRADING_DEFAULT_SAT],
+      [option.lumKey, GRADING_DEFAULT_LUM],
+    ]),
+  )
 }

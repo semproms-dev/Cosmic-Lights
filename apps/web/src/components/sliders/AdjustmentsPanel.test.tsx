@@ -28,6 +28,17 @@ describe('AdjustmentsPanel', () => {
     expect(exposure).toHaveAttribute('aria-valuenow', '0');
   });
 
+  it('puts the three grading wheels in the Color section', () => {
+    render(<AdjustmentsPanel />);
+
+    // Side by side rather than stacked — what the shadows are tinted towards
+    // only means something next to where the highlights went. What each wheel
+    // writes is covered in GradingWheels.test.tsx.
+    expect(screen.getByText('Grading', INCLUDING_COLLAPSED)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Midtones', ...INCLUDING_COLLAPSED })).toBeInTheDocument();
+    expect(screen.getAllByText('0° · 0', INCLUDING_COLLAPSED)).toHaveLength(3);
+  });
+
   it('splits Details into local contrast and noise reduction', () => {
     render(<AdjustmentsPanel />);
 

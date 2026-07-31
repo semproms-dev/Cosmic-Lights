@@ -17,6 +17,24 @@ const RENDER_DEFAULTS: RenderAdjustments = {
   tint: 0,
   vibrance: 0,
   saturation: 0,
+  // Grading: lo que apaga una zona es su saturación, así que el tono de al lado
+  // da igual mientras esté en 0 — pero tiene que ser un número finito igual.
+  gradeShadowHue: 0,
+  gradeShadowSat: 0,
+  gradeMidHue: 0,
+  gradeMidSat: 0,
+  gradeHighHue: 0,
+  gradeHighSat: 0,
+  // La luminancia de cada zona va aparte de la rueda y funciona con el tinte a
+  // 0: es como se oscurece una zona sin teñirla.
+  gradeShadowLum: 0,
+  gradeMidLum: 0,
+  gradeHighLum: 0,
+  // El difuminado es la *forma* del reparto entre zonas, no su cantidad: neutro
+  // en 50, como el punto medio del viñeteado. A 0 las tres zonas se cortan a
+  // cuchillo. Todavía no tiene control en el panel; el shader lo espera igual.
+  gradeBlending: 50,
+  gradeBalance: 0,
   sharpness: 0,
   threshold: 0,
   clarity: 0,

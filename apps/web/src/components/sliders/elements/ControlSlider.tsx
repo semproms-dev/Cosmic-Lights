@@ -46,6 +46,7 @@ export function ControlSlider({
   const { image } = useEditor();
   const { t } = useTranslation(['common']);
   const { preferences } = usePreferences();
+  const showReset = hovered && onReset !== undefined;
   return (
     <Stack gap={4} className={classes.control}>
       <Group justify="space-between" gap="xs">
@@ -55,13 +56,25 @@ export function ControlSlider({
               <IconInfoCircle size={16} stroke={2} color="var(--mantine-color-dimmed)"  />
             </Tooltip>: null
           }
+          {/*
+            Both texts stay in the DOM, stacked in one grid cell, and only their
+            visibility swaps. Replacing the text outright is what caused the
+            label to flicker: "Reset" is shorter than most labels, so the element
+            shrank out from under the pointer, the hover went false, the long
+            label came back under the pointer, and round it went. Sharing a cell
+            keeps the box as wide as the wider of the two, whatever is showing.
+            The visibility is inline rather than a class so that jsdom — which
+            never applies the stylesheet — can still see which one is showing.
+          */}
           <Text
             size="sm"
+            className={classes.label}
             onClick={onReset}
             style={{ cursor: onReset === undefined ? 'default' : 'pointer' }}
             ref={ref}
           >
-            {hovered && onReset !== undefined ? t('common.reset') : label}
+            <span style={{ visibility: showReset ? 'hidden' : 'visible' }}>{label}</span>
+            <span style={{ visibility: showReset ? 'visible' : 'hidden' }}>{t('common.reset')}</span>
           </Text>
         </Group> 
         <Text size="sm" c="dimmed">

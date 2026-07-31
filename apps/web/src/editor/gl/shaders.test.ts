@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  GRADE_BALANCE_RANGE,
+  GRADE_BLEND_MAX,
+  GRADE_BLEND_MIN,
+  GRADE_LUM_RANGE,
+} from '../colorGrading'
+import {
   AMOUNT_MAP_FRAGMENT_SHADER,
   AMOUNT_MAP_RANGE,
   BLUR_FRAGMENT_SHADER,
@@ -63,6 +69,74 @@ describe('shader sources', () => {
     // Without this early out the shoulder would dim already-blown highlights on
     // every photo, including ones edited before it existed.
     expect(FRAGMENT_SHADER).toContain('if (ev == 0.0) { return c; }')
+  })
+
+  it('grades between saturation and the curves', () => {
+    // After saturation, or a later global saturation would amplify the tint the
+    // wheels just laid down; before the curves, or moving a curve point would
+    // redistribute which pixels each zone owns.
+    const saturation = FRAGMENT_SHADER.indexOf('rgb = mix(vec3(lumaC), rgb, 1.0 + sat);')
+    const grading = FRAGMENT_SHADER.indexOf('rgb = applyGrading(')
+    const curves = FRAGMENT_SHADER.indexOf('rgb.r = applyCurve(rgb.r, 1.0);')
+
+    expect(saturation).toBeGreaterThan(-1)
+    expect(grading).toBeGreaterThan(saturation)
+    expect(curves).toBeGreaterThan(grading)
+  })
+
+  it('keeps colour grading out of the mask pass', () => {
+    // Grading is global on purpose (§5 of the doc): in the mask pass it would be
+    // eight more uniforms per mask per pixel, and eight keys a mask could save,
+    // undo and export while the mask shader painted nothing with them.
+    expect(MASK_FRAGMENT_SHADER).not.toContain('applyGrading(')
+    expect(MASK_FRAGMENT_SHADER).not.toContain('uGradeShadow')
+  })
+
+  it('defines hsvToRgb once, in the shared chunk', () => {
+    // The day the mixer or a local grading arrives, the second copy is the bug:
+    // both features need this function and only one may declare it.
+    const declarations = FRAGMENT_SHADER.match(/vec3 hsvToRgb\(/g) ?? []
+    expect(declarations).toHaveLength(1)
+  })
+
+  it('is an exact identity while every zone is at rest', () => {
+    // All six controls at 0 must return the pixel untouched — not merely close.
+    // Anything else restyles every photo edited before grading existed.
+    expect(FRAGMENT_SHADER).toContain('if (touched <= 0.0) { return rgb; }')
+  })
+
+  it('counts a darkened zone as touched even with no tint on it', () => {
+    // The luminances join the early-out by ABSOLUTE value. Summed raw, a zone
+    // darkened to -40 would cancel another brightened to +40 and the whole block
+    // would be skipped; tested by saturation alone, a zone darkened with no tint
+    // — an ordinary edit — would never render at all.
+    expect(FRAGMENT_SHADER).toContain('+ abs(shadow.z) + abs(mid.z) + abs(high.z);')
+  })
+
+  it('brightens a zone with an offset, not a multiply', () => {
+    // The tint multiplies so a tinted black stays black; the luminance has to
+    // add, or "brighten the shadows" would do nothing to the darkest pixels —
+    // the one place it is asked for.
+    expect(FRAGMENT_SHADER).toContain('return tinted + weight * (zone.z / 100.0) * GRADE_LUM_RANGE;')
+  })
+
+  it('writes the grading constants as GLSL float literals', () => {
+    // Interpolated from `colorGrading.ts` so the shader and its TypeScript twin
+    // cannot drift — and as floats, because `const float x = 5;` does not
+    // compile in GLSL ES 3.00.
+    expect(FRAGMENT_SHADER).toContain(`const float GRADE_BLEND_MIN = ${GRADE_BLEND_MIN.toFixed(1)};`)
+    expect(FRAGMENT_SHADER).toContain(`const float GRADE_BLEND_MAX = ${GRADE_BLEND_MAX.toFixed(1)};`)
+    expect(FRAGMENT_SHADER).toContain(
+      `const float GRADE_BALANCE_RANGE = ${GRADE_BALANCE_RANGE.toFixed(1)};`,
+    )
+    expect(FRAGMENT_SHADER).toContain(`const float GRADE_LUM_RANGE = ${GRADE_LUM_RANGE.toFixed(2)};`)
+    expect(FRAGMENT_SHADER).toMatch(/const float GRADE_BLEND_MIN = \d+\.\d+;/)
+  })
+
+  it('clamps the luma before the zone powers', () => {
+    // `pow` of a negative base is NaN, and one NaN pixel paints the whole frame
+    // black with no GL error to point at it.
+    expect(FRAGMENT_SHADER).toContain('float l = clamp(dot(rgb, LUMA), 0.0, 1.0);')
   })
 
   it('writes the amount map range as a GLSL float literal', () => {

@@ -24,6 +24,37 @@ describe('toRenderAdjustments', () => {
     // Detail is the shape of the luminance filter, not its amount — same reason
     // grainSize sits at 50. What turns it off is luminanceNoise = 0.
     expect(result.luminanceDetail).toBe(50)
+    // Grading: what turns a zone off is its saturation, and blending is the
+    // shape of the split rather than its amount — hence 50, like the vignette's
+    // midpoint. At 0 the three zones would cut into each other at a knife edge.
+    expect(result.gradeShadowSat).toBe(0)
+    expect(result.gradeMidSat).toBe(0)
+    expect(result.gradeHighSat).toBe(0)
+    expect(result.gradeBlending).toBe(50)
+    expect(result.gradeBalance).toBe(0)
+    // The zone luminances are their own controls, neutral at 0 in the middle of
+    // a symmetric range.
+    expect(result.gradeShadowLum).toBe(0)
+    expect(result.gradeMidLum).toBe(0)
+    expect(result.gradeHighLum).toBe(0)
+  })
+
+  it('carries a zone luminance through with no tint on it', () => {
+    // Darkening a zone without colouring it is an ordinary edit, so the
+    // luminance has to survive the trip on its own.
+    const result = toRenderAdjustments({ gradeShadowLum: -40 })
+    expect(result.gradeShadowLum).toBe(-40)
+    expect(result.gradeShadowSat).toBe(0)
+  })
+
+  it('carries a wheel through as the two scalars the shader reads', () => {
+    // The wheel is one control in the panel but a hue and a saturation here, and
+    // it is these keys — not a colour object — that presets and the export walk.
+    const result = toRenderAdjustments({ gradeShadowHue: 210, gradeShadowSat: 35 })
+    expect(result.gradeShadowHue).toBe(210)
+    expect(result.gradeShadowSat).toBe(35)
+    // Untouched zones stay off.
+    expect(result.gradeHighSat).toBe(0)
   })
 
   it('carries the values that are set through', () => {

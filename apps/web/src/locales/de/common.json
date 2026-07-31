@@ -21,7 +21,8 @@
     "vignetteFeather": "Wie weich der Übergang zu den abgeschatteten Rändern verläuft",
     "grain": "Filmkorn über das Bild legen, am stärksten in den Mitteltönen",
     "grainSize": "Wie groß ein Korn ist, im Verhältnis zum Bildausschnitt",
-    "grainRoughness": "Wie klumpig und unregelmäßig das Korn ist statt gleichmäßig"
+    "grainRoughness": "Wie klumpig und unregelmäßig das Korn ist statt gleichmäßig",
+    "gradeLum": "Hellt nur diesen Tonbereich auf oder ab, ohne seine Färbung zu ändern"
   },
   "groups": {
     "basic": "Grundlegend",
@@ -32,7 +33,8 @@
     "localContrast": "Lokaler Kontrast",
     "noise": "Rauschreduzierung",
     "curves": "Kurven",
-    "effects": "Effekte"
+    "effects": "Effekte",
+    "grading": "Farbabstimmung"
   },
   "nav": {
     "info": "Info",
@@ -76,7 +78,11 @@
     "grainSize": "Größe",
     "grainRoughness": "Rauheit",
     "noIso": "Die Datei enthält keinen ISO-Wert der Aufnahme",
-    "denoiseButton": "Auto-Rauschunterdrückung"
+    "denoiseButton": "Auto-Rauschunterdrückung",
+    "gradeShadow": "Schatten",
+    "gradeMid": "Mitteltöne",
+    "gradeHigh": "Lichter",
+    "gradeLum": "Helligkeit"
   },
   "settings": {
     "general": "Allgemein",

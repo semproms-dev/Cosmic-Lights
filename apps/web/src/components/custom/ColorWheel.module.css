@@ -1,0 +1,61 @@
+.wheel {
+  position: relative;
+  border-radius: 50%;
+  cursor: crosshair;
+  /* Sin esto el navegador se queda el gesto para hacer scroll y el arrastre
+     salta en cuanto el dedo se mueve un par de píxeles. */
+  touch-action: none;
+  /* Rueda de tono: `from 90deg` pone el rojo a las 3 en punto, que es donde el
+     ángulo 0 de `Math.atan2` coloca el puntero. Sin ese giro el color pintado y
+     el tono guardado van desfasados un cuarto de vuelta. El radial blanco
+     encima desatura hacia el centro. */
+  background:
+    radial-gradient(circle, #fff 0%, transparent 100%),
+    conic-gradient(
+      from 90deg,
+      hsl(0, 100%, 50%),
+      hsl(60, 100%, 50%),
+      hsl(120, 100%, 50%),
+      hsl(180, 100%, 50%),
+      hsl(240, 100%, 50%),
+      hsl(300, 100%, 50%),
+      hsl(360, 100%, 50%)
+    );
+}
+
+.wheel:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/*
+ * La etiqueta y su «Restablecer» comparten celda: así la caja mide siempre lo
+ * que el más ancho de los dos y no encoge bajo el puntero a media pasada, que es
+ * lo que hacía parpadear el hover.
+ */
+.label {
+  display: grid;
+  justify-items: center;
+}
+
+.label > span {
+  grid-area: 1 / 1;
+}
+
+.handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  /* El puntero lo maneja la rueda: si el asa recibiera los eventos, arrastrarla
+     desde su propio centro no movería nada. */
+  pointer-events: none;
+}

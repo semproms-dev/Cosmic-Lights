@@ -47,6 +47,28 @@ export interface RenderAdjustments {
   vibrance: number
   /** Saturation in [-100, 100]; uniform luma↔color blend. */
   saturation: number
+  /** Shadow-zone tint hue in degrees [0, 360]. Inert while its saturation is 0. */
+  gradeShadowHue: number
+  /** Shadow-zone tint strength in [0, 100]; 0 leaves the zone untinted. */
+  gradeShadowSat: number
+  /** Shadow-zone brightness in [-100, 100]; weighted offset, works with no tint. */
+  gradeShadowLum: number
+  /** Midtone-zone tint hue in degrees [0, 360]. */
+  gradeMidHue: number
+  /** Midtone-zone tint strength in [0, 100]. */
+  gradeMidSat: number
+  /** Midtone-zone brightness in [-100, 100]. */
+  gradeMidLum: number
+  /** Highlight-zone tint hue in degrees [0, 360]. */
+  gradeHighHue: number
+  /** Highlight-zone tint strength in [0, 100]. */
+  gradeHighSat: number
+  /** Highlight-zone brightness in [-100, 100]. */
+  gradeHighLum: number
+  /** Zone blending in [0, 100]; how much the three grading zones overlap. Neutral at 50. */
+  gradeBlending: number
+  /** Zone balance in [-100, 100]; shifts the midpoint between shadows and highlights. */
+  gradeBalance: number
   /** Sharpness in [-5, 5]; unsharp-mask amount on luma (negatives soften). */
   sharpness: number
   /** Threshold in [-100, 100]; dead-band that spares sub-threshold detail from the sharpen. */
@@ -110,6 +132,13 @@ export class WebGLRenderer {
   private readonly uTint: WebGLUniformLocation | null
   private readonly uVibrance: WebGLUniformLocation | null
   private readonly uSaturation: WebGLUniformLocation | null
+  // One vec3 per zone — (hue, saturation, luminance) — rather than nine floats:
+  // a third of the locations, and it keeps one zone's controls together.
+  private readonly uGradeShadow: WebGLUniformLocation | null
+  private readonly uGradeMid: WebGLUniformLocation | null
+  private readonly uGradeHigh: WebGLUniformLocation | null
+  private readonly uGradeBlending: WebGLUniformLocation | null
+  private readonly uGradeBalance: WebGLUniformLocation | null
   private readonly uTexel: WebGLUniformLocation | null
   private readonly uSharpness: WebGLUniformLocation | null
   private readonly uThreshold: WebGLUniformLocation | null
@@ -337,6 +366,11 @@ export class WebGLRenderer {
     this.uTint = gl.getUniformLocation(this.program, 'uTint')
     this.uVibrance = gl.getUniformLocation(this.program, 'uVibrance')
     this.uSaturation = gl.getUniformLocation(this.program, 'uSaturation')
+    this.uGradeShadow = gl.getUniformLocation(this.program, 'uGradeShadow')
+    this.uGradeMid = gl.getUniformLocation(this.program, 'uGradeMid')
+    this.uGradeHigh = gl.getUniformLocation(this.program, 'uGradeHigh')
+    this.uGradeBlending = gl.getUniformLocation(this.program, 'uGradeBlending')
+    this.uGradeBalance = gl.getUniformLocation(this.program, 'uGradeBalance')
     this.uTexel = gl.getUniformLocation(this.program, 'uTexel')
     this.uSharpness = gl.getUniformLocation(this.program, 'uSharpness')
     this.uThreshold = gl.getUniformLocation(this.program, 'uThreshold')
@@ -1025,6 +1059,21 @@ export class WebGLRenderer {
     gl.uniform1f(this.uTint, adjustments.tint)
     gl.uniform1f(this.uVibrance, adjustments.vibrance)
     gl.uniform1f(this.uSaturation, adjustments.saturation)
+    gl.uniform3f(
+      this.uGradeShadow,
+      adjustments.gradeShadowHue,
+      adjustments.gradeShadowSat,
+      adjustments.gradeShadowLum,
+    )
+    gl.uniform3f(this.uGradeMid, adjustments.gradeMidHue, adjustments.gradeMidSat, adjustments.gradeMidLum)
+    gl.uniform3f(
+      this.uGradeHigh,
+      adjustments.gradeHighHue,
+      adjustments.gradeHighSat,
+      adjustments.gradeHighLum,
+    )
+    gl.uniform1f(this.uGradeBlending, adjustments.gradeBlending)
+    gl.uniform1f(this.uGradeBalance, adjustments.gradeBalance)
     // Texel size in UV space so the sharpen can reach its neighbours.
     gl.uniform2f(this.uTexel, 1 / this.imageWidth, 1 / this.imageHeight)
     gl.uniform1f(this.uSharpness, adjustments.sharpness)

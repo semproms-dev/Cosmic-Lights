@@ -21,7 +21,8 @@
     "vignetteFeather": "How soft the transition into the shaded edges is",
     "grain": "Add film grain over the frame, strongest in the midtones",
     "grainSize": "How big each grain particle is, as a fraction of the frame",
-    "grainRoughness": "How clumped and irregular the grain is, instead of even"
+    "grainRoughness": "How clumped and irregular the grain is, instead of even",
+    "gradeLum": "Brightens or darkens only this tonal zone, leaving its tint alone"
   },
   "groups": {
     "basic": "Basic",
@@ -32,7 +33,8 @@
     "localContrast": "Local Contrast",
     "noise": "Noise Reduction",
     "curves": "Curves",
-    "effects": "Effects"
+    "effects": "Effects",
+    "grading": "Grading"
   },
   "nav": {
     "info": "Info",
@@ -76,7 +78,11 @@
     "grainSize": "Size",
     "grainRoughness": "Roughness",
     "noIso": "The file does not record the shot's ISO",
-    "denoiseButton": "Auto denoise"
+    "denoiseButton": "Auto denoise",
+    "gradeShadow": "Shadows",
+    "gradeMid": "Midtones",
+    "gradeHigh": "Highlights",
+    "gradeLum": "Luminance"
   },
   "settings": {
     "general": "General",

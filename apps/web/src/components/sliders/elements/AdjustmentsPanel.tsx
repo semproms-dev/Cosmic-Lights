@@ -1,5 +1,10 @@
 import { Accordion, Button, Group, Stack, Text, Tooltip } from '@mantine/core';
-import { basicAdjustments, colorAdjustement, detailsAdjustement, effectsAdjustement } from '../../../editor/adjustments';
+import {
+  basicAdjustments,
+  colorAdjustement,
+  detailsAdjustement,
+  effectsAdjustement,
+} from '../../../editor/adjustments';
 import { useEditor } from '../../../editor/editorContext';
 import { autoDenoiseSliders } from '../../../editor/noise';
 import { ControlSlider } from './ControlSlider';
@@ -7,6 +12,7 @@ import { GradientSlider } from './GradientSlider';
 import { CurvesPanel } from '../../panels/CurvesPanel/CurvesPanel';
 import { groupBy } from '../../../utils';
 import { useTranslation } from 'react-i18next';
+import { GradingWheels } from './GradingWheels';
 
 
 const TEMPERATURE_GRADIENT = 'linear-gradient(to right, #2690f0, #ffffff, #f5c542)';
@@ -88,10 +94,10 @@ export function AdjustmentsPanel() {
         <Accordion.Panel>
           <Stack gap="md">
             {colorsByGroup.map(([group, options]) => (
-              <Group key={group}>
-                <Text fw={500} size="sm">{group}</Text>
+              <Stack key={group} gap="xs">
+                <Text fw={500} size="sm">{t(`groups.${group}`)}</Text>
                 {options.map((option) =>
-                  (option.key === 'temperature' || option.key === 'tint') ? (
+                  option.key === 'temperature' || option.key === 'tint' ? (
                     <GradientSlider
                       key={option.key}
                       label={t(`lateralNavBar.${option.key}`)}
@@ -118,8 +124,12 @@ export function AdjustmentsPanel() {
                     />
                   ),
                 )}
-              </Group>
+              </Stack>
             ))}
+            <Stack gap="xs">
+              <Text fw={500} size="sm">{t('groups.grading')}</Text>
+              <GradingWheels />
+            </Stack>
           </Stack>
         </Accordion.Panel>
       </Accordion.Item>

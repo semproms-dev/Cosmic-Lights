@@ -1,3 +1,17 @@
 .control {
   width: 100%;
 }
+
+/*
+ * The label and its "Reset" share one grid cell, so the box is always as wide as
+ * the wider of the two and never resizes under the pointer mid-hover. Swapping
+ * the text instead made the label flicker: it shrank, the pointer fell outside,
+ * the hover dropped, and the long label came back under the pointer again.
+ */
+.label {
+  display: grid;
+}
+
+.label > span {
+  grid-area: 1 / 1;
+}
