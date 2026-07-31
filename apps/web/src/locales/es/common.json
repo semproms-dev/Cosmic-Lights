@@ -49,6 +49,8 @@
     "file": "Archivo",
     "open": "Abrir...",
     "exportJpg": "Exportar JPG...",
+    "showOriginal": "Mostrar original",
+    "showEdited": "Mostrar editado",
     "undo": "Deshacer",
     "undoAll": "Reiniciar imagen",
     "redo": "Rehacer",

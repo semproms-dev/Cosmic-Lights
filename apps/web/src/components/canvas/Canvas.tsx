@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEditor } from '../../editor/editorContext'
+import { buildDefaultCurves } from '../../editor/curves'
 import { compileCurveTexture } from '../../editor/curvesMath'
+import { buildInitialAdjustments } from '../../editor/editorReducer'
 import { WebGLRenderer } from '../../editor/gl/renderer'
 import { toRenderAdjustments } from '../../editor/renderAdjustments'
 import { logger } from '../../logger'
@@ -15,12 +17,16 @@ import {
   promptBoxFromCorners,
   withPromptPoint,
 } from '../../editor/masks'
-import type { BrushMode, MaskPoint, NormalizedPoint, ObjectPrompt } from '../../editor/masks'
+import type { BrushMode, Mask, MaskPoint, NormalizedPoint, ObjectPrompt } from '../../editor/masks'
 import { DropOverlay } from './DropOverlay'
 import { isSupportedFile } from './rawFormats'
 
 /** Per wheel notch, the fitted image grows/shrinks by this factor. */
 const ZOOM_STEP = 1.1
+
+// Stable empty mask list for the before/after preview. A fresh `[]` each render
+// would be a new reference and re-fire the draw effect on every render.
+const NO_MASKS: Mask[] = []
 
 interface CanvasProps {
   /**
@@ -113,6 +119,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     orientation,
     rotationSpin,
     resetOrientation,
+    showOriginal,
   } = useEditor()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -185,10 +192,11 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
 
   // Recompile and upload the tone-curve LUTs only when the curves change. Runs
   // before the redraw effect below (both depend on `curves`) so the texture is
-  // current by the time the frame draws.
+  // current by the time the frame draws. While showing the original, the LUT is
+  // the identity line so the shader applies no tonal curve.
   useEffect(() => {
-    rendererRef.current?.uploadCurves(compileCurveTexture(curves))
-  }, [curves])
+    rendererRef.current?.uploadCurves(compileCurveTexture(showOriginal ? buildDefaultCurves() : curves))
+  }, [curves, showOriginal])
 
   // Redraw on image/adjustment change or resize, coalesced into one frame.
   useEffect(() => {
@@ -214,16 +222,17 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       canvas.width = width
       canvas.height = height
       if(image != null) {
-        // While cropping, show the full frame so the overlay stays aligned.
-        renderer.setCrop(cropping ? null : cropRegion, image.width, image.height)
+        // While cropping, show the full frame so the overlay stays aligned. Same
+        // in the before/after preview, where the original has no crop either.
+        renderer.setCrop(cropping || showOriginal ? null : cropRegion, image.width, image.height)
         renderer.setOrientation(orientation);
       }
       renderer.setView(view.scale, view.offsetX, view.offsetY)
       renderer.render(
-        toRenderAdjustments(adjustments),
-        masks,
+        toRenderAdjustments(showOriginal ? buildInitialAdjustments() : adjustments),
+        showOriginal ? NO_MASKS : masks,
         maskAlphas.current,
-        overlayMaskId,
+        showOriginal ? null : overlayMaskId,
         width,
         height,
       )
@@ -249,7 +258,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     }
     // `maskAlphas` is a stable ref-backed Map, so it never fires this effect on
     // its own: `masks` (via each mask's `version`) is what signals a new alpha.
-  }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId, orientation])
+  }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId, orientation, showOriginal])
 
   // Zoom toward a point (in clip space, −1..1) by a scale factor, keeping the
   // content under that point fixed. Clip space matches the renderer's view

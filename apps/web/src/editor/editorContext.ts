@@ -151,6 +151,10 @@ export interface EditorState {
   maskOverlayHidden: boolean
   /** Shows/hides the mask editing overlay (transient UI state, not undoable). */
   setMaskOverlayHidden: (hidden: boolean) => void
+  /** Whether the canvas renders the untouched original (defaults, full frame). */
+  showOriginal: boolean
+  /** Shows/hides the original-state preview (transient view state, not undoable). */
+  setShowOriginal: (value: boolean) => void
   /**
    * Alphas generated for AI masks, keyed by mask id.
    *

@@ -49,6 +49,8 @@
     "file": "File",
     "open": "Open...",
     "exportJpg": "Export JPG...",
+    "showOriginal": "Show original",
+    "showEdited": "Show edited",
     "undo": "Undo",
     "undoAll": "Reset picture",
     "redo": "Redo",

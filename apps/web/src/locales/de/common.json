@@ -49,6 +49,8 @@
     "file": "Datei",
     "open": "Öffnen...",
     "exportJpg": "Als JPG exportieren...",
+    "showOriginal": "Original anzeigen",
+    "showEdited": "Bearbeitete Version anzeigen",
     "undo": "Rückgängig",
     "undoAll": "Réinitialiser l'image",
     "redo": "Wiederholen",

@@ -47,6 +47,8 @@
     "file": "File",
     "open": "Apri...",
     "exportJpg": "Esporta JPG...",
+    "showOriginal": "Mostra originale",
+    "showEdited": "Mostra la versione modificata",
     "undo": "Annulla",
     "undoAll": "Reimposta immagine",
     "redo": "Ripeti",

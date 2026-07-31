@@ -55,6 +55,12 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // so the change is visible. Not part of the editor store (never undoable).
   const [maskOverlayHidden, setMaskOverlayHidden] = useState(false)
 
+  // Transient UI: whether the canvas shows the untouched original (default
+  // sliders/curves, full frame) while the before/after control is held. Like
+  // `maskOverlayHidden`, it only changes what gets rendered — never the undo
+  // history or the live values.
+  const [showOriginal, setShowOriginal] = useState(false)
+
   // Brush tool settings. Transient like the overlay flag: each stroke stores its
   // own radius/hardness/mode, so undo replays the mask exactly as painted no
   // matter where the tool sits now.
@@ -514,6 +520,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         setObjectPrompt,
         maskOverlayHidden,
         setMaskOverlayHidden,
+        showOriginal,
+        setShowOriginal,
         maskAlphas,
         maskStatus,
         modelProgress,
