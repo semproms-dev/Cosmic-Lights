@@ -50,6 +50,7 @@
     "open": "Öffnen...",
     "exportJpg": "Als JPG exportieren...",
     "undo": "Rückgängig",
+    "undoAll": "Réinitialiser l'image",
     "redo": "Wiederholen",
     "settings": "Einstellungen",
     "about": "Über"

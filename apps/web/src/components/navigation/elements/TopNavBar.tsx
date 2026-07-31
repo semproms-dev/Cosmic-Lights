@@ -15,6 +15,7 @@ import { useModals } from '@mantine/modals';
 import { AdjustementsModal } from '../../modals/Adjustments.modal';
 import { AboutModal } from '../../modals/About.modal';
 import { useTranslation } from 'react-i18next';
+import { IconRestore } from '@tabler/icons-react';
 
 interface MenuItem {
   label: string;
@@ -38,7 +39,7 @@ interface NavBarProps {
 export function NavBar({ onOpenImage }: NavBarProps = {}) {
   const [active, setActive] = useState('File');
   const [openedLabel, setOpenedLabel] = useState('');
-  const {redo, undo, canRedo, canUndo} = useEditor();
+  const {redo, undo, canRedo, canUndo, openResetDialog} = useEditor();
   const modals = useModals();
   const { t } = useTranslation(['common']);
 
@@ -118,6 +119,11 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
       <Group gap="xs">{mainLinks}</Group>
 
       <Group gap="xs" ml="auto">
+        <Tooltip label={t('topNav.undoAll')} withArrow>
+          <ActionIcon variant='subtle' size="lg" onClick={() => openResetDialog()} disabled={!canUndo}>
+            <IconRestore />
+          </ActionIcon>
+        </Tooltip>
         <Tooltip label={t('topNav.undo')} withArrow>
           <ActionIcon variant='subtle' size="lg" onClick={() => undo()} disabled={!canUndo}>
             <FaUndoAlt />

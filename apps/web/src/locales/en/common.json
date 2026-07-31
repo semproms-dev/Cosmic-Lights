@@ -50,6 +50,7 @@
     "open": "Open...",
     "exportJpg": "Export JPG...",
     "undo": "Undo",
+    "undoAll": "Reset picture",
     "redo": "Redo",
     "settings": "Settings",
     "about": "About"

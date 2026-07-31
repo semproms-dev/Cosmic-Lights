@@ -48,6 +48,7 @@
     "open": "Ouvrir...",
     "exportJpg": "Exporter en JPG...",
     "undo": "Annuler",
+    "undoAll": "Réinitialiser l'image",
     "redo": "Rétablir",
     "settings": "Paramètres",
     "about": "À propos"

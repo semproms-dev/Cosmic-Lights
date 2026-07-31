@@ -50,6 +50,7 @@
     "open": "Abrir...",
     "exportJpg": "Exportar JPG...",
     "undo": "Deshacer",
+    "undoAll": "Reiniciar imagen",
     "redo": "Rehacer",
     "settings": "Ajustes",
     "about": "Acerca de"
