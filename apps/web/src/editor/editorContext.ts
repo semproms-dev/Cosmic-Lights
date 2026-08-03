@@ -86,6 +86,19 @@ export interface EditorState {
    * since the last checkpoint is a no-op, so over-calling it is safe.
    */
   commit: () => void
+  /**
+   * An opaque token whose **identity** changes whenever the committed state
+   * does — a slider released, Auto pressed, an undo taken. Compare it by
+   * reference (or put it in a dependency array); never read into it.
+   *
+   * What it is for: it is the app's only signal that the user has *finished* a
+   * gesture rather than being in the middle of one. Anything that would rather
+   * react to a settled edit than to every intermediate value — the quality
+   * denoise being the first — can watch this instead of guessing with a timer.
+   * A commit that changes nothing is a no-op upstream, so this does not move for
+   * one.
+   */
+  commitToken: object
   /** Whether there is a checkpoint to undo back to. */
   canUndo: boolean
   /** Whether there is an undone checkpoint to redo. */

@@ -53,13 +53,16 @@ describe('AdjustmentsPanel', () => {
   it('rests the noise sliders where each one is neutral', () => {
     render(<AdjustmentsPanel />);
 
-    // Detail is the shape of the luminance filter, not its amount, so it is
-    // neutral at 50 — what turns the feature off is Luminance at 0.
+    // All three rest at 0. Detail is the shape of the luminance filter rather
+    // than its amount — what turns the feature off is Luminance at 0 — but its
+    // neutral is still 0, because it mixes back toward the ORIGINAL luminance:
+    // any non-zero value hands that fraction of the NOISE back and caps the
+    // denoiser accordingly. See the note in editor/adjustments.ts.
     const at = (name: string) =>
       screen.getByRole('slider', { name, ...INCLUDING_COLLAPSED }).getAttribute('aria-valuenow');
     expect(at('Color')).toBe('0');
     expect(at('Luminance')).toBe('0');
-    expect(at('Detail')).toBe('50');
+    expect(at('Detail')).toBe('0');
   });
 
   it('offers Auto denoise, but only once there is an ISO to read', () => {

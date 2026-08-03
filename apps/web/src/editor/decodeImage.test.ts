@@ -6,7 +6,6 @@ import { readJpegMetadata } from './jpegMetadata'
 
 vi.mock('./decodeRaw', () => ({ decodeRaw: vi.fn() }))
 vi.mock('./jpegMetadata', () => ({ readJpegMetadata: vi.fn() }))
-
 /**
  * jsdom ships no `ImageData`, and the RAW branch only ever hands it straight to
  * `createImageBitmap` — so a stand-in is enough, and it doubles as the marker
@@ -52,6 +51,49 @@ function stubDecoders(browserAccepts: boolean): ReturnType<typeof vi.fn> {
   return createImageBitmapMock
 }
 
+/**
+ * Points the browser canvas at a stand-in 2D context (jsdom has no real one).
+ *
+ * The developed branch draws the frame into a canvas and reads pixels back; in
+ * jsdom that would hit the "not implemented" getContext and log a console
+ * error, so every test gets a stand-in — `null` by default (which the branch
+ * handles by reporting no noise) and a pixel source in the tests that need one.
+ */
+function stubCanvasContext(context: unknown): void {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D)
+}
+
+/** A deterministic-ish noisy RGB buffer large enough to estimate from. */
+function noisyRgb(width: number, height: number): Uint8Array {
+  const rgb = new Uint8Array(width * height * 3)
+  for (let i = 0; i < width * height; i++) {
+    const value = 128 + Math.round((Math.random() - 0.5) * 60)
+    rgb[i * 3] = value
+    rgb[i * 3 + 1] = value
+    rgb[i * 3 + 2] = value
+  }
+  return rgb
+}
+
+/** The same noisy 64×64 pixels in RGBA form, for the stand-in canvas. */
+function noisyRgba(width: number, height: number): Uint8ClampedArray {
+  const rgba = new Uint8ClampedArray(width * height * 4)
+  for (let i = 0; i < width * height; i++) {
+    const value = 128 + Math.round((Math.random() - 0.5) * 60)
+    rgba[i * 4] = value
+    rgba[i * 4 + 1] = value
+    rgba[i * 4 + 2] = value
+    rgba[i * 4 + 3] = 255
+  }
+  return rgba
+}
+
+/** A stand-in canvas that always returns the same noisy 64×64 pixels. */
+const FAKE_CANVAS_CONTEXT = {
+  drawImage: () => {},
+  getImageData: () => ({ data: noisyRgba(64, 64) }),
+} as unknown as CanvasRenderingContext2D
+
 beforeEach(() => {
   vi.stubGlobal('ImageData', FakeImageData)
   vi.mocked(decodeRaw).mockResolvedValue({
@@ -61,10 +103,15 @@ beforeEach(() => {
     metadata: CAMERA_METADATA,
   })
   vi.mocked(readJpegMetadata).mockResolvedValue(JPEG_EXIF)
+  stubCanvasContext(null)
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  // restore: drop the getContext spy so the next test can install a fresh one.
+  // clear: `restoreAllMocks` does not reset module mocks' call history in
+  // vitest 4, and a leak across tests would fake "decodeRaw was called".
+  vi.restoreAllMocks()
   vi.clearAllMocks()
 })
 
@@ -144,5 +191,72 @@ describe('decodeImage', () => {
     const decoded = await decodeImage(unreadable)
 
     expect(decoded.source).toBe('raw')
+  })
+
+  describe('noise estimation', () => {
+    it('estimates the noise of a RAW from the pixels it decoded', async () => {
+      stubDecoders(true)
+      vi.mocked(decodeRaw).mockResolvedValue({
+        data: noisyRgb(64, 64),
+        width: 64,
+        height: 64,
+        metadata: CAMERA_METADATA,
+      })
+
+      const decoded = await decodeImage(fileNamed('shot.nef', RAW_BYTES))
+
+      expect(decoded.noise).not.toBeNull()
+      expect(decoded.noise?.lumaSigma).toBeGreaterThan(0.01)
+      expect(decoded.noise?.chromaSigma).toBeGreaterThanOrEqual(0)
+    })
+
+    it('reports no noise for a RAW frame too small to measure', async () => {
+      stubDecoders(true)
+
+      const decoded = await decodeImage(fileNamed('shot.nef', RAW_BYTES))
+
+      expect(decoded.noise).toBeNull()
+    })
+
+    it('has no noise estimate for a developed file when the canvas has no context', async () => {
+      // jsdom's getContext stub returns null; the branch must treat that as "no
+      // estimate" rather than crash the whole decode.
+      stubDecoders(true)
+
+      const decoded = await decodeImage(fileNamed('shot.jpg', JPEG_BYTES))
+
+      expect(decoded.noise).toBeNull()
+    })
+
+    it('estimates the noise of a developed file from its pixels', async () => {
+      // A real decode would hand this branch a bitmap with real dimensions; the
+      // shared BROWSER_BITMAP has none, and a dimension-less frame measures as
+      // "nothing" — so this test decodes to a 64×64 browser frame instead.
+      vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ from: 'browser', width: 64, height: 64 })))
+      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(FAKE_CANVAS_CONTEXT)
+
+      const decoded = await decodeImage(fileNamed('shot.jpg', JPEG_BYTES))
+
+      expect(decoded.noise).not.toBeNull()
+      expect(decoded.noise?.lumaSigma).toBeGreaterThan(0.01)
+    })
+
+    it('survives a canvas that throws while reading pixels', async () => {
+      stubDecoders(true)
+      vi.mocked(HTMLCanvasElement.prototype.getContext).mockImplementation(
+        () =>
+          ({
+            drawImage: () => {},
+            getImageData: () => {
+              throw new Error('canvas tainted')
+            },
+          }) as unknown as CanvasRenderingContext2D,
+      )
+
+      const decoded = await decodeImage(fileNamed('shot.jpg', JPEG_BYTES))
+
+      expect(decoded.noise).toBeNull()
+      expect(decoded.bitmap).toBe(BROWSER_BITMAP)
+    })
   })
 })

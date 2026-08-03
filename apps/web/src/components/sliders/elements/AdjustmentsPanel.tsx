@@ -6,7 +6,7 @@ import {
   effectsAdjustement,
 } from '../../../editor/adjustments';
 import { useEditor } from '../../../editor/editorContext';
-import { autoDenoiseSliders } from '../../../editor/noise';
+import { autoDenoiseSliders, denoiseSlidersFromNoise } from '../../../editor/noise';
 import { ControlSlider } from './ControlSlider';
 import { GradientSlider } from './GradientSlider';
 import { CurvesPanel } from '../../panels/CurvesPanel/CurvesPanel';
@@ -27,12 +27,14 @@ export function AdjustmentsPanel() {
   const { adjustments, setAdjustment, commit, image } = useEditor();
   const colorsByGroup = Object.entries(groupBy(colorAdjustement, i => i.group))
   const detailsByGroup = Object.entries(groupBy(detailsAdjustement, i => i.group));
-  // Auto denoise asks the shot's ISO how noisy the sensor was, so what gates it
-  // is having that ISO — not the file being RAW. A JPEG carries it in its EXIF
-  // just as well, and the denoise pass is the same shader either way; what
-  // changes for an already-developed file is the dose, inside the mapping.
+  // Auto denoise has two sources to work from: the shot's ISO (how noisy the
+  // sensor should have been) and the noise measured from the pixels at load
+  // time (how noisy the image actually is). Either one is enough — a JPEG
+  // carries an ISO in its EXIF just as well as a RAW, and a file with no ISO
+  // at all can still be measured. It is only when *neither* is available that
+  // the button has nothing to propose.
   const iso = image?.metadata?.iso_speed ?? 0;
-  const canAutoDenoise = iso > 0;
+  const canAutoDenoise = iso > 0 || image?.noise != null;
 
   /**
    * Restores one slider to its default, for the click-the-label reset.
@@ -49,7 +51,14 @@ export function AdjustmentsPanel() {
   };
 
   /**
-   * Fills the three noise sliders from the shot's ISO.
+   * Fills the three noise sliders from the measured noise and the ISO.
+   *
+   * When the image was measured at load, that measurement is the primary input:
+   * it knows what the camera did between the sensor and the file, which the ISO
+   * alone cannot. The ISO still shapes the result (a low ISO keeps the prior's
+   * conservative dose, so fine texture is not mistaken for noise) — see
+   * `denoiseSlidersFromNoise`. Without a measurement it falls back to the pure
+   * ISO mapping.
    *
    * It writes the sliders rather than flipping a hidden "auto" flag, so the
    * result stays visible and draggable, and the single `commit()` at the end
@@ -60,7 +69,10 @@ export function AdjustmentsPanel() {
    */
   const applyAutoDenoise = () => {
     if (!image || !canAutoDenoise) return;
-    const auto = autoDenoiseSliders(iso, image.source);
+    const auto =
+      image.noise != null
+        ? denoiseSlidersFromNoise(image.noise, iso, image.source)
+        : autoDenoiseSliders(iso, image.source);
     setAdjustment('colorNoise', auto.colorNoise);
     setAdjustment('luminanceNoise', auto.luminanceNoise);
     setAdjustment('luminanceDetail', auto.luminanceDetail);
@@ -161,7 +173,7 @@ export function AdjustmentsPanel() {
                   // way it stays focusable and hoverable — announced as unavailable,
                   // able to say so — with `data-disabled` doing the greying out and
                   // `applyAutoDenoise` refusing to act.
-                  <Tooltip key={option.key} label={t('lateralNavBar.noIso')} disabled={canAutoDenoise}>
+                  <Tooltip key={option.key} label={t('lateralNavBar.noAutoDenoise')} disabled={canAutoDenoise}>
                     <Button
                       data-disabled={!canAutoDenoise || undefined}
                       aria-disabled={!canAutoDenoise}

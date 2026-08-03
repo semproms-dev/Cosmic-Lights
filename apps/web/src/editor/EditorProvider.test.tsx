@@ -125,3 +125,59 @@ describe('EditorProvider · duplicateMask', () => {
     expect(result.current.masks).toHaveLength(MAX_MASKS)
   })
 })
+
+describe('EditorProvider · commitToken', () => {
+  it('keeps the same identity until something is committed', () => {
+    // Canvas compares this by reference to tell "the gesture ended" from "the
+    // user is still dragging". A token that changed on every render would make
+    // the quality denoise restart on every frame.
+    const { result, rerender } = renderEditor()
+    const initial = result.current.commitToken
+    rerender()
+    expect(result.current.commitToken).toBe(initial)
+
+    act(() => {
+      result.current.setAdjustment('luminanceNoise', 40)
+    })
+    // Mid-gesture: the value has changed but nothing has been committed yet.
+    expect(result.current.commitToken).toBe(initial)
+  })
+
+  it('changes identity when a gesture ends', () => {
+    const { result } = renderEditor()
+    const initial = result.current.commitToken
+    act(() => {
+      result.current.setAdjustment('luminanceNoise', 40)
+      result.current.commit()
+    })
+    expect(result.current.commitToken).not.toBe(initial)
+  })
+
+  it('does not move for a commit that changed nothing', () => {
+    // Committing is safe to over-call, and over-calling it must not kick off a
+    // second's worth of GPU work for a picture that is already on screen.
+    const { result } = renderEditor()
+    act(() => {
+      result.current.setAdjustment('luminanceNoise', 40)
+      result.current.commit()
+    })
+    const committed = result.current.commitToken
+    act(() => {
+      result.current.commit()
+    })
+    expect(result.current.commitToken).toBe(committed)
+  })
+
+  it('moves on undo, which is also a settled state worth refining', () => {
+    const { result } = renderEditor()
+    act(() => {
+      result.current.setAdjustment('luminanceNoise', 40)
+      result.current.commit()
+    })
+    const committed = result.current.commitToken
+    act(() => {
+      result.current.undo()
+    })
+    expect(result.current.commitToken).not.toBe(committed)
+  })
+})

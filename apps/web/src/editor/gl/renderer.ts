@@ -1,4 +1,4 @@
-import { createProgram, createRenderTarget, deleteRenderTarget } from './glContext'
+import { createProgram, createRenderTarget, deleteRenderTarget, supportsHalfFloatTargets } from './glContext'
 import type { RenderTarget } from './glContext'
 import {
   BLUR_FRAGMENT_SHADER,
@@ -6,9 +6,14 @@ import {
   BRUSH_VERTEX_SHADER,
   AMOUNT_MAP_FRAGMENT_SHADER,
   AMOUNT_MAP_RANGE,
+  PYRAMID_MERGE_FRAGMENT_SHADER,
   CLARITY_FRAGMENT_SHADER,
   DENOISE_FRAGMENT_SHADER,
+  DOWNSAMPLE_FRAGMENT_SHADER,
   FRAGMENT_SHADER,
+  NLM_ACCUMULATE_FRAGMENT_SHADER,
+  NLM_DISTANCE_FRAGMENT_SHADER,
+  NLM_RESOLVE_FRAGMENT_SHADER,
   GRADIENT_FRAGMENT_SHADER,
   GRADIENT_VERTEX_SHADER,
   MASK_FRAGMENT_SHADER,
@@ -16,7 +21,24 @@ import {
   VERTEX_SHADER,
 } from './shaders'
 import type { CropRegion } from '../image'
-import { CHROMA_EDGE_SIGMA, denoiseParams, type DenoiseParams } from '../noise'
+import {
+  CHROMA_EDGE_SIGMA,
+  COLOR_PYRAMID_MAX_LEVELS,
+  COLOR_PYRAMID_RADIUS,
+  denoiseParams,
+  lumaShapeCurve,
+  pyramidSize,
+  type DenoiseParams,
+} from '../noise'
+import type { NoiseEstimate } from '../noiseEstimate'
+import {
+  NLM_PYRAMID_LEVELS,
+  NLM_SEARCH_RADIUS,
+  nlmChunkSize,
+  nlmLevelSigma,
+  nlmOffsets,
+  nlmParams,
+} from '../nlm'
 import { IDENTITY_ORIENTATION, uvTransform, type Orientation } from '../rotation'
 import { MASK_TONE_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint, type RadialShape } from '../masks'
 import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
@@ -98,6 +120,41 @@ export interface RenderAdjustments {
   /** Grain roughness in [0, 100]; how clumped the grain is (0 = even). */
   grainRoughness: number
 }
+
+/**
+ * Smallest side a chroma pyramid level may have before it stops being built.
+ *
+ * Below roughly this, a level is narrower than the blur that would run on it:
+ * every tap clamps to the same few edge texels, so the pass costs its full price
+ * and returns something between "nothing" and "the average of the image". The
+ * levels are dropped instead, and a small enough thumbnail simply runs the
+ * full-resolution pass alone.
+ */
+const MIN_PYRAMID_SIZE = 2 * COLOR_PYRAMID_RADIUS
+
+/**
+ * How hard the denoise is allowed to work.
+ *
+ * `preview` is the separable bilateral: cheap enough to keep up with a dragging
+ * slider, and limited by what a per-pixel comparison can tell about noise.
+ * `quality` swaps the luminance half for non-local means, which removes far more
+ * noise for far more work — the trade a desktop raw developer makes when its
+ * denoise takes a few seconds. The chroma half is the same either way; it is
+ * already as good as it needs to be, and it is not what costs.
+ *
+ * The caller decides when each is appropriate: the editor shows `preview` while
+ * a control is moving and promotes to `quality` once it settles, and the export
+ * never uses anything but `quality`.
+ */
+export type DenoiseQuality = 'preview' | 'quality'
+
+/** The candidate neighbours the quality pass searches, built once. */
+const NLM_OFFSETS = nlmOffsets(NLM_SEARCH_RADIUS)
+
+/** Channel mask for the colour pyramid: correct Cb and Cr, never brightness. */
+const CHROMA_CHANNELS = [0, 1, 1] as const
+/** Channel mask for the luminance pyramid: correct Y, never colour. */
+const LUMA_CHANNELS = [1, 0, 0] as const
 
 /**
  * Owns the WebGL2 resources for the editor pipeline: the program, the geometry
@@ -195,6 +252,52 @@ export class WebGLRenderer {
   private readonly uDenoiseLumaSigmaRange: WebGLUniformLocation | null
   private readonly uDenoiseDetail: WebGLUniformLocation | null
   private readonly uDenoiseFinal: WebGLUniformLocation | null
+  private readonly uDenoiseLumaShape: WebGLUniformLocation | null
+
+  // Fifth and sixth programs: the chroma pyramid's two halves — shrink a level,
+  // and fold a cleaned level back into the one above it.
+  private readonly downsampleProgram: WebGLProgram
+  private readonly uDownsampleScale: WebGLUniformLocation | null
+  private readonly uDownsampleFlipV: WebGLUniformLocation | null
+  private readonly uDownsampleSource: WebGLUniformLocation | null
+  private readonly uDownsampleTexel: WebGLUniformLocation | null
+
+  private readonly mergeProgram: WebGLProgram
+  private readonly uMergeScale: WebGLUniformLocation | null
+  private readonly uMergeFlipV: WebGLUniformLocation | null
+  private readonly uMergeFine: WebGLUniformLocation | null
+  private readonly uMergeCoarseClean: WebGLUniformLocation | null
+  private readonly uMergeCoarseNoisy: WebGLUniformLocation | null
+  private readonly uMergeChannels: WebGLUniformLocation | null
+
+  // The quality pass: non-local means over luminance, in three programs — one
+  // candidate's half-distance, its weighted contribution, and the final divide.
+  private readonly nlmDistanceProgram: WebGLProgram
+  private readonly uNlmDistScale: WebGLUniformLocation | null
+  private readonly uNlmDistFlipV: WebGLUniformLocation | null
+  private readonly uNlmDistSource: WebGLUniformLocation | null
+  private readonly uNlmDistShift: WebGLUniformLocation | null
+  private readonly uNlmDistTexel: WebGLUniformLocation | null
+
+  private readonly nlmAccumulateProgram: WebGLProgram
+  private readonly uNlmAccScale: WebGLUniformLocation | null
+  private readonly uNlmAccFlipV: WebGLUniformLocation | null
+  private readonly uNlmAccDistance: WebGLUniformLocation | null
+  private readonly uNlmAccSource: WebGLUniformLocation | null
+  private readonly uNlmAccAccum: WebGLUniformLocation | null
+  private readonly uNlmAccShift: WebGLUniformLocation | null
+  private readonly uNlmAccTexel: WebGLUniformLocation | null
+  private readonly uNlmAccSigma: WebGLUniformLocation | null
+  private readonly uNlmAccH: WebGLUniformLocation | null
+  private readonly uNlmAccLumaShape: WebGLUniformLocation | null
+
+  private readonly nlmResolveProgram: WebGLProgram
+  private readonly uNlmResScale: WebGLUniformLocation | null
+  private readonly uNlmResFlipV: WebGLUniformLocation | null
+  private readonly uNlmResAccum: WebGLUniformLocation | null
+  private readonly uNlmResChroma: WebGLUniformLocation | null
+  private readonly uNlmResOriginal: WebGLUniformLocation | null
+  private readonly uNlmResDetail: WebGLUniformLocation | null
 
   // Fifth program: the per-mask local-adjustment pass. Reads the current
   // developed image + a mask's alpha and blends the mask's tone/colour delta
@@ -284,6 +387,37 @@ export class WebGLRenderer {
   // driven by any other control. Cleared in `uploadImage` — a new image is the
   // one input to the pass that the key itself does not describe.
   private denoiseKey: string | null = null
+  // How this image's luma noise is spread across brightness, from the estimate
+  // taken at decode time. A property of the PIXELS, not of the sliders — which is
+  // why it arrives through uploadImage and stays out of `denoiseKey`: it can only
+  // change when the image does, and that already clears the key.
+  private lumaShape: number[] = lumaShapeCurve(null)
+  // The chroma pyramid, coarsest last. Each level owns the downsample of the
+  // level above (`down`) plus two scratch targets: `a` takes the horizontal
+  // denoise pass and is then recycled for the merge, `b` takes the vertical one.
+  private pyramid: { down: RenderTarget; a: RenderTarget; b: RenderTarget }[] = []
+  // How hard the denoise may work; see DenoiseQuality. Part of `denoiseKey`, so
+  // promoting a frame to quality re-runs the pass and demoting it back reuses
+  // nothing — which is correct, they are different pictures.
+  private denoiseQuality: DenoiseQuality = 'preview'
+  // Non-local means scratch, allocated on first use rather than with the image:
+  // these are full-resolution and most sessions never ask for a quality pass at
+  // all (thumbnails never do). `nlmDistance` holds one candidate's half-finished
+  // patch distance; the two accumulators ping-pong the running totals.
+  private nlmDistance: RenderTarget | null = null
+  private nlmAccumA: RenderTarget | null = null
+  private nlmAccumB: RenderTarget | null = null
+  // The same three again per pyramid level, so the identical filter can run at
+  // every scale. This is what reaches the slow mottle a full-resolution search
+  // cannot see, however wide it is made.
+  private nlmLevels: { distance: RenderTarget; accumA: RenderTarget; accumB: RenderTarget }[] = []
+  // A quality pass in flight, spread over frames. `key` is the denoise key it is
+  // computing, so a slider moved mid-flight abandons it rather than finishing a
+  // picture nobody asked for any more; `index` is the next candidate to process.
+  private nlmJob: { key: string; index: number; read: RenderTarget; write: RenderTarget } | null = null
+  // False makes the quality pass finish inside a single render() — what the
+  // export needs, since it renders once and reads the pixels straight back.
+  private progressiveDenoise = true
 
   private imageWidth = 0
   private imageHeight = 0
@@ -420,6 +554,50 @@ export class WebGLRenderer {
     this.uDenoiseLumaSigmaRange = gl.getUniformLocation(this.denoiseProgram, 'uLumaSigmaRange')
     this.uDenoiseDetail = gl.getUniformLocation(this.denoiseProgram, 'uDetail')
     this.uDenoiseFinal = gl.getUniformLocation(this.denoiseProgram, 'uFinal')
+    // Arrays are addressed by their first element's location; uniform1fv fills
+    // the rest from there.
+    this.uDenoiseLumaShape = gl.getUniformLocation(this.denoiseProgram, 'uLumaShape[0]')
+
+    this.downsampleProgram = createProgram(gl, VERTEX_SHADER, DOWNSAMPLE_FRAGMENT_SHADER)
+    this.uDownsampleScale = gl.getUniformLocation(this.downsampleProgram, 'uScale')
+    this.uDownsampleFlipV = gl.getUniformLocation(this.downsampleProgram, 'uFlipV')
+    this.uDownsampleSource = gl.getUniformLocation(this.downsampleProgram, 'uSource')
+    this.uDownsampleTexel = gl.getUniformLocation(this.downsampleProgram, 'uSourceTexel')
+
+    this.mergeProgram = createProgram(gl, VERTEX_SHADER, PYRAMID_MERGE_FRAGMENT_SHADER)
+    this.uMergeScale = gl.getUniformLocation(this.mergeProgram, 'uScale')
+    this.uMergeFlipV = gl.getUniformLocation(this.mergeProgram, 'uFlipV')
+    this.uMergeFine = gl.getUniformLocation(this.mergeProgram, 'uFine')
+    this.uMergeCoarseClean = gl.getUniformLocation(this.mergeProgram, 'uCoarseClean')
+    this.uMergeCoarseNoisy = gl.getUniformLocation(this.mergeProgram, 'uCoarseNoisy')
+    this.uMergeChannels = gl.getUniformLocation(this.mergeProgram, 'uChannels')
+
+    this.nlmDistanceProgram = createProgram(gl, VERTEX_SHADER, NLM_DISTANCE_FRAGMENT_SHADER)
+    this.uNlmDistScale = gl.getUniformLocation(this.nlmDistanceProgram, 'uScale')
+    this.uNlmDistFlipV = gl.getUniformLocation(this.nlmDistanceProgram, 'uFlipV')
+    this.uNlmDistSource = gl.getUniformLocation(this.nlmDistanceProgram, 'uSource')
+    this.uNlmDistShift = gl.getUniformLocation(this.nlmDistanceProgram, 'uShift')
+    this.uNlmDistTexel = gl.getUniformLocation(this.nlmDistanceProgram, 'uTexel')
+
+    this.nlmAccumulateProgram = createProgram(gl, VERTEX_SHADER, NLM_ACCUMULATE_FRAGMENT_SHADER)
+    this.uNlmAccScale = gl.getUniformLocation(this.nlmAccumulateProgram, 'uScale')
+    this.uNlmAccFlipV = gl.getUniformLocation(this.nlmAccumulateProgram, 'uFlipV')
+    this.uNlmAccDistance = gl.getUniformLocation(this.nlmAccumulateProgram, 'uDistance')
+    this.uNlmAccSource = gl.getUniformLocation(this.nlmAccumulateProgram, 'uSource')
+    this.uNlmAccAccum = gl.getUniformLocation(this.nlmAccumulateProgram, 'uAccum')
+    this.uNlmAccShift = gl.getUniformLocation(this.nlmAccumulateProgram, 'uShift')
+    this.uNlmAccTexel = gl.getUniformLocation(this.nlmAccumulateProgram, 'uTexel')
+    this.uNlmAccSigma = gl.getUniformLocation(this.nlmAccumulateProgram, 'uSigma')
+    this.uNlmAccH = gl.getUniformLocation(this.nlmAccumulateProgram, 'uH')
+    this.uNlmAccLumaShape = gl.getUniformLocation(this.nlmAccumulateProgram, 'uLumaShape[0]')
+
+    this.nlmResolveProgram = createProgram(gl, VERTEX_SHADER, NLM_RESOLVE_FRAGMENT_SHADER)
+    this.uNlmResScale = gl.getUniformLocation(this.nlmResolveProgram, 'uScale')
+    this.uNlmResFlipV = gl.getUniformLocation(this.nlmResolveProgram, 'uFlipV')
+    this.uNlmResAccum = gl.getUniformLocation(this.nlmResolveProgram, 'uAccum')
+    this.uNlmResChroma = gl.getUniformLocation(this.nlmResolveProgram, 'uChroma')
+    this.uNlmResOriginal = gl.getUniformLocation(this.nlmResolveProgram, 'uOriginal')
+    this.uNlmResDetail = gl.getUniformLocation(this.nlmResolveProgram, 'uDetail')
 
     this.maskProgram = createProgram(gl, VERTEX_SHADER, MASK_FRAGMENT_SHADER)
     this.uMaskScale = gl.getUniformLocation(this.maskProgram, 'uScale')
@@ -469,8 +647,14 @@ export class WebGLRenderer {
    * itself changes, not on every adjustment.
    *
    * @param bitmap - The decoded frame to draw.
+   * @param noise - The frame's measured noise, from `decodeImage`. Only its
+   *   brightness curve is read here — the σs themselves drive the Auto button in
+   *   the React layer, not the renderer. Omit it (or pass `null`) for a frame
+   *   with no measurement, such as a preset thumbnail rendered from a downscaled
+   *   copy, whose noise has already been averaged away by the downscale and would
+   *   measure as a lie.
    */
-  uploadImage(bitmap: ImageBitmap): void {
+  uploadImage(bitmap: ImageBitmap, noise?: NoiseEstimate | null): void {
     const gl = this.gl
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     // Flip vertically on upload so texture V=1 is the image's top row. With this
@@ -506,6 +690,9 @@ export class WebGLRenderer {
     }
     this.amountMap = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.denoised = createRenderTarget(gl, bitmap.width, bitmap.height)
+    this.lumaShape = lumaShapeCurve(noise)
+    this.buildPyramid(bitmap.width, bitmap.height)
+    this.disposeNlm()
     // The cached denoise belongs to the previous image; the sliders may not have
     // moved, but the pixels underneath them have.
     this.denoiseKey = null
@@ -696,7 +883,581 @@ export class WebGLRenderer {
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.uniform1i(this.uDenoiseOriginal, 1)
+    gl.uniform1fv(this.uDenoiseLumaShape, this.lumaShape)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+  }
+
+  /**
+   * Allocates the chroma pyramid for an image of this size, replacing whatever
+   * the previous image left behind.
+   *
+   * Stops early once a level would fall below {@link MIN_PYRAMID_SIZE}, so the
+   * number of levels is a property of the image rather than a constant — a
+   * 4000px frame gets both, a 200px one gets neither, and the render path asks
+   * how many it actually got rather than assuming.
+   *
+   * The targets are asked for half-float storage. This is the one place in the
+   * pipeline that computes a *difference* of two rendered images, and 8 bits
+   * quantise it hard enough to band a clear sky; the extension is optional and
+   * `createRenderTarget` falls back on its own. The cost is negligible either
+   * way: every level together is under a third of one full-resolution target.
+   *
+   * @param width - Full-resolution image width.
+   * @param height - Full-resolution image height.
+   */
+  private buildPyramid(width: number, height: number): void {
+    const gl = this.gl
+    this.disposePyramid()
+    for (let level = 1; level <= COLOR_PYRAMID_MAX_LEVELS; level++) {
+      const levelWidth = pyramidSize(width, level)
+      const levelHeight = pyramidSize(height, level)
+      if (levelWidth < MIN_PYRAMID_SIZE || levelHeight < MIN_PYRAMID_SIZE) {
+        break
+      }
+      this.pyramid.push({
+        down: createRenderTarget(gl, levelWidth, levelHeight, { format: 'rgba16f' }),
+        a: createRenderTarget(gl, levelWidth, levelHeight, { format: 'rgba16f' }),
+        b: createRenderTarget(gl, levelWidth, levelHeight, { format: 'rgba16f' }),
+      })
+    }
+  }
+
+  /** Frees every chroma pyramid target and empties the list. */
+  private disposePyramid(): void {
+    const gl = this.gl
+    for (const level of this.pyramid) {
+      deleteRenderTarget(gl, level.down)
+      deleteRenderTarget(gl, level.a)
+      deleteRenderTarget(gl, level.b)
+    }
+    this.pyramid = []
+  }
+
+  /**
+   * Shrinks `sourceTexture` to a quarter of its size on each axis, into `target`.
+   *
+   * @param sourceTexture - The texture to shrink.
+   * @param sourceWidth - Its width, which sets the tap offsets.
+   * @param sourceHeight - Its height.
+   * @param target - The quarter-sized render target to fill.
+   */
+  private downsample(
+    sourceTexture: WebGLTexture,
+    sourceWidth: number,
+    sourceHeight: number,
+    target: RenderTarget,
+  ): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    gl.useProgram(this.downsampleProgram)
+    gl.uniform2f(this.uDownsampleScale, 1, 1)
+    gl.uniform1f(this.uDownsampleFlipV, 0) // identity mapping, as in denoise1D
+    gl.uniform2f(this.uDownsampleTexel, 1 / sourceWidth, 1 / sourceHeight)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, sourceTexture)
+    gl.uniform1i(this.uDownsampleSource, 0)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+  }
+
+  /**
+   * Folds a cleaned coarse level back into a finer image, on the chosen channels.
+   *
+   * @param fine - The finer image; everything `channels` does not select, and
+   *   everything finer than the coarse level, survives intact.
+   * @param coarseClean - The level below, after its own denoise.
+   * @param coarseNoisy - The same level before it, so the difference of the two
+   *   is exactly what that denoise removed.
+   * @param target - Where to write, at `fine`'s resolution.
+   * @param channels - Which of (Y, Cb, Cr) the correction applies to.
+   */
+  private mergePyramid(
+    fine: RenderTarget,
+    coarseClean: RenderTarget,
+    coarseNoisy: RenderTarget,
+    target: RenderTarget,
+    channels: readonly [number, number, number],
+  ): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    gl.useProgram(this.mergeProgram)
+    gl.uniform2f(this.uMergeScale, 1, 1)
+    gl.uniform1f(this.uMergeFlipV, 0) // identity mapping, as in denoise1D
+    gl.uniform3f(this.uMergeChannels, channels[0], channels[1], channels[2])
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, fine.texture)
+    gl.uniform1i(this.uMergeFine, 0)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, coarseClean.texture)
+    gl.uniform1i(this.uMergeCoarseClean, 1)
+    gl.activeTexture(gl.TEXTURE2)
+    gl.bindTexture(gl.TEXTURE_2D, coarseNoisy.texture)
+    gl.uniform1i(this.uMergeCoarseNoisy, 2)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+  }
+
+  /**
+   * Cleans the chroma the full-resolution pass cannot reach, and writes the
+   * finished frame into `target`.
+   *
+   * Colour noise is not one problem but two at different scales. The speckle
+   * between neighbouring pixels dies to a 16-texel blur; what survives it is
+   * *mottle* — slow blotches tens of pixels wide, the kind that turns an
+   * out-of-focus background into a colour rash. No practical radius at full
+   * resolution reaches those, so the image is shrunk until they become speckle
+   * again, cleaned there for almost nothing, and the correction lifted back.
+   *
+   * Runs coarsest-first so each level is denoised, corrected by the one below
+   * it, and only then used to correct the one above — the corrections compose
+   * instead of competing.
+   *
+   * @param fine - The full-resolution result of the ordinary denoise passes.
+   * @param target - Where the finished frame goes; must be `fine`'s size and a
+   *   different target.
+   * @param levels - How many pyramid levels to use, already capped to the number
+   *   allocated.
+   * @param params - The frame's denoise parameters, for the edge guard.
+   */
+  private refineChroma(fine: RenderTarget, target: RenderTarget, levels: number, params: DenoiseParams): void {
+    // Chroma only: luma has had its bilateral at full resolution, where its
+    // detail lives, and re-filtering it here — at a quarter of the size, where
+    // one texel is 16 pixels of the photo — is how a face turns to wax.
+    const coarse: DenoiseParams = {
+      ...params,
+      colorRadius: COLOR_PYRAMID_RADIUS,
+      lumaRadius: 0,
+      detail: 0,
+      maxRadius: COLOR_PYRAMID_RADIUS,
+    }
+
+    let source = fine
+    for (let level = 0; level < levels; level++) {
+      this.downsample(source.texture, source.width, source.height, this.pyramid[level].down)
+      source = this.pyramid[level].down
+    }
+
+    // `clean` is the finished, corrected level below the one being handled.
+    let clean: RenderTarget | null = null
+    for (let level = levels - 1; level >= 0; level--) {
+      const { down, a, b } = this.pyramid[level]
+      this.denoise1D(down.texture, a, 1 / down.width, 0, coarse, false)
+      this.denoise1D(a.texture, b, 0, 1 / down.height, coarse, false)
+      if (clean === null) {
+        clean = b
+      } else {
+        // `a` held the horizontal scratch, which is spent — so the merge lands
+        // there rather than in a fourth target per level.
+        this.mergePyramid(b, clean, this.pyramid[level + 1].down, a, CHROMA_CHANNELS)
+        clean = a
+      }
+    }
+
+    if (clean !== null) {
+      this.mergePyramid(fine, clean, this.pyramid[0].down, target, CHROMA_CHANNELS)
+    }
+  }
+
+  /**
+   * Chooses how hard the denoise may work from here on; see {@link DenoiseQuality}.
+   *
+   * Takes effect on the next {@link render}, and only re-runs the filter if the
+   * level actually changed — the level is part of the pass's cache key, so
+   * setting the same value twice costs nothing.
+   *
+   * @param quality - `preview` for the interactive filter, `quality` for
+   *   non-local means. A `quality` request silently stays on `preview` when the
+   *   context cannot render to half-float targets, since the accumulator needs a
+   *   range 8 bits cannot hold.
+   * @param progressive - Whether the quality pass may spread itself over several
+   *   {@link render} calls, refining what is on screen as it goes. True for an
+   *   interactive canvas; **false for anything that renders once and then reads
+   *   the pixels**, such as the export, which would otherwise capture a frame
+   *   holding only the first slice of the work.
+   */
+  setDenoiseQuality(quality: DenoiseQuality, progressive = true): void {
+    this.denoiseQuality = quality
+    this.progressiveDenoise = progressive
+  }
+
+  /**
+   * Whether a quality pass is part-way through and needs more {@link render}
+   * calls to finish.
+   *
+   * The host is expected to keep scheduling frames while this is true. Nothing
+   * is wrong in the meantime — the canvas is showing the interactive filter's
+   * result, which is a perfectly good picture; it is simply not the best one yet.
+   *
+   * @returns True while there is queued denoise work left.
+   */
+  isDenoisePending(): boolean {
+    return this.nlmJob !== null
+  }
+
+  /**
+   * Allocates the non-local means scratch, if it is not already there and the
+   * context can hold it.
+   *
+   * @returns True when the quality pass has somewhere to work.
+   */
+  private ensureNlmTargets(): boolean {
+    // The accumulator sums dozens of weights and dozens of weighted luminances,
+    // which leaves the 0..1 range an 8-bit target would clamp to. Without the
+    // float attachment there is no correct fallback, only a wrong picture — so
+    // the pass declines to run and the caller keeps the bilateral.
+    if (!supportsHalfFloatTargets(this.gl)) {
+      return false
+    }
+    if (this.nlmDistance !== null && this.nlmDistance.width === this.imageWidth) {
+      return true
+    }
+    this.disposeNlm()
+    const gl = this.gl
+    const { imageWidth: width, imageHeight: height } = this
+    // One channel for the distance, two for the totals: at full resolution the
+    // difference between this and three RGBA16F buffers is hundreds of megabytes
+    // on a big frame.
+    this.nlmDistance = createRenderTarget(gl, width, height, { format: 'r16f' })
+    this.nlmAccumA = createRenderTarget(gl, width, height, { format: 'rg16f' })
+    this.nlmAccumB = createRenderTarget(gl, width, height, { format: 'rg16f' })
+    // The same three per pyramid level, for the luminance pyramid. They cost
+    // essentially nothing — a sixteenth and a two-hundred-and-fifty-sixth of the
+    // above — and they are what lets one filter run at every scale.
+    this.nlmLevels = this.pyramid.map((level) => ({
+      distance: createRenderTarget(gl, level.down.width, level.down.height, { format: 'r16f' }),
+      accumA: createRenderTarget(gl, level.down.width, level.down.height, { format: 'rg16f' }),
+      accumB: createRenderTarget(gl, level.down.width, level.down.height, { format: 'rg16f' }),
+    }))
+    return true
+  }
+
+  /** Frees the non-local means scratch, at every scale. */
+  private disposeNlm(): void {
+    const gl = this.gl
+    for (const level of this.nlmLevels) {
+      deleteRenderTarget(gl, level.distance)
+      deleteRenderTarget(gl, level.accumA)
+      deleteRenderTarget(gl, level.accumB)
+    }
+    this.nlmLevels = []
+    for (const target of [this.nlmDistance, this.nlmAccumA, this.nlmAccumB]) {
+      if (target !== null) {
+        deleteRenderTarget(gl, target)
+      }
+    }
+    this.nlmDistance = null
+    this.nlmAccumA = null
+    this.nlmAccumB = null
+  }
+
+  /**
+   * Accumulates every candidate's weighted vote for one image, at whatever
+   * resolution that image happens to be.
+   *
+   * One candidate at a time: measure how alike its neighbourhood is, weigh it by
+   * that, add it to the running totals. Resolution-agnostic on purpose — the
+   * pyramid runs this exact filter on a quarter-sized copy, which is the only way
+   * to reach noise slower than the search window.
+   *
+   * @param source - The image to filter.
+   * @param scratch - Distance buffer and the two ping-ponged accumulators, all
+   *   at `source`'s resolution.
+   * @param sigma - The noise σ to assume at this scale.
+   * @param h - Filter strength, as a multiple of σ.
+   * @returns Whichever accumulator ended up holding the totals.
+   */
+  private accumulateNlm(
+    source: RenderTarget | { texture: WebGLTexture; width: number; height: number },
+    scratch: { distance: RenderTarget; accumA: RenderTarget; accumB: RenderTarget },
+    sigma: number,
+    h: number,
+  ): RenderTarget {
+    const state = { index: 0, read: scratch.accumA, write: scratch.accumB }
+    this.clearAccumulator(state.read)
+    this.accumulateChunk(source, scratch, sigma, h, state, NLM_OFFSETS.length)
+    return state.read
+  }
+
+  /** Empties an accumulator so a fresh run starts from zero totals. */
+  private clearAccumulator(accumulator: RenderTarget): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, accumulator.framebuffer)
+    gl.viewport(0, 0, accumulator.width, accumulator.height)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+  }
+
+  /**
+   * Runs up to `count` candidates of an accumulation, resuming from `state`.
+   *
+   * The unit of interruption is one candidate, because that is the smallest step
+   * that leaves the totals meaningful: its two passes must both have run, or the
+   * distance buffer holds one candidate's data while the accumulator has already
+   * counted it.
+   *
+   * @param source - The image being filtered.
+   * @param scratch - Distance buffer and the two accumulators, at `source`'s size.
+   * @param sigma - The noise σ to assume at this scale.
+   * @param h - Filter strength, as a multiple of σ.
+   * @param state - Where to resume from; advanced in place.
+   * @param count - How many candidates to process before returning.
+   */
+  private accumulateChunk(
+    source: RenderTarget | { texture: WebGLTexture; width: number; height: number },
+    scratch: { distance: RenderTarget; accumA: RenderTarget; accumB: RenderTarget },
+    sigma: number,
+    h: number,
+    state: { index: number; read: RenderTarget; write: RenderTarget },
+    count: number,
+  ): void {
+    const gl = this.gl
+    const { distance } = scratch
+    const stepX = 1 / source.width
+    const stepY = 1 / source.height
+    const last = Math.min(state.index + count, NLM_OFFSETS.length)
+
+    for (; state.index < last; state.index++) {
+      const { dx, dy } = NLM_OFFSETS[state.index]
+      const offsetX = dx * stepX
+      const offsetY = dy * stepY
+      const read = state.read
+      const write = state.write
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, distance.framebuffer)
+      gl.viewport(0, 0, distance.width, distance.height)
+      gl.useProgram(this.nlmDistanceProgram)
+      gl.uniform2f(this.uNlmDistScale, 1, 1)
+      gl.uniform1f(this.uNlmDistFlipV, 0) // identity mapping, as in denoise1D
+      gl.uniform2f(this.uNlmDistShift, offsetX, offsetY)
+      gl.uniform2f(this.uNlmDistTexel, stepX, stepY)
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, source.texture)
+      gl.uniform1i(this.uNlmDistSource, 0)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, write.framebuffer)
+      gl.viewport(0, 0, write.width, write.height)
+      gl.useProgram(this.nlmAccumulateProgram)
+      gl.uniform2f(this.uNlmAccScale, 1, 1)
+      gl.uniform1f(this.uNlmAccFlipV, 0)
+      gl.uniform2f(this.uNlmAccShift, offsetX, offsetY)
+      gl.uniform2f(this.uNlmAccTexel, stepX, stepY)
+      gl.uniform1f(this.uNlmAccSigma, sigma)
+      gl.uniform1f(this.uNlmAccH, h)
+      gl.uniform1fv(this.uNlmAccLumaShape, this.lumaShape)
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, distance.texture)
+      gl.uniform1i(this.uNlmAccDistance, 0)
+      gl.activeTexture(gl.TEXTURE1)
+      gl.bindTexture(gl.TEXTURE_2D, source.texture)
+      gl.uniform1i(this.uNlmAccSource, 1)
+      gl.activeTexture(gl.TEXTURE2)
+      gl.bindTexture(gl.TEXTURE_2D, read.texture)
+      gl.uniform1i(this.uNlmAccAccum, 2)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+      state.read = write
+      state.write = read
+    }
+  }
+
+  /**
+   * Divides the accumulated totals and rebuilds a picture from them.
+   *
+   * @param accum - The totals, from {@link accumulateNlm}.
+   * @param chromaTexture - Where the colour comes from; its luminance is ignored.
+   * @param originalTexture - The unfiltered luminance, for the detail mix.
+   * @param detail - How much of that original luminance to mix back, 0..1.
+   * @param target - Where the finished image goes.
+   */
+  private resolveNlm(
+    accum: RenderTarget,
+    chromaTexture: WebGLTexture,
+    originalTexture: WebGLTexture,
+    detail: number,
+    target: RenderTarget,
+  ): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
+    gl.useProgram(this.nlmResolveProgram)
+    gl.uniform2f(this.uNlmResScale, 1, 1)
+    gl.uniform1f(this.uNlmResFlipV, 0)
+    gl.uniform1f(this.uNlmResDetail, detail)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, accum.texture)
+    gl.uniform1i(this.uNlmResAccum, 0)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, chromaTexture)
+    gl.uniform1i(this.uNlmResChroma, 1)
+    gl.activeTexture(gl.TEXTURE2)
+    gl.bindTexture(gl.TEXTURE_2D, originalTexture)
+    gl.uniform1i(this.uNlmResOriginal, 2)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+  }
+
+  /**
+   * Runs the interactive filter — the separable bilateral plus the colour
+   * pyramid — into `target`.
+   *
+   * Also what the canvas shows while a quality pass is still being computed: a
+   * perfectly good picture, just not the best one available yet.
+   *
+   * @param noise - The frame's denoise parameters.
+   * @param levels - Colour pyramid levels to use.
+   * @param scratchH - Scratch for the horizontal pass.
+   * @param scratchV - Scratch for the vertical pass, used only with a pyramid.
+   * @param target - Where the finished frame goes.
+   */
+  private runPreviewDenoise(
+    noise: DenoiseParams,
+    levels: number,
+    scratchH: RenderTarget,
+    scratchV: RenderTarget,
+    target: RenderTarget,
+  ): void {
+    // With the pyramid on, the separable pair lands in the scratch and `target`
+    // receives the merged result instead.
+    const fine = levels > 0 ? scratchV : target
+    this.denoise1D(this.texture, scratchH, 1 / this.imageWidth, 0, noise, false)
+    this.denoise1D(scratchH.texture, fine, 0, 1 / this.imageHeight, noise, true)
+    if (levels > 0) {
+      this.refineChroma(fine, target, levels, noise)
+    }
+  }
+
+  /** Begins a quality pass for `key`, with empty totals and nothing done yet. */
+  private startNlmJob(key: string): void {
+    if (this.nlmAccumA === null || this.nlmAccumB === null) {
+      return
+    }
+    this.clearAccumulator(this.nlmAccumA)
+    this.nlmJob = { key, index: 0, read: this.nlmAccumA, write: this.nlmAccumB }
+  }
+
+  /**
+   * Advances the quality pass by one frame's worth of work, finishing it if that
+   * was the last of the candidates.
+   *
+   * Progress is measured in candidates rather than time, and the slice is sized
+   * from the image (see `nlmChunkSize`) so a 45 MP frame takes more frames
+   * instead of longer ones. Nothing is written to `target` until the very end:
+   * a half-accumulated total is not a dim picture, it is a wrong one, so the
+   * interactive result stays on screen until there is something better to
+   * replace it with.
+   *
+   * @param noise - The frame's denoise parameters.
+   * @param levels - Colour pyramid levels to use.
+   * @param scratchH - Scratch for the chroma horizontal pass, and for the
+   *   resolve output when the luminance pyramid runs.
+   * @param scratchChroma - Where the finished chroma lands.
+   * @param scratchV - Scratch for the chroma vertical pass, used with a pyramid.
+   * @param target - Where the finished frame goes, once there is one.
+   * @returns True when the pass is complete and `target` now holds it.
+   */
+  private advanceNlmJob(
+    noise: DenoiseParams,
+    levels: number,
+    scratchH: RenderTarget,
+    scratchChroma: RenderTarget,
+    scratchV: RenderTarget,
+    target: RenderTarget,
+  ): boolean {
+    const job = this.nlmJob
+    if (job === null || this.nlmDistance === null || this.nlmAccumA === null || this.nlmAccumB === null) {
+      return false
+    }
+    const nlm = nlmParams(noise)
+    const scratch = { distance: this.nlmDistance, accumA: this.nlmAccumA, accumB: this.nlmAccumB }
+    const source = { texture: this.texture, width: this.imageWidth, height: this.imageHeight }
+    const chunk = this.progressiveDenoise
+      ? nlmChunkSize(this.imageWidth, this.imageHeight)
+      : NLM_OFFSETS.length
+    this.accumulateChunk(source, scratch, nlm.sigma, nlm.h, job, chunk)
+    if (job.index < NLM_OFFSETS.length) {
+      return false
+    }
+
+    // Last candidate done: build the colour half and put the two together. The
+    // chroma passes are re-run here rather than kept from the frame the job
+    // started on, because the buffers they would have to live in are the same
+    // ones the clarity blurs rebuild every frame.
+    const chroma: DenoiseParams = { ...noise, lumaRadius: 0, detail: 0, maxRadius: noise.colorRadius }
+    let chromaTexture = this.texture
+    if (noise.colorRadius > 0) {
+      const fine = levels > 0 ? scratchV : scratchChroma
+      this.denoise1D(this.texture, scratchH, 1 / this.imageWidth, 0, chroma, false)
+      this.denoise1D(scratchH.texture, fine, 0, 1 / this.imageHeight, chroma, false)
+      if (levels > 0) {
+        this.refineChroma(fine, scratchChroma, levels, chroma)
+      }
+      chromaTexture = scratchChroma.texture
+    }
+    // The luminance pyramid reuses the colour one's targets, which are spent by
+    // now: its result is in `scratchChroma` and about to be consumed.
+    const lumaLevels = Math.min(NLM_PYRAMID_LEVELS, this.nlmLevels.length)
+    this.resolveNlm(job.read, chromaTexture, this.texture, nlm.detail, lumaLevels > 0 ? scratchH : target)
+    if (lumaLevels > 0) {
+      this.refineLuma(scratchH, target, lumaLevels, noise)
+    }
+    this.nlmJob = null
+    return true
+  }
+
+  /**
+   * Cleans the luminance noise the full-resolution pass is blind to.
+   *
+   * A search of radius R averages over R pixels, so noise slower than that is
+   * not weakly attenuated by it — it is invisible to it. On a smooth
+   * out-of-focus background that leftover reads as faint mottling, and it is
+   * *half* of everything the full-resolution pass leaves behind. Widening the
+   * search cannot fix it: doubling the radius doubles the reach and quadruples
+   * the cost, while the mottle is tens of pixels wide.
+   *
+   * Shrinking the picture fixes it. At a quarter size a 30-pixel blotch is 7
+   * pixels across — exactly what this filter is good at — so each level runs the
+   * same non-local means it always does, and only the *correction* comes back up.
+   *
+   * Coarsest-first, so each level is cleaned, corrected by the one below it, and
+   * only then used to correct the one above.
+   *
+   * @param fine - The full-resolution result of {@link runNlm}.
+   * @param target - Where the finished frame goes; must be `fine`'s size and a
+   *   different target.
+   * @param levels - How many pyramid levels to use, already capped to the number
+   *   allocated.
+   * @param params - The frame's denoise parameters.
+   */
+  private refineLuma(fine: RenderTarget, target: RenderTarget, levels: number, params: DenoiseParams): void {
+    const nlm = nlmParams(params)
+
+    let source: RenderTarget = fine
+    for (let level = 0; level < levels; level++) {
+      this.downsample(source.texture, source.width, source.height, this.pyramid[level].down)
+      source = this.pyramid[level].down
+    }
+
+    // `clean` is the finished, corrected level below the one being handled.
+    let clean: RenderTarget | null = null
+    for (let level = levels - 1; level >= 0; level--) {
+      const { down, a, b } = this.pyramid[level]
+      const totals = this.accumulateNlm(down, this.nlmLevels[level], nlmLevelSigma(nlm.sigma, level + 1), nlm.h)
+      // Colour comes straight from this level untouched: the colour pyramid has
+      // already had its turn, and a second correction would double it. Detail is
+      // 0 for the same reason — the mix back toward the original happens once,
+      // at full resolution, where the user can see what they are trading.
+      this.resolveNlm(totals, down.texture, down.texture, 0, b)
+      if (clean === null) {
+        clean = b
+      } else {
+        // `a` held the chroma pyramid's scratch, which is spent by now.
+        this.mergePyramid(b, clean, this.pyramid[level + 1].down, a, LUMA_CHANNELS)
+        clean = a
+      }
+    }
+
+    if (clean !== null) {
+      this.mergePyramid(fine, clean, this.pyramid[0].down, target, LUMA_CHANNELS)
+    }
   }
 
   /**
@@ -1027,14 +1788,39 @@ export class WebGLRenderer {
       // Only moving a noise slider (or loading an image, which clears the key)
       // re-runs the passes. Without this, every frame would pay for the widest
       // filter in the pipeline.
-      const key = `${noise.colorRadius}|${noise.lumaRadius}|${noise.lumaSigmaRange}|${noise.detail}`
+      // Non-local means only earns its cost on the luminance half, and only if
+      // the context can hold its accumulator — otherwise this stays the
+      // interactive filter and the picture is merely less clean, not wrong.
+      const quality =
+        this.denoiseQuality === 'quality' && nlmParams(noise).enabled && this.ensureNlmTargets()
+      const key = `${noise.colorRadius}|${noise.lumaRadius}|${noise.lumaSigmaRange}|${noise.detail}|${quality ? 'q' : 'p'}`
       if (this.denoiseKey !== key) {
         // blur1D and the pipeline pass bind the VAO themselves further down, but
         // this pass runs before either of them.
         gl.bindVertexArray(this.vao)
-        this.denoise1D(this.texture, blurA, 1 / this.imageWidth, 0, noise, false)
-        this.denoise1D(blurA.texture, denoised, 0, 1 / this.imageHeight, noise, true)
-        this.denoiseKey = key
+        // A small image may not have earned every level it asked for.
+        const levels = Math.min(noise.pyramidLevels, this.pyramid.length)
+        if (quality) {
+          if (this.nlmJob === null || this.nlmJob.key !== key) {
+            // Put the interactive filter's result up straight away, so the frame
+            // is never showing stale pixels while the slow one is computed. It is
+            // also the fallback if the job is abandoned half-way.
+            this.runPreviewDenoise(noise, levels, blurA, blurB, denoised)
+            this.startNlmJob(key)
+          }
+          // Only the last slice writes `denoised`; until then the key stays
+          // unset, which is what keeps the frames coming.
+          if (this.advanceNlmJob(noise, levels, blurA, blurB, blurC, denoised)) {
+            this.denoiseKey = key
+          }
+        } else {
+          // Any quality pass in flight was computing a picture for parameters
+          // that no longer apply. Dropping it costs the work already done, and
+          // finishing it would cost that plus the wrong answer.
+          this.nlmJob = null
+          this.runPreviewDenoise(noise, levels, blurA, blurB, denoised)
+          this.denoiseKey = key
+        }
       }
       pipelineSource = denoised.texture
     }
@@ -1270,6 +2056,8 @@ export class WebGLRenderer {
     if (this.amountMap !== null) {
       deleteRenderTarget(gl, this.amountMap)
     }
+    this.disposePyramid()
+    this.disposeNlm()
     this.disposeMaskTargets()
     gl.deleteTexture(this.texture)
     gl.deleteTexture(this.curveLut)
@@ -1279,6 +2067,11 @@ export class WebGLRenderer {
     gl.deleteProgram(this.clarityProgram)
     gl.deleteProgram(this.blurProgram)
     gl.deleteProgram(this.denoiseProgram)
+    gl.deleteProgram(this.downsampleProgram)
+    gl.deleteProgram(this.mergeProgram)
+    gl.deleteProgram(this.nlmDistanceProgram)
+    gl.deleteProgram(this.nlmAccumulateProgram)
+    gl.deleteProgram(this.nlmResolveProgram)
     gl.deleteProgram(this.maskProgram)
     gl.deleteProgram(this.amountProgram)
     gl.deleteProgram(this.brushProgram)

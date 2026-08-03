@@ -95,7 +95,15 @@ export function ExportPanel() {
     if (!gl) throw new Error('WebGL2 not available');
 
     const renderer = new WebGLRenderer(gl);
-    renderer.uploadImage(image.bitmap);
+    renderer.uploadImage(image.bitmap, image.noise);
+    // The export is never interactive, so it always gets the slow denoise. A
+    // file the user is going to keep should not carry the compromises the
+    // preview makes to stay at 60 fps.
+    //
+    // And it must NOT be spread over frames: this renders once and reads the
+    // pixels straight back, so a progressive pass would export the first slice
+    // of the work rather than the finished result.
+    renderer.setDenoiseQuality('quality', false);
     renderer.uploadCurves(compileCurveTexture(curves));
     renderer.setCrop(cropRegion, image.width, image.height);
     renderer.setOrientation(orientation);

@@ -80,7 +80,7 @@
     "grain": "Korn",
     "grainSize": "Größe",
     "grainRoughness": "Rauheit",
-    "noIso": "Die Datei enthält keinen ISO-Wert der Aufnahme",
+    "noAutoDenoise": "Die Datei enthält weder ISO-Wert noch messbares Rauschen",
     "denoiseButton": "Auto-Rauschunterdrückung",
     "gradeShadow": "Schatten",
     "gradeMid": "Mitteltöne",

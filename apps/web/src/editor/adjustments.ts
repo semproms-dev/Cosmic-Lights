@@ -143,10 +143,18 @@ export const detailsAdjustement: DetailOption[] = [
   // would silently restyle edits saved before the slider existed.
   { key: 'colorNoise', label: 'Color Noise', min: 0, max: 100, step: 1, defaultValue: 0, group: 'noise', type: 'slider' },
   { key: 'luminanceNoise', label: 'Luminance Noise', min: 0, max: 100, step: 1, defaultValue: 0, group: 'noise', type: 'slider' },
-  // Detail is the *shape* of the luminance filter, not its amount — like the
-  // grain's size and roughness. Hence a neutral value of 50 rather than 0: what
-  // turns the effect off is `luminanceNoise = 0`.
-  { key: 'luminanceDetail', label: 'Luminance Detail', min: 0, max: 100, step: 1, defaultValue: 50, group: 'noise', type: 'slider' },
+  // Detail is the *shape* of the luminance filter, not its amount — what turns
+  // the effect off is `luminanceNoise = 0`, not this.
+  //
+  // Neutral is 0, and that is not the obvious choice. The slider is a straight
+  // mix back toward the ORIGINAL luminance, so 50 does not mean "keep half the
+  // texture", it means **put half the noise back**: it caps any luminance
+  // denoiser at a 50% reduction no matter how good it is, which is precisely the
+  // ceiling that made the old bilateral look like it was doing nothing. Detail
+  // preservation belongs inside the filter — where the non-local means pass now
+  // does it, by comparing neighbourhoods rather than pixels — and this slider is
+  // what is left for a photo that wants some grit back on purpose.
+  { key: 'luminanceDetail', label: 'Luminance Detail', min: 0, max: 100, step: 1, defaultValue: 0, group: 'noise', type: 'slider' },
   { key: 'denoiseRemove', label: 'Auto denoise removal', step: 0, min: 0, max: 0, defaultValue: 0, group: 'noise', type: 'button' },
 ]
 

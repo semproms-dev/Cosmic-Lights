@@ -88,6 +88,16 @@ interface ObjectDrag {
 const OBJECT_DRAG_THRESHOLD = 6
 
 /**
+ * How long the noise sliders must sit still before the slow denoise runs (ms).
+ *
+ * Long enough to sit out the gap between two deliberate nudges of a slider —
+ * starting a pass the user is about to invalidate wastes a second of GPU and
+ * makes the app feel like it is fighting them — and short enough that letting go
+ * feels like it finished rather than like it forgot.
+ */
+const DENOISE_SETTLE_MS = 400
+
+/**
  * Central editor canvas. Renders the decoded image through the WebGL pipeline,
  * applying the live adjustments from the shared editor store. Redraws on image
  * change, adjustment change or resize, batching each into a single animation
@@ -120,6 +130,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     rotationSpin,
     resetOrientation,
     showOriginal,
+    commitToken,
   } = useEditor()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -187,7 +198,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     if (image === null) {
       return
     }
-    rendererRef.current?.uploadImage(image.bitmap)
+    rendererRef.current?.uploadImage(image.bitmap, image.noise)
   }, [image])
 
   // Recompile and upload the tone-curve LUTs only when the curves change. Runs
@@ -236,6 +247,13 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
         width,
         height,
       )
+      // The quality denoise hands back a slice of itself per frame rather than
+      // locking the tab for a second, so keep the frames coming until it is
+      // done. Each one shows the interactive filter's result; the last one swaps
+      // in the finished pass. `schedule` is idempotent, so this cannot stack up.
+      if (renderer.isDenoisePending()) {
+        schedule()
+      }
     }
     // Expose the latest draw so live brush painting can force a redraw (painting
     // changes no React state, so the effect alone wouldn't re-run).
@@ -259,6 +277,47 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     // `maskAlphas` is a stable ref-backed Map, so it never fires this effect on
     // its own: `masks` (via each mask's `version`) is what signals a new alpha.
   }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId, orientation, showOriginal])
+
+  // Promote the denoise to its slow, much better filter once the noise controls
+  // stop moving.
+  //
+  // Keyed on the noise sliders alone, and that is the whole design. The denoise
+  // depends on nothing else, and the renderer caches its result — so panning,
+  // zooming or moving any other slider keeps whatever quality pass was last
+  // computed instead of throwing it away and paying for it again. Only touching
+  // noise drops back to the interactive filter, and only until the user lets go.
+  const noiseSettings = `${adjustments.colorNoise}|${adjustments.luminanceNoise}|${adjustments.luminanceDetail}`
+  const lastCommit = useRef(commitToken)
+  useEffect(() => {
+    const renderer = rendererRef.current
+    if (renderer === null) {
+      return
+    }
+    // A commit means the gesture is over — the slider was released, or Auto was
+    // pressed, which has no gesture at all. There is no pause left to wait out,
+    // so skip straight to the good filter. This is most of the perceived wait
+    // after Auto: the pass itself takes about a second, and sitting out a
+    // debounce that exists for dragging added nearly half of that again.
+    const settled = commitToken !== lastCommit.current
+    lastCommit.current = commitToken
+    if (settled) {
+      renderer.setDenoiseQuality('quality')
+      return
+    }
+
+    // Mid-gesture: show the interactive filter and wait for the dragging to
+    // stop. The timer is the fallback for every path that changes these sliders
+    // without committing — a preset, a reset, an arrow key on a control that
+    // does not report gesture end.
+    renderer.setDenoiseQuality('preview')
+    const settle = window.setTimeout(() => {
+      rendererRef.current?.setDenoiseQuality('quality')
+      drawRef.current()
+    }, DENOISE_SETTLE_MS)
+    return () => {
+      window.clearTimeout(settle)
+    }
+  }, [noiseSettings, commitToken, image])
 
   // Zoom toward a point (in clip space, −1..1) by a scale factor, keeping the
   // content under that point fixed. Clip space matches the renderer's view

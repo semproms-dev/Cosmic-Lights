@@ -80,7 +80,7 @@
     "grain": "Grain",
     "grainSize": "Size",
     "grainRoughness": "Roughness",
-    "noIso": "The file does not record the shot's ISO",
+    "noAutoDenoise": "The file records neither an ISO reading nor measurable noise",
     "denoiseButton": "Auto denoise",
     "gradeShadow": "Shadows",
     "gradeMid": "Midtones",

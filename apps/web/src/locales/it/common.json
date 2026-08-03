@@ -78,7 +78,7 @@
     "grain": "Grana",
     "grainSize": "Dimensione",
     "grainRoughness": "Irregolarità",
-    "noIso": "Il file non registra l'ISO dello scatto",
+    "noAutoDenoise": "Il file non registra né ISO né rumore misurabile",
     "denoiseButton": "Riduzione rumore auto"
   },
   "settings": {

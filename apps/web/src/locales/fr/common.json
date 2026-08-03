@@ -78,7 +78,7 @@
     "grain": "Grain",
     "grainSize": "Taille",
     "grainRoughness": "Rugosité",
-    "noIso": "Le fichier n'enregistre pas la sensibilité ISO de la prise de vue",
+    "noAutoDenoise": "Le fichier n'enregistre ni ISO ni bruit mesurable",
     "denoiseButton": "Débruitage auto"
   },
   "settings": {

@@ -4,6 +4,7 @@ import { logger } from '../logger'
 import { decodeRaw } from './decodeRaw'
 import { rgbToRgba } from './image'
 import { readJpegMetadata } from './jpegMetadata'
+import { estimateNoise, mergeNoiseEstimates, NOISE_WINDOW, type NoiseEstimate } from './noiseEstimate'
 
 /**
  * Which decoder produced the pixels.
@@ -21,6 +22,13 @@ export interface DecodedImage {
   /** Camera metadata, or null when the file genuinely carries none. */
   metadata: Metadata | null
   source: ImageSource
+  /**
+   * Noise measured from the decoded pixels, or `null` when the decoder could
+   * not read pixels for it (no canvas, or a frame too small to estimate from).
+   * Read once here — at load, where the pixels already exist in memory — so the
+   * Auto denoise button later costs nothing to run.
+   */
+  noise: NoiseEstimate | null
 }
 
 /**
@@ -36,15 +44,16 @@ export interface DecodedImage {
 async function decodeAsRaw(file: File): Promise<DecodedImage> {
   try {
     const decoded = await decodeRaw(await file.arrayBuffer())
-    const imageData = new ImageData(
-      rgbToRgba(decoded.data, decoded.width, decoded.height),
-      decoded.width,
-      decoded.height,
-    )
+    const rgba = rgbToRgba(decoded.data, decoded.width, decoded.height)
+    const imageData = new ImageData(rgba, decoded.width, decoded.height)
     return {
       bitmap: await createImageBitmap(imageData),
       metadata: decoded.metadata,
       source: 'raw',
+      // The pixels are already in memory here, and they are exactly what the
+      // denoise pass will filter — so the estimate is free and correct by
+      // construction.
+      noise: estimateNoise(rgba, decoded.width, decoded.height),
     }
   } catch (error) {
     // Debug, not error: a rejection here is an ordinary step of the fallback, and
@@ -74,10 +83,68 @@ async function decodeAsDeveloped(file: File): Promise<DecodedImage> {
       createImageBitmap(file, { imageOrientation: 'from-image' }),
       readJpegMetadata(file),
     ])
-    return { bitmap, metadata, source: 'developed' }
+    return { bitmap, metadata, source: 'developed', noise: readNoiseFromBitmap(bitmap) }
   } catch (error) {
     logger.debug(`the browser declined ${file.name}: ${String(error)}`)
     throw error
+  }
+}
+
+/**
+ * Estimates the noise of a browser-decoded frame by sampling it 1:1.
+ *
+ * The estimator must never run on a *downscaled* copy: the browser's filter
+ * averages neighbouring pixels, and averaged noise stops being noise — the
+ * measurement would come back systematically too clean. So instead of scaling
+ * the frame, a handful of full-resolution tiles are copied from it, reading
+ * only a bounded region rather than materialising the whole (possibly 45 MP)
+ * image in a canvas.
+ *
+ * Tiles are spread across the frame (centre + quadrants) because a single tile
+ * can land on one texture — fabric, foliage — and overestimate; the median
+ * across tiles throws such outliers away (see `mergeNoiseEstimates`).
+ *
+ * @param bitmap - The frame to measure.
+ * @returns The estimated noise, or `null` when no canvas is available, the
+ *   frame is too small, or no tile yields a usable estimate.
+ */
+function readNoiseFromBitmap(bitmap: ImageBitmap): NoiseEstimate | null {
+  try {
+    const canvas =
+      typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(1, 1)
+        : document.createElement('canvas')
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (context === null) {
+      return null
+    }
+    // `getContext`'s return type is the union of every context kind; this branch
+    // only ever asks for a 2D one, which is what drawImage/getImageData need.
+    const ctx = context as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+    const tile = 512
+    const estimates: NoiseEstimate[] = []
+    for (const fraction of [0.5, 0.25, 0.75]) {
+      for (const other of [0.5, 0.25, 0.75]) {
+        const x = Math.max(0, Math.round((bitmap.width - tile) * fraction))
+        const y = Math.max(0, Math.round((bitmap.height - tile) * other))
+        const width = Math.min(tile, bitmap.width - x)
+        const height = Math.min(tile, bitmap.height - y)
+        if (width < NOISE_WINDOW || height < NOISE_WINDOW) {
+          continue
+        }
+        canvas.width = width
+        canvas.height = height
+        ctx.drawImage(bitmap, x, y, width, height, 0, 0, width, height)
+        const estimate = estimateNoise(ctx.getImageData(0, 0, width, height).data, width, height)
+        if (estimate !== null) {
+          estimates.push(estimate)
+        }
+      }
+    }
+    return mergeNoiseEstimates(estimates)
+  } catch {
+    logger.warn(`could not measure the noise of ${bitmap.width}×${bitmap.height} frame`)
+    return null
   }
 }
 

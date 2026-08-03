@@ -80,7 +80,7 @@
     "grain": "Grano",
     "grainSize": "Tamaño",
     "grainRoughness": "Irregularidad",
-    "noIso": "El fichero no guarda el ISO de la toma",
+    "noAutoDenoise": "El fichero no guarda ni el ISO de la toma ni ruido medible",
     "denoiseButton": "Auto denoising",
     "gradeShadow": "Sombras",
     "gradeMid": "Medios",

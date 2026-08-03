@@ -11,6 +11,7 @@
  */
 
 import type { ImageSource } from './decodeImage'
+import { NOISE_LUMA_BINS, type NoiseEstimate } from './noiseEstimate'
 
 /**
  * Widest chroma blur, in image texels, reached at `colorNoise = 100`.
@@ -78,6 +79,17 @@ const AUTO_LUMA_THRESHOLD_STOPS = 2
 const AUTO_LUMA_PER_STOP = 13
 
 /**
+ * `luminanceDetail` every Auto mapping proposes: the slider's own neutral.
+ *
+ * Zero, and deliberately so. `luminanceDetail` mixes back toward the *original*
+ * luminance, which still carries all of its noise — so a value of n% hands n% of
+ * the noise straight back and caps the luminance denoiser's reduction at
+ * `100 − n`%. A "50 is neutral" reading of the slider is the intuitive one and
+ * costs half the filter; see the note on the slider in `adjustments.ts`.
+ */
+const AUTO_LUMA_DETAIL = 0
+
+/**
  * Fraction of the Auto strength applied to an already-developed file.
  *
  * A camera JPEG arrives having been denoised in-camera already, and the
@@ -89,6 +101,105 @@ const AUTO_LUMA_PER_STOP = 13
  * always push the sliders further, but cannot get destroyed detail back.
  */
 export const AUTO_DEVELOPED_SCALE = 0.5
+
+/**
+ * Floor and ceiling on the brightness shape multiplier
+ * ({@link NoiseEstimate.lumaShape}) before it reaches the filter.
+ *
+ * The measurement is robust, not infallible: a frame whose only flat areas are
+ * three near-black bands can report a shadow σ many times the mean, and letting
+ * that through unbounded would smear the shadows into mud. The clamp keeps the
+ * redistribution meaningful (a 4:1 spread between the shadows and the highlights
+ * is already most of what the gamma produces) while bounding what a bad reading
+ * can do to the picture.
+ */
+export const LUMA_SHAPE_MIN = 0.5
+/** @see LUMA_SHAPE_MIN */
+export const LUMA_SHAPE_MAX = 4
+
+/** The shape of a frame with no measurement: the same strength everywhere. */
+const FLAT_LUMA_SHAPE = Array.from({ length: NOISE_LUMA_BINS }, () => 1)
+
+/**
+ * Blur radius, in that level's own texels, used at every pyramid level.
+ *
+ * Constant across levels on purpose: each level is a quarter of the one above,
+ * so the same 8 texels reach 32 image pixels at the first level and 128 at the
+ * second. The reach grows geometrically while the cost per level *falls*
+ * geometrically, which is the whole reason the pyramid exists — the full-
+ * resolution pass would need 128 taps per side to match the second level, and
+ * the second level needs 8.
+ */
+export const COLOR_PYRAMID_RADIUS = 8
+
+/** Linear downscale between one pyramid level and the next. */
+export const COLOR_PYRAMID_FACTOR = 4
+
+/** `colorNoise` above which the first (¼) pyramid level joins in. */
+export const COLOR_PYRAMID_LEVEL_1_AT = 30
+/** `colorNoise` above which the second (1⁄16) level joins in. */
+export const COLOR_PYRAMID_LEVEL_2_AT = 60
+
+/** Most levels the pyramid ever builds. */
+export const COLOR_PYRAMID_MAX_LEVELS = 2
+
+/**
+ * How many pyramid levels a given `colorNoise` earns.
+ *
+ * Gated rather than always-on because the levels answer a different question
+ * from the full-resolution pass. Fine chroma speckle is gone by the time the
+ * slider reaches a third of its travel; what survives past that is *mottle* —
+ * slow blotches tens of pixels across that the 16-texel pass cannot even see. So
+ * a gentle setting pays for one pass, and only a user who has asked for real
+ * cleaning pays for three.
+ *
+ * @param colorNoise - Slider value in [0, 100].
+ * @returns 0, 1 or 2 levels.
+ */
+export function colorPyramidLevels(colorNoise: number): number {
+  const value = clampSlider(colorNoise)
+  if (value > COLOR_PYRAMID_LEVEL_2_AT) {
+    return 2
+  }
+  return value > COLOR_PYRAMID_LEVEL_1_AT ? 1 : 0
+}
+
+/**
+ * Size of a pyramid level, in pixels along one axis.
+ *
+ * Rounds **up**, so a level never loses the last partial block of the level
+ * above it, and never reaches zero — a 1-pixel level is degenerate but harmless,
+ * whereas a 0-pixel one is an invalid texture.
+ *
+ * @param size - The full-resolution size along this axis.
+ * @param level - 1 for the first level below full resolution, 2 for the next.
+ * @returns The level's size, at least 1.
+ */
+export function pyramidSize(size: number, level: number): number {
+  return Math.max(1, Math.ceil(size / COLOR_PYRAMID_FACTOR ** level))
+}
+
+/**
+ * Reads the brightness shape a frame's measurement calls for, clamped and
+ * guarded, ready to hand to the shader.
+ *
+ * Everything that can be missing is missing here at some point — no image, an
+ * image the estimator could not read, a curve of the wrong length from a stale
+ * cache — and all of it means the same thing: filter every brightness the same,
+ * which is exactly what the feature did before the curve existed.
+ *
+ * @param estimate - The frame's measured noise, or `null` when there is none.
+ * @returns One multiplier per {@link NOISE_LUMA_BINS} band, all 1 when unknown.
+ */
+export function lumaShapeCurve(estimate: NoiseEstimate | null | undefined): number[] {
+  const shape = estimate?.lumaShape
+  if (shape === undefined || shape.length !== NOISE_LUMA_BINS) {
+    return FLAT_LUMA_SHAPE.slice()
+  }
+  return shape.map((value) =>
+    Number.isFinite(value) ? Math.min(Math.max(value, LUMA_SHAPE_MIN), LUMA_SHAPE_MAX) : 1,
+  )
+}
 
 /** Finished, shader-ready parameters for one frame's noise reduction. */
 export interface DenoiseParams {
@@ -107,6 +218,12 @@ export interface DenoiseParams {
   detail: number
   /** Widest of the two radii: how far the shader's loop has to reach. */
   maxRadius: number
+  /**
+   * Extra chroma pyramid levels to run below full resolution, 0..2. See
+   * {@link colorPyramidLevels}; the renderer may build fewer if the image is too
+   * small to halve twice.
+   */
+  pyramidLevels: number
   /** False when neither filter would change anything, so the pass can be skipped. */
   enabled: boolean
 }
@@ -218,6 +335,7 @@ export function denoiseParams(sliders: NoiseSliders): DenoiseParams {
     lumaSigmaRange: luminanceSigmaRange(sliders.luminanceNoise),
     detail,
     maxRadius: Math.max(colorRadius, effectiveLumaRadius),
+    pyramidLevels: colorPyramidLevels(sliders.colorNoise),
     enabled: colorRadius > 0 || effectiveLumaRadius > 0,
   }
 }
@@ -255,9 +373,140 @@ export function autoDenoiseSliders(iso: number, source: ImageSource): NoiseSlide
   return {
     colorNoise: Math.round(Math.min(AUTO_COLOR_AT_BASE + stops * AUTO_COLOR_PER_STOP, 100) * scale),
     luminanceNoise: Math.round(Math.min(lumaStops * AUTO_LUMA_PER_STOP, 100) * scale),
-    // Detail stays at its neutral 50: it is the *shape* of the luminance filter,
-    // and how much texture a given photo can spare is a look, not something the
+    // Detail stays at its neutral 0: it is the *shape* of the luminance filter,
+    // and how much grit a given photo wants back is a look, not something the
     // ISO reading knows. Auto sets the strength; the user shapes it from there.
-    luminanceDetail: 50,
+    //
+    // Emphatically not 50. The slider mixes back toward the original luminance,
+    // so any non-zero value returns that fraction of the NOISE — an Auto button
+    // that suggested 50 would cap its own suggestion at half a job.
+    luminanceDetail: AUTO_LUMA_DETAIL,
+  }
+}
+
+/**
+ * How many σ of measured noise the luminance filter's range term should span.
+ *
+ * The bilateral averages neighbours whose luma lies within its range sigma. To
+ * actually smooth a noise of σ, that range has to reach ~1.5σ — covering a
+ * noise-dominated neighbourhood — while staying far short of real detail,
+ * which is many σ away. This factor is the bridge from a *measured* noise σ
+ * (see `estimateNoise`) to the *filter* range sigma the slider really controls.
+ */
+export const NOISE_SIGMA_OVERLAP = 1.5
+
+/** Measured luma noise σ (0..1) that `luminanceNoise` maps to 0. */
+export const LUMA_NOISE_SIGMA_AT_0 = LUMINANCE_SIGMA_RANGE_MIN / NOISE_SIGMA_OVERLAP
+
+/** Measured luma noise σ (0..1) that `luminanceNoise` maps to 100. */
+export const LUMA_NOISE_SIGMA_AT_100 = LUMINANCE_SIGMA_RANGE_MAX / NOISE_SIGMA_OVERLAP
+
+/**
+ * Measured chroma noise magnitude σ (0..1) that `colorNoise` maps to 100.
+ *
+ * Deliberately a little wider than the luma top: chroma tolerates a heavier
+ * hand (the eye resolves colour worse than brightness), so the slider is
+ * allowed to reach full strength on noise the luma mapping would still hold
+ * back from.
+ */
+export const CHROMA_NOISE_SIGMA_AT_100 = 0.07
+
+/**
+ * Stops above base ISO at which the measured noise is trusted fully over the
+ * ISO prior (3 stops = ISO 800).
+ *
+ * The measurement can be fooled *upwards* by fine texture, and the only way to
+ * tell "ISO 100 but textured" from "genuinely noisy" is the ISO itself: if the
+ * sensor should have been clean, a high reading is probably texture and the
+ * prior gets to keep its conservative dose. From ISO 800 up the sensor is
+ * provably noisy, so the measurement — which knows the *actual* noise — wins.
+ */
+export const AUTO_NOISE_TRUST_STOPS = 3
+
+/** Trust granted to the measurement when the file carries no ISO at all. */
+export const AUTO_NOISE_MISSING_ISO_TRUST = 0.5
+
+/**
+ * Maps a measured luma noise σ to the `luminanceNoise` slider.
+ *
+ * The inverse of {@link luminanceSigmaRange} scaled by {@link NOISE_SIGMA_OVERLAP}:
+ * the slider that would set the range sigma to `1.5 × σ`. Below
+ * {@link LUMA_NOISE_SIGMA_AT_0} the noise is below the filter's resolution and
+ * maps to 0 (off), which is exactly the right dose for a clean image.
+ *
+ * @param sigma - Measured luma noise σ in 0..1 units.
+ * @returns A slider value in [0, 100], rounded to the slider's step of 1.
+ */
+export function luminanceSliderFromSigma(sigma: number): number {
+  const slider = ((sigma - LUMA_NOISE_SIGMA_AT_0) / (LUMA_NOISE_SIGMA_AT_100 - LUMA_NOISE_SIGMA_AT_0)) * 100
+  return Math.round(clampSlider(slider))
+}
+
+/**
+ * Maps a measured chroma noise magnitude σ to the `colorNoise` slider.
+ *
+ * Linear against {@link CHROMA_NOISE_SIGMA_AT_100}: a σ that reaches the top of
+ * the calibration gets the full chroma blur radius, anything smaller a
+ * proportional share, and sub-resolution noise maps to 0 (off).
+ *
+ * @param sigma - Measured chroma noise σ in 0..1 units.
+ * @returns A slider value in [0, 100], rounded to the slider's step of 1.
+ */
+export function colorSliderFromSigma(sigma: number): number {
+  return Math.round(clampSlider((sigma / CHROMA_NOISE_SIGMA_AT_100) * 100))
+}
+
+/**
+ * Turns a measured noise estimate into the three sliders it calls for.
+ *
+ * The measured σs already know what the camera did (a clean JPEG reads clean),
+ * so unlike the ISO mapping this makes no distinction between `raw` and
+ * `developed` — the *measurement* is the dose. Detail stays at its neutral 50,
+ * for the same reason as in {@link autoDenoiseSliders}.
+ *
+ * @param estimate - The frame's measured noise, from `estimateNoise`.
+ * @returns The three slider values, rounded to the sliders' step of 1.
+ */
+export function slidersFromNoise(estimate: NoiseEstimate): NoiseSliders {
+  return {
+    colorNoise: colorSliderFromSigma(estimate.chromaSigma),
+    luminanceNoise: luminanceSliderFromSigma(estimate.lumaSigma),
+    luminanceDetail: AUTO_LUMA_DETAIL,
+  }
+}
+
+/**
+ * Proposes the three noise sliders from the *measured* noise, ISO included.
+ *
+ * This is the button's closed-loop mapping: the measurement says how noisy the
+ * image actually is, the ISO prior (`autoDenoiseSliders`) says how noisy the
+ * sensor should have been, and the result is a blend of the two in which the
+ * measurement is trusted in proportion to {@link AUTO_NOISE_TRUST_STOPS} — the
+ * higher the ISO, the more certain it is that a high reading is noise rather
+ * than texture. A file with no ISO falls back to a fixed middle trust, since
+ * the measurement is then all there is.
+ *
+ * @param estimate - The frame's measured noise, or the measurement half when it
+ *   is unavailable.
+ * @param iso - ISO from the shot's metadata; zero, missing or non-finite means
+ *   "no ISO signal", and the measurement stands mostly alone.
+ * @param source - Which decoder produced the image; shapes only the prior.
+ * @returns The three slider values, rounded to the sliders' step of 1.
+ */
+export function denoiseSlidersFromNoise(
+  estimate: NoiseEstimate,
+  iso: number,
+  source: ImageSource,
+): NoiseSliders {
+  const measured = slidersFromNoise(estimate)
+  const prior = autoDenoiseSliders(iso, source)
+  const hasIso = Number.isFinite(iso) && iso > 0
+  const trust = hasIso
+    ? Math.min(Math.log2(Math.max(iso, AUTO_BASE_ISO) / AUTO_BASE_ISO) / AUTO_NOISE_TRUST_STOPS, 1)
+    : AUTO_NOISE_MISSING_ISO_TRUST
+  return {
+    colorNoise: Math.round(prior.colorNoise + (measured.colorNoise - prior.colorNoise) * trust),
+    luminanceNoise: Math.round(prior.luminanceNoise + (measured.luminanceNoise - prior.luminanceNoise) * trust),
+    luminanceDetail: AUTO_LUMA_DETAIL,
   }
 }

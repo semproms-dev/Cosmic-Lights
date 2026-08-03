@@ -469,6 +469,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
           fileName: file.name,
           metadata: decoded.metadata,
           source: decoded.source,
+          noise: decoded.noise,
         },
       })
     } catch (error) {
@@ -502,6 +503,9 @@ export function EditorProvider({ children }: EditorProviderProps) {
         undo,
         redo,
         commit,
+        // The checkpoint object itself: the reducer builds a new one only when a
+        // COMMIT actually changed something, which is exactly the signal.
+        commitToken: history.checkpoint,
         canUndo: canUndo(history),
         canRedo: canRedo(history),
         masks: state.masks,

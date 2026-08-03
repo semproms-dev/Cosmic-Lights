@@ -23,7 +23,7 @@ describe('toRenderAdjustments', () => {
     expect(result.luminanceNoise).toBe(0)
     // Detail is the shape of the luminance filter, not its amount — same reason
     // grainSize sits at 50. What turns it off is luminanceNoise = 0.
-    expect(result.luminanceDetail).toBe(50)
+    expect(result.luminanceDetail).toBe(0)
     // Grading: what turns a zone off is its saturation, and blending is the
     // shape of the split rather than its amount — hence 50, like the vignette's
     // midpoint. At 0 the three zones would cut into each other at a knife edge.

@@ -4,6 +4,8 @@ import {
   GRADE_BLEND_MIN,
   GRADE_LUM_RANGE,
 } from '../colorGrading'
+import { NOISE_LUMA_BINS } from '../noiseEstimate'
+import { NLM_PATCH_PIXELS, NLM_PATCH_RADIUS } from '../nlm'
 
 /**
  * GLSL sources for the editor pipeline. WebGL2 (`#version 300 es`).
@@ -441,6 +443,78 @@ void main() {
  * a single shader instead of two chained passes: with both sliders up, fusing
  * them halves the sampling, and sampling is the scarce resource here.
  */
+/**
+ * The luma/chroma-opponent space every noise pass works in, shared by the three
+ * shaders that touch chroma (the denoise itself, and the pyramid's merge).
+ *
+ * Interpolated rather than copied because the three MUST agree to the last
+ * decimal: the pyramid subtracts one shader's chroma from another's, and a luma
+ * weight that differed in the third decimal would leave that difference carrying
+ * a sliver of luminance — visible as brightness mottling in exactly the flat
+ * areas the pass exists to clean.
+ *
+ * Not BT.601 either: this is the minimal opponent pair, chosen for two
+ * properties the filters depend on.
+ *
+ * 1. It is EXACTLY reversible. Each pass recomposes to RGB to write its FBO and
+ *    the next decomposes again; a lossy round trip would show up as a colour
+ *    cast rather than as noise reduction.
+ * 2. Green is not stored — toRgb() solves it back out of the luma definition. So
+ *    luminance is preserved by construction: touching Cb/Cr *cannot* change how
+ *    bright a pixel is. That invariant is what makes a huge chroma radius safe,
+ *    and it is what lets the pyramid rewrite chroma across a hundred pixels
+ *    without the picture moving.
+ */
+const YCC_GLSL = `
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+/** RGB → (Y, Cb, Cr). */
+vec3 toYcc(vec3 rgb) {
+  float y = dot(rgb, LUMA);
+  return vec3(y, rgb.b - y, rgb.r - y);
+}
+
+/** (Y, Cb, Cr) → RGB; green is solved from the luma definition, not stored. */
+vec3 toRgb(vec3 ycc) {
+  float r = ycc.x + ycc.z;
+  float b = ycc.x + ycc.y;
+  float g = (ycc.x - 0.2126 * r - 0.0722 * b) / 0.7152;
+  return vec3(r, g, b);
+}
+`
+
+/**
+ * The frame's brightness-noise curve and the lookup into it, shared by every
+ * pass whose strength has to follow the tone scale — the bilateral, the chroma
+ * guard and the non-local means.
+ *
+ * Interpolated rather than copied for the same reason as {@link YCC_GLSL}: the
+ * preview filter and the quality filter must read the curve identically, or
+ * letting go of the slider would visibly re-balance the picture between the
+ * shadows and the highlights instead of just cleaning it better.
+ */
+const LUMA_SHAPE_GLSL = `
+// How the frame's luma noise is distributed across brightness, measured at load
+// (estimateNoise) and normalised so its average is 1. See shapeAt().
+uniform float uLumaShape[${NOISE_LUMA_BINS}];
+
+/**
+ * The measured noise multiplier at a given luma, interpolated between band
+ * centres so the filter's strength varies smoothly rather than in eight steps.
+ *
+ * Bands are centred at (i + 0.5) / N, hence the half-band shift: sampling at a
+ * band's own centre must return that band's value exactly, or a flat curve would
+ * come back tilted.
+ */
+float shapeAt(float y) {
+  float bins = float(${NOISE_LUMA_BINS});
+  float t = clamp(y, 0.0, 1.0) * bins - 0.5;
+  float lower = clamp(floor(t), 0.0, bins - 1.0);
+  float upper = min(lower + 1.0, bins - 1.0);
+  return mix(uLumaShape[int(lower)], uLumaShape[int(upper)], clamp(t - lower, 0.0, 1.0));
+}
+`
+
 export const DENOISE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 
@@ -457,35 +531,13 @@ uniform float uLumaSigmaRange;  // luminance: the bilateral's range sigma
 uniform float uDetail;          // 0..1; luminance detail mixed back in
 uniform float uFinal;           // 1 on the V pass, where uDetail is applied
 
-const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+${YCC_GLSL}
 
 // Hard cap on taps per side (compile-time loop bound), as in the Gaussian pass.
 // 24 comfortably covers COLOR_NOISE_MAX_RADIUS (noise.ts).
 const int MAX_TAPS = 24;
 
-/**
- * RGB → (Y, Cb, Cr). Not BT.601: this is the minimal opponent pair, and it is
- * chosen for two properties the filter depends on.
- *
- * 1. It is EXACTLY reversible. The horizontal pass recomposes to RGB to write its
- *    FBO and the vertical pass decomposes again; a lossy round trip would show up
- *    as a colour cast rather than as noise reduction.
- * 2. Green is not stored — toRgb() solves it back out of the luma definition. So
- *    luminance is preserved by construction: touching Cb/Cr *cannot* change how
- *    bright a pixel is. That invariant is what makes a huge chroma radius safe.
- */
-vec3 toYcc(vec3 rgb) {
-  float y = dot(rgb, LUMA);
-  return vec3(y, rgb.b - y, rgb.r - y);
-}
-
-/** (Y, Cb, Cr) → RGB; green is solved from the luma definition, not stored. */
-vec3 toRgb(vec3 ycc) {
-  float r = ycc.x + ycc.z;
-  float b = ycc.x + ycc.y;
-  float g = (ycc.x - 0.2126 * r - 0.0722 * b) / 0.7152;
-  return vec3(r, g, b);
-}
+${LUMA_SHAPE_GLSL}
 
 void main() {
   vec4 texel = texture(uSource, vUv);
@@ -497,8 +549,22 @@ void main() {
   float sigmaL = max(uLumaRadius / 3.0, 1e-4);
   float twoSigmaC2 = 2.0 * sigmaC * sigmaC;
   float twoSigmaL2 = 2.0 * sigmaL * sigmaL;
-  float twoSigmaE2 = 2.0 * max(uEdgeSigma, 1e-4) * max(uEdgeSigma, 1e-4);
-  float twoSigmaR2 = 2.0 * max(uLumaSigmaRange, 1e-4) * max(uLumaSigmaRange, 1e-4);
+
+  // How noisy THIS pixel's brightness is, relative to the frame's average. Both
+  // range terms below ask "is this neighbour within the noise?", and the answer
+  // depends on where in the tone scale the question is asked: after the decoder's
+  // gamma, a shadow's noise is several times a highlight's (see noiseEstimate).
+  //
+  // Evaluated ONCE, from the centre pixel, and deliberately not per tap. A filter
+  // whose weights depended on each neighbour's own sigma would stop being
+  // symmetric — bright neighbours would count a dark pixel more than the reverse
+  // — and an asymmetric weight is how an edge-preserving filter starts dragging
+  // edges toward the brighter side.
+  float shape = shapeAt(centre.x);
+  float edgeSigma = max(uEdgeSigma * shape, 1e-4);
+  float rangeSigma = max(uLumaSigmaRange * shape, 1e-4);
+  float twoSigmaE2 = 2.0 * edgeSigma * edgeSigma;
+  float twoSigmaR2 = 2.0 * rangeSigma * rangeSigma;
 
   vec2 chromaSum = vec2(0.0);
   float chromaWeight = 0.0;
@@ -555,6 +621,226 @@ void main() {
   }
 
   fragColor = vec4(clamp(toRgb(result), 0.0, 1.0), texel.a);
+}
+`
+
+/**
+ * Quarter-size downsample, one step of the chroma pyramid.
+ *
+ * Exactly a 4×4 box average, in four fetches rather than sixteen: with LINEAR
+ * filtering, sampling *between* two texel centres returns their mean for free,
+ * so one tap placed at the centre of each 2×2 quadrant is already the average of
+ * four texels. That is the difference between a downsample that costs 4 taps and
+ * one that costs 16, repeated over every level.
+ *
+ * A box and not a Gaussian: the pyramid's merge subtracts this level from the
+ * one above, and the subtraction only cancels cleanly if both sides went through
+ * the *same* low-pass. A box is the cheapest filter for which that holds.
+ */
+export const DOWNSAMPLE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uSource;
+uniform vec2 uSourceTexel;  // 1 / source size, in UV
+
+void main() {
+  vec2 o = uSourceTexel;
+  fragColor = 0.25 * (
+      texture(uSource, vUv + vec2(-o.x, -o.y))
+    + texture(uSource, vUv + vec2( o.x, -o.y))
+    + texture(uSource, vUv + vec2(-o.x,  o.y))
+    + texture(uSource, vUv + vec2( o.x,  o.y))
+  );
+}
+`
+
+/**
+ * Folds a coarser pyramid level's cleaned channels back into a finer one.
+ *
+ * The operation is a one-level Laplacian correction:
+ *
+ *     out = fine + (coarseClean − coarseNoisy)
+ *
+ * and the parenthesis is the point. It is *only* what the coarse denoise
+ * changed — the slow mottle it removed — upsampled. Everything finer than the
+ * coarse level cancels between the two terms, so every edge and detail in
+ * `uFine` survives untouched.
+ *
+ * The tempting alternative, mixing toward the upsampled coarse level, would
+ * instead *replace* fine content with blurred content: on chroma that is how a
+ * denoiser bleeds red past a lip or a sign, and on luma it is how it turns a
+ * face to wax.
+ *
+ * `uChannels` picks which of (Y, Cb, Cr) the correction touches, so one program
+ * serves both pyramids: `(0,1,1)` for the colour one, `(1,0,0)` for the
+ * luminance one. Whichever is not selected passes through *bit for bit*, which
+ * is what keeps the two from interfering — the colour pyramid provably cannot
+ * change a brightness, and the luminance one provably cannot shift a hue.
+ */
+export const PYRAMID_MERGE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uFine;          // this level, already denoised at its own scale
+uniform sampler2D uCoarseClean;   // the level below, denoised
+uniform sampler2D uCoarseNoisy;   // the level below, before its denoise
+uniform vec3 uChannels;           // which of (Y, Cb, Cr) the correction applies to
+
+${YCC_GLSL}
+
+void main() {
+  vec4 fine = texture(uFine, vUv);
+  vec3 result = toYcc(fine.rgb);
+  // Both coarse levels are sampled at the same vUv and stretched by the GPU's
+  // LINEAR filtering, which is the upsample: no explicit interpolation pass.
+  vec3 clean = toYcc(texture(uCoarseClean, vUv).rgb);
+  vec3 noisy = toYcc(texture(uCoarseNoisy, vUv).rgb);
+  result += (clean - noisy) * uChannels;
+  fragColor = vec4(clamp(toRgb(result), 0.0, 1.0), fine.a);
+}
+`
+
+/**
+ * Non-local means, part 1 of 3: the horizontal half of one candidate's patch
+ * distance.
+ *
+ * Run once per candidate offset. It writes, for every pixel, the sum of squared
+ * luma differences along a horizontal line of the patch between this pixel's
+ * neighbourhood and the candidate's. Part 2 sums those lines vertically, which
+ * completes the patch.
+ *
+ * **Why in two passes.** The patch sum is separable, and separating it is what
+ * makes the filter affordable: a P×P patch costs `2P` fetches across two passes
+ * instead of `P²` in one, and — far more importantly — every pixel's horizontal
+ * line is reused by all P rows that overlap it, so the work per pixel stops
+ * growing with the patch at all. Done naively, in one shader with four nested
+ * loops, this filter needs hundreds of fetches per pixel and takes minutes on a
+ * large frame.
+ */
+export const NLM_DISTANCE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uSource;   // the image, in its original state
+// This candidate's shift, in UV. NOT named uOffset: the shared vertex shader
+// already has a uniform by that name, and a linked program has ONE uniform per
+// name across its stages — writing this would have panned the quad as well.
+uniform vec2 uShift;
+uniform vec2 uTexel;         // 1 / image size
+
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+const int PATCH = ${NLM_PATCH_RADIUS};
+
+void main() {
+  float sum = 0.0;
+  for (int i = -PATCH; i <= PATCH; i++) {
+    vec2 at = vUv + vec2(float(i) * uTexel.x, 0.0);
+    float here = dot(texture(uSource, at).rgb, LUMA);
+    float there = dot(texture(uSource, at + uShift).rgb, LUMA);
+    sum += (here - there) * (here - there);
+  }
+  fragColor = vec4(sum, 0.0, 0.0, 1.0);
+}
+`
+
+/**
+ * Non-local means, part 2 of 3: finish the patch distance, weigh the candidate,
+ * and add it to the running totals.
+ *
+ * The weight is `exp(−max(d² − 2σ², 0) / h²)` — see NLM_H in `nlm.ts` for why
+ * the `2σ²` is subtracted and what `h` decides. σ follows the frame's brightness
+ * curve, exactly as the bilateral's range term does, so the filter works harder
+ * in the shadows where the noise actually is.
+ *
+ * The totals are carried through a ping-ponged texture rather than accumulated
+ * with additive blending. Blending would save a fetch, but it is only guaranteed
+ * on float targets by an extension this pass would then depend on, and the
+ * fetch is free next to the patch work already done above it.
+ */
+export const NLM_ACCUMULATE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uDistance;  // part 1's output for this candidate
+uniform sampler2D uSource;    // the image, in its original state
+uniform sampler2D uAccum;     // totals so far: (sum of w*luma, sum of w)
+uniform vec2 uShift;          // this candidate's shift, in UV (see the note above)
+uniform vec2 uTexel;          // 1 / image size
+uniform float uSigma;         // measured noise sigma, before the brightness curve
+uniform float uH;             // strength, as a multiple of sigma
+
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+const int PATCH = ${NLM_PATCH_RADIUS};
+
+${LUMA_SHAPE_GLSL}
+
+void main() {
+  float distance = 0.0;
+  for (int i = -PATCH; i <= PATCH; i++) {
+    distance += texture(uDistance, vUv + vec2(0.0, float(i) * uTexel.y)).r;
+  }
+  // A mean, not a sum: h is expressed in luma units, so the distance it is
+  // compared against has to be per-pixel too, whatever the patch size.
+  distance /= float(${NLM_PATCH_PIXELS});
+
+  float centre = dot(texture(uSource, vUv).rgb, LUMA);
+  float sigma = max(uSigma * shapeAt(centre), 1e-5);
+  float h = max(uH * sigma, 1e-5);
+  // Two patches of the SAME signal, seen through independent noise, differ by
+  // 2*sigma^2 on average. Subtracting it makes a true match score zero and take
+  // a weight of 1, so the filter needs no threshold to average confidently.
+  float excess = max(distance - 2.0 * sigma * sigma, 0.0);
+  float weight = exp(-excess / (h * h));
+
+  float neighbour = dot(texture(uSource, vUv + uShift).rgb, LUMA);
+  vec2 totals = texture(uAccum, vUv).rg;
+  fragColor = vec4(totals.r + weight * neighbour, totals.g + weight, 0.0, 1.0);
+}
+`
+
+/**
+ * Non-local means, part 3 of 3: divide the totals and rebuild a picture.
+ *
+ * Luminance comes from the accumulation, chroma from whatever the chroma half of
+ * the denoise produced, and the two are recombined through the shared opponent
+ * space. That separation is the reason the quality pass costs what it costs and
+ * no more: the expensive filter runs on one channel, the one the eye resolves.
+ */
+export const NLM_RESOLVE_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uAccum;     // (sum of w*luma, sum of w)
+uniform sampler2D uChroma;    // the frame with its chroma already cleaned
+uniform sampler2D uOriginal;  // the untouched image, for the detail mix
+uniform float uDetail;        // 0..1; original luminance mixed back in
+
+${YCC_GLSL}
+
+void main() {
+  vec4 chroma = texture(uChroma, vUv);
+  vec3 result = toYcc(chroma.rgb);
+  float original = dot(texture(uOriginal, vUv).rgb, LUMA);
+
+  vec2 totals = texture(uAccum, vUv).rg;
+  // The centre is one of the candidates and always weighs 1, so the total can
+  // only be zero if the pass never ran. Falling back to the original then is
+  // what keeps a skipped frame looking like the photo rather than like black.
+  float filtered = totals.g > 0.0 ? totals.r / totals.g : original;
+
+  result.x = mix(filtered, original, uDetail);
+  fragColor = vec4(clamp(toRgb(result), 0.0, 1.0), chroma.a);
 }
 `
 

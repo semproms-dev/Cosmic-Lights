@@ -1,5 +1,6 @@
 import type { Metadata } from "libraw-wasm";
 import type { ImageSource } from "./decodeImage";
+import type { NoiseEstimate } from "./noiseEstimate";
 
 export interface LoadedImage {
     bitmap: ImageBitmap,
@@ -19,6 +20,13 @@ export interface LoadedImage {
      * export skips the EXIF block.
      */
     metadata: Metadata | null,
+    /**
+     * Noise measured from the pixels at decode time, or `null` when the decoder
+     * could not read them for it (or the frame is too small). Lets the Auto
+     * denoise button work from the actual noise instead of the ISO alone — and
+     * even when the file records no ISO at all.
+     */
+    noise: NoiseEstimate | null,
 }
 
 export type ImageState = LoadedImage | null;

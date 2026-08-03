@@ -385,8 +385,11 @@ export function buildMaskAdjustments(): Record<string, number> {
     ...buildDefaults(basicAdjustments),
     ...buildDefaults(colorAdjustement),
     // Taken from the Details options rather than seeded with 0, so a mask key
-    // whose neutral value is not 0 (as `luminanceDetail` would be, should it
-    // ever become local) cannot quietly start life wrong.
+    // whose neutral value is not 0 cannot quietly start life wrong. Every noise
+    // key happens to be neutral at 0 today, which makes this look redundant —
+    // it is not: the point is that the neutral lives in one place, and reading
+    // it from there is what keeps a future non-zero default from silently
+    // breaking masks.
     ...buildDefaults(detailsAdjustement.filter((o) => MASK_LOCAL_CONTRAST_KEYS.includes(o.key))),
   }
 }
