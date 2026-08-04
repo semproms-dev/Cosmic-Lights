@@ -9,6 +9,8 @@ import {
 } from './preferences'
 import type {
   Language,
+  MenuPosition,
+  NavBarPosition,
   PanelPosition,
   Preferences,
   PreferencesStore,
@@ -68,9 +70,19 @@ export function PreferencesProvider({
     [update],
   )
 
+  const setMenuPosition = useCallback(
+    (menuPosition: MenuPosition) => update({ menuPosition }),
+    [update],
+  )
+
+  const setNavBarPosition = useCallback(
+    (navBarPosition: NavBarPosition) => update({ navBarPosition }),
+    [update],
+  )
+
   const store = useMemo<PreferencesStore>(
-    () => ({ preferences, setPanelPosition, setFontSize, setLanguage, setHelpers }),
-    [preferences, setPanelPosition, setFontSize, setLanguage, setHelpers],
+    () => ({ preferences, setPanelPosition, setFontSize, setLanguage, setHelpers, setMenuPosition, setNavBarPosition }),
+    [preferences, setPanelPosition, setFontSize, setLanguage, setHelpers, setMenuPosition, setNavBarPosition],
   )
 
   return (

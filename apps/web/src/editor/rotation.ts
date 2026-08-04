@@ -47,6 +47,12 @@ export interface Orientation {
   flipH: boolean
   /** Mirror the displayed image top↔bottom. */
   flipV: boolean
+  /**
+   * Free straighten angle in degrees, clockwise on screen. Applied *after* the
+   * turns and the flips — it is the last thing that happens to the displayed
+   * frame — and unlike them it resamples, so it is not lossless.
+   */
+  angleDeg: number
 }
 
 /** Upright, unmirrored: what an image opens as. */
@@ -54,6 +60,7 @@ export const IDENTITY_ORIENTATION: Orientation = {
   quarterTurns: 0,
   flipH: false,
   flipV: false,
+  angleDeg: 0
 }
 
 /** Which way a turn goes **from the user's point of view**, not the image's. */
@@ -126,6 +133,33 @@ const INVERSE_QUARTER_TURN: Record<QuarterTurns, [number, number, number, number
 }
 
 /**
+ * The axis-aligned bounding box of a `width × height` rectangle rotated by
+ * `angleDeg` about its centre, in the rectangle's own units.
+ *
+ * A rotated rectangle's corners sweep out
+ * `bboxW = w·|cosθ| + h·|sinθ|` and `bboxH = w·|sinθ| + h·|cosθ|`. This is the
+ * frame the letterbox must fit and the canvas an export must allocate: letterbox
+ * or crop to the *unrotated* aspect and the corners get clipped.
+ *
+ * `width`/`height` must already be quarter-turn-swapped — the free angle applies
+ * on top of the discrete turn, so the rectangle being rotated is the *displayed*
+ * frame, not the source crop.
+ *
+ * @param width - The unrotated rectangle's width.
+ * @param height - The unrotated rectangle's height.
+ * @param angleDeg - The free-angle rotation in degrees, clockwise on screen.
+ */
+export function rotatedBoundingBox(width: number, height: number, angleDeg: number): { width: number; height: number } {
+  const a = (angleDeg * Math.PI) / 180
+  const c = Math.abs(Math.cos(a))
+  const s = Math.abs(Math.sin(a))
+  return {
+    width: width * c + height * s,
+    height: width * s + height * c,
+  }
+}
+
+/**
  * Folds the crop and the orientation into the single UV remap the composite pass
  * applies: `uv = center + matrix · (vUv − 0.5)`.
  *
@@ -133,22 +167,44 @@ const INVERSE_QUARTER_TURN: Record<QuarterTurns, [number, number, number, number
  * remap it replaces (`uv = cropOffset + vUv · cropScale`), so an unrotated image
  * renders bit-for-bit as before.
  *
- * The maths, for the record. The output frame is `(ow, oh)` — the crop's size,
- * **swapped on odd quarter turns**, because a quarter turn changes the frame's
- * shape. A point at output offset `s = vUv − 0.5` is therefore `q = diag(ow, oh)·s`
- * pixels from the frame's centre. Display is built from source as
- * `q = F · R(θ) · p` (turn, then mirror what you see), so sampling inverts it:
+ * The maths, for the record. The output frame is `(bw, bh)` — the *rotated
+ * bounding box* of the crop's size, **swapped on odd quarter turns**, because a
+ * quarter turn changes the frame's shape and the free angle then grows it. A
+ * point at output offset `s = vUv − 0.5` is therefore `q = diag(bw, bh)·s` pixels
+ * from the frame's centre. Display is built from source as
+ * `q = R_free(θ) · F · R(θ) · p` (turn, mirror what you see, then straighten),
+ * so sampling inverts it:
  *
  * ```
- * p  = R(−θ) · F · q                       (F is its own inverse)
+ * p  = R(−θ) · F · R_free(−θ) · q            (F is its own inverse)
  * uv = center + diag(1/W, 1/H) · p
- *    → matrix = diag(1/W, 1/H) · R(−θ) · F · diag(ow, oh)
+ *    → matrix = diag(1/W, 1/H) · R(−θ) · F · R_free(−θ) · diag(bw, bh)
  * ```
  *
- * Scaling by `(ow, oh)` — not by `(cw, ch)` — is the load-bearing detail: on an
- * odd turn the output's x-axis spans the crop's *height*. Using `(cw, ch)` there
- * makes a quarter turn sample outside the crop on one axis and short of it on
- * the other, which reads as a squashed, cropped image on every non-square photo.
+ * Two details in that order are load-bearing, and getting either wrong is what a
+ * straighten looks like when it goes wrong:
+ *
+ * - **Scaling by the bounding box, not by `(ow, oh)`.** `s` runs across the quad
+ *   the letterbox actually draws, and that quad is the bounding box. Feed it the
+ *   unrotated frame and the two axes pick up different scale factors — an
+ *   anisotropic stretch along the *tilted* axes, so the photo comes out squashed
+ *   and its corners stop being square (at 30° on a 3:2 frame, a 35% stretch).
+ *   With `angleDeg = 0` the box *is* `(ow, oh)`, so nothing changes there.
+ * - **`R_free(−θ)` to the right of `F`.** The free angle is the last thing
+ *   applied to the display, so its inverse is the first thing applied when
+ *   sampling. Rotations commute with rotations, but not with a mirror
+ *   (`F · R(θ) = R(−θ) · F`), so hoisting it left would straighten the wrong way
+ *   round with exactly one flip on.
+ *
+ * `R_free(−θ)` is kept as its own `cos/sin` matrix outside the tabulated `R(−θ)`
+ * so a lossless 90° turn never picks up 6.1e-17 noise (see the note above
+ * `INVERSE_QUARTER_TURN`).
+ *
+ * The bounding box is built from `(ow, oh)` — not from `(cw, ch)` — for the same
+ * reason: on an odd turn the output's x-axis spans the crop's *height*. Using
+ * `(cw, ch)` there makes a quarter turn sample outside the crop on one axis and
+ * short of it on the other, which reads as a squashed, cropped image on every
+ * non-square photo.
  *
  * @param orientation - The turns and mirroring to apply.
  * @param crop - The active crop in image pixels, or `null` for the full frame.
@@ -171,23 +227,47 @@ export function uvTransform(
   const turned = orientation.quarterTurns % 2 === 1
   const outWidth = turned ? region.height : region.width
   const outHeight = turned ? region.width : region.height
+  const a = (orientation.angleDeg * Math.PI) / 180 // degrees → radians
+  const c = Math.cos(a)
+  const s = Math.sin(a)
 
-  const [r00, r01, r10, r11] = INVERSE_QUARTER_TURN[orientation?.quarterTurns]
-  const flipX = orientation?.flipH ? -1 : 1
-  const flipY = orientation?.flipV ? -1 : 1
+  const [r00, r01, r10, r11] = INVERSE_QUARTER_TURN[orientation.quarterTurns]
+  const flipX = orientation.flipH ? -1 : 1
+  const flipY = orientation.flipV ? -1 : 1
 
-  // matrix = diag(1/W, 1/H) · R(−θ) · diag(flipX, flipY) · diag(outWidth, outHeight)
-  const m00 = (r00 * flipX * outWidth) / imageWidth
-  const m01 = (r01 * flipY * outHeight) / imageWidth
-  const m10 = (r10 * flipX * outWidth) / imageHeight
-  const m11 = (r11 * flipY * outHeight) / imageHeight
+  // turn = R_quarter(−θ) · F, kept exact: the quarter turn is tabulated, never
+  // folded into the free-angle cos/sin (see the table above), so a lossless 90°
+  // turn stays bit-for-bit 0 and ±1.
+  const t00 = r00 * flipX
+  const t01 = r01 * flipY
+  const t10 = r10 * flipX
+  const t11 = r11 * flipY
 
-  const cropAspect = region.width / region.height
+  // The frame the letterbox draws — and therefore the frame `vUv` runs across —
+  // is the ROTATED bounding box: the free angle grows it, and letterboxing to
+  // the unrotated aspect would clip the corners. Reduces exactly to
+  // (outWidth, outHeight) when angleDeg = 0.
+  const bbox = rotatedBoundingBox(outWidth, outHeight, orientation.angleDeg)
+
+  // free = R_free(−θ) · diag(bbox.width, bbox.height): from a point on the drawn
+  // quad to the unrotated display frame, in image pixels. R_free(−θ) is the
+  // inverse of the clockwise y-down turn `[c, −s; s, c]`, i.e. `[c, s; −s, c]`.
+  const f00 = c * bbox.width
+  const f01 = s * bbox.height
+  const f10 = -s * bbox.width
+  const f11 = c * bbox.height
+
+  // matrix = diag(1/W, 1/H) · turn · free. Right-multiplied, not left: the free
+  // angle is undone first because it was applied last (see the note above).
+  const m00 = (t00 * f00 + t01 * f10) / imageWidth
+  const m01 = (t00 * f01 + t01 * f11) / imageWidth
+  const m10 = (t10 * f00 + t11 * f10) / imageHeight
+  const m11 = (t10 * f01 + t11 * f11) / imageHeight
 
   return {
     matrix: [m00, m10, m01, m11],
     center,
-    displayedAspect: turned ? 1 / cropAspect : cropAspect,
+    displayedAspect: bbox.width / bbox.height,
   }
 }
 

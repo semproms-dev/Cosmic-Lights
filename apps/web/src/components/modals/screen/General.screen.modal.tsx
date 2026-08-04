@@ -1,6 +1,6 @@
 import { Group, NumberInput, Radio, Stack, Switch, useMantineColorScheme } from '@mantine/core';
 import { usePreferences, MIN_FONT_SIZE, MAX_FONT_SIZE } from '../../../preferences/preferences';
-import type { PanelPosition } from '../../../preferences/preferences';
+import type { NavBarPosition, PanelPosition } from '../../../preferences/preferences';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
  */
 export function General() {
   const { t } = useTranslation(['common']);
-  const { preferences, setPanelPosition, setFontSize, setHelpers } = usePreferences();
+  const { preferences, setPanelPosition, setFontSize, setHelpers, setMenuPosition, setNavBarPosition } = usePreferences();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
 
   return (
@@ -25,6 +25,32 @@ export function General() {
         <Group mt="xs">
           <Radio value="left" label={t('settings.left')} />
           <Radio value="right" label={t('settings.right')} />
+        </Group>
+      </Radio.Group>
+
+      <Radio.Group
+        value={preferences.menuPosition}
+        onChange={(value) => value && setMenuPosition(value)}
+        name='menuPosition'
+        label={t('settings.menuPosition')}
+        mt={'xs'}
+      >
+        <Group mt="xs">
+          <Radio value="left" label={t('settings.left')} />
+          <Radio value="right" label={t('settings.right')} />
+        </Group>
+      </Radio.Group>
+
+      <Radio.Group
+        value={preferences.navBarPosition}
+        onChange={(value) => value && setNavBarPosition(value as NavBarPosition)}
+        name="navBarPosition"
+        label={t('settings.navBarPosition')}
+        mt="xs"
+      >
+        <Group mt="xs">
+          <Radio value="top" label={t('settings.top')} />
+          <Radio value="bottom" label={t('settings.bottom')} />
         </Group>
       </Radio.Group>
 

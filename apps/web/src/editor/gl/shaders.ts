@@ -241,6 +241,7 @@ uniform float uVignette;        // -100..100; negative darkens (Lightroom's sign
 uniform float uVignetteMid;     // 0..100; where the falloff starts
 uniform float uVignetteFeather; // 0..100; how soft the transition is
 uniform float uFrameAspect;     // width/height of the DISPLAYED frame
+uniform vec3 uBackdrop;         // colour behind the frame where a free angle uncovers canvas
 uniform sampler2D uAmountMap;   // per-pixel texture amount (see AMOUNT_MAP_FRAGMENT_SHADER)
 uniform float uUseAmountMap;    // 1 → read texture's amount per pixel instead of uTexture
 uniform float uAmountRange;     // the amount map's full scale, so decoding matches encoding
@@ -283,7 +284,19 @@ void main() {
   // turned/mirrored about its centre. Built on the CPU by uvTransform()
   // (editor/rotation.ts); identity (mat2(1.0), centre 0.5) means uv == vUv.
   vec2 uv = uUvCenter + uUvMatrix * (vUv - 0.5);
-  vec4 base = texture(uDeveloped, uv);
+  // A free angle can push the sample outside the image: the letterbox is sized
+  // to the rotated bounding box, so the corners of the quad leave [0,1]². Paint
+  // them with the backdrop — and return it untouched, before grading/vignette/
+  // grain, so the colour behind the frame is exactly the uniform and never gets
+  // tinted by the image's edge. Inclusive bounds: uv == 0/1 exactly is the frame
+  // edge texel, and treating it as backdrop would eat the four corners of every
+  // unrotated photo.
+  bool inFrame = all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0)));
+  vec4 base = inFrame ? texture(uDeveloped, uv) : vec4(uBackdrop, 1.0);
+  if (!inFrame) {
+    fragColor = base;
+    return;
+  }
   vec3 rgb = base.rgb;
   float clarityAmt = uClarity * 0.2;              // slider → strength (k, tunable)
   // Texture's amount is per-pixel whenever a mask carries one: the map holds the

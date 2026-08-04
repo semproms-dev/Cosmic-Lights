@@ -221,6 +221,8 @@ export interface EditorState {
    */
   rotationSpin: RotationSpin | null
   setMaskRadial: (id: string, radial: RadialShape) => void;
+  setRotationAngle: (angleDeg: number) => void
+  angle: number
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

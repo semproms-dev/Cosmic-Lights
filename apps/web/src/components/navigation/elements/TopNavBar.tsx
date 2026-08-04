@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { IconRestore } from '@tabler/icons-react';
 import { IconViewfinder } from '@tabler/icons-react';
 import { IconViewfinderOff } from '@tabler/icons-react';
+import { usePreferences } from '../../../preferences/preferences';
 
 interface MenuItem {
   label: string;
@@ -44,6 +45,8 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
   const {redo, undo, canRedo, canUndo, openResetDialog, image, imageDirty, showOriginal, setShowOriginal} = useEditor();
   const modals = useModals();
   const { t } = useTranslation(['common']);
+  const {preferences} = usePreferences();
+  const isBottom = preferences.navBarPosition === 'bottom';
 
   const openSettings = () => {
     modals.openModal({
@@ -117,10 +120,12 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
   ));
 
   return (
-    <nav className={classes.navbar}>
-      <Group gap="xs">{mainLinks}</Group>
-
-      <Group gap="xs" ml="auto">
+    <nav
+      className={isBottom ? `${classes.navbar} ${classes.navbarBottom}` : classes.navbar}
+      style={isBottom ? { order: 1 } : undefined}
+    >
+      <Group gap="xs" w="100%" justify={preferences.menuPosition === 'right' ? 'flex-end' : 'flex-start'}>
+        <Group gap="xs">{mainLinks}</Group>
         <Tooltip label={t(showOriginal ? 'topNav.showEdited' : 'topNav.showOriginal')} withArrow>
           <ActionIcon size="lg" variant='subtle' onClick={() => setShowOriginal(!showOriginal)} disabled={image === null || !imageDirty}>
             {showOriginal ? <IconViewfinderOff /> : <IconViewfinder />}

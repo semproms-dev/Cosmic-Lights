@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CropRegion } from './image'
-import { IDENTITY_ORIENTATION, type Orientation, type QuarterTurns } from './rotation'
+import { IDENTITY_ORIENTATION, uvTransform, type Orientation, type QuarterTurns } from './rotation'
 import {
   exportDimensions,
   exportExtension,
@@ -108,6 +108,46 @@ describe('exportDimensions', () => {
 
       expect(size.width / size.height).toBeCloseTo(displayedAspect)
     }
+  })
+
+  it('expands to the rotated bounding box on a free angle', () => {
+    // At 45° a 6000×4000 frame's corners sweep out a ~7071×7071 box; exporting
+    // at the unrotated size would clip them.
+    const angleDeg = 45
+    const rad = (angleDeg * Math.PI) / 180
+    const c = Math.abs(Math.cos(rad))
+    const s = Math.abs(Math.sin(rad))
+
+    const size = exportDimensions(null, 6000, 4000, turned(0, { angleDeg }))
+
+    expect(size).toEqual({
+      width: Math.round(6000 * c + 4000 * s),
+      height: Math.round(6000 * s + 4000 * c),
+    })
+  })
+
+  it('matches the ROTATED aspect the renderer letterboxes to', () => {
+    // Same contract as above, but with a free angle: the export canvas must
+    // equal the rotated bounding box's aspect, or the free angle reintroduces
+    // the bars (and clips the corners) that the even-turn case removed.
+    const crop: CropRegion = { x: 0, y: 0, width: 800, height: 600 }
+    const angleDeg = 15
+
+    const size = exportDimensions(crop, 6000, 4000, turned(1, { angleDeg }))
+    const displayedAspect = uvTransform(turned(1, { angleDeg }), crop, 6000, 4000).displayedAspect
+
+    // Rounded to whole pixels on the export side, so the aspect agrees to
+    // within a fraction of a percent rather than exactly.
+    expect(size.width / size.height).toBeCloseTo(displayedAspect, 2)
+  })
+
+  it('a 90° free angle exports as the quarter-turn swap', () => {
+    // cos(90°) ≈ 6.1e-17 washes out of the rounding; the frame comes out as if
+    // it had been turned the long way round, with no floating-point smearing.
+    expect(exportDimensions(null, 6000, 4000, turned(0, { angleDeg: 90 }))).toEqual({
+      width: 4000,
+      height: 6000,
+    })
   })
 })
 

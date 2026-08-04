@@ -4,6 +4,9 @@ import { logger } from '../logger'
 
 /** Which side of the editor the tool rail and its panels live on. */
 export type PanelPosition = 'left' | 'right'
+export type MenuPosition = 'left' | 'right'
+/** Whether the top navigation bar sits at the top or the bottom of the window. */
+export type NavBarPosition = 'top' | 'bottom'
 
 /** Interface language. Synced with the i18n runtime via PreferencesProvider. */
 export type Language = 'de' | 'en' | 'es' | 'fr' | 'it'
@@ -17,6 +20,9 @@ export interface Preferences {
   /** Selected interface language. */
   language: Language
   helper: boolean
+  menuPosition: MenuPosition
+  /** Where the top navigation bar is shown: top or bottom of the window. */
+  navBarPosition: NavBarPosition
 }
 
 /** Values used before the user changes anything (and the persistence fallback). */
@@ -25,6 +31,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   fontSize: 14,
   language: 'en',
   helper: false,
+  menuPosition: 'left',
+  navBarPosition: 'top',
 }
 
 /** Bounds for the font-size control, shared by the UI and the parser. */
@@ -43,6 +51,10 @@ const preferencesSchema = z.object({
     .catch(DEFAULT_PREFERENCES.fontSize),
   language: z.enum(['de', 'en', 'es', 'fr', 'it']).catch(DEFAULT_PREFERENCES.language),
   helper: z.boolean().catch(DEFAULT_PREFERENCES.helper),
+  menuPosition: z.enum(['left', 'right']).catch(DEFAULT_PREFERENCES.menuPosition),
+  navBarPosition: z
+    .enum(['top', 'bottom'])
+    .catch(DEFAULT_PREFERENCES.navBarPosition),
 })
 
 /** localStorage key under which the serialized preferences live. */
@@ -99,6 +111,10 @@ export interface PreferencesStore {
   setLanguage: (language: Language) => void
   /** Sets helps messages in the app */
   setHelpers: (helper: boolean) => void
+  /** Sets the position of the Top Bar Menu */
+  setMenuPosition: (position: MenuPosition) => void
+  /** Sets whether the top navigation bar is shown at the top or bottom. */
+  setNavBarPosition: (position: NavBarPosition) => void
 }
 
 export const PreferencesContext = createContext<PreferencesStore | null>(null)

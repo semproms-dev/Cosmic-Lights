@@ -270,11 +270,31 @@ describe('editorReducer — crop slice', () => {
   })
 
   it('SET_IMAGE resets the orientation, so a new photo does not inherit the turn', () => {
-    const state = createState({ orientation: { quarterTurns: 3, flipH: true, flipV: false } })
+    const state = createState({ orientation: { quarterTurns: 3, flipH: true, flipV: false, angleDeg: 0 } })
 
     const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
 
     expect(next.orientation).toEqual(IDENTITY_ORIENTATION)
+  })
+})
+
+describe('editorReducer — orientation slice', () => {
+  it('SET_ROTATION_ANGLE sets the free angle and leaves turns and mirrors alone', () => {
+    const state = createState({ orientation: { quarterTurns: 1, flipH: true, flipV: false, angleDeg: 0 } })
+
+    const next = editorReducer(state, { type: 'SET_ROTATION_ANGLE', angleDeg: -12.5 })
+
+    expect(next.orientation).toEqual({ quarterTurns: 1, flipH: true, flipV: false, angleDeg: -12.5 })
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('RESET_ORIENTATION puts the photo back upright, free angle included', () => {
+    const state = createState({ orientation: { quarterTurns: 3, flipH: true, flipV: true, angleDeg: -12.5 } })
+
+    const next = editorReducer(state, { type: 'RESET_ORIENTATION' })
+
+    expect(next.orientation).toEqual(IDENTITY_ORIENTATION)
+    expect(next.imageDirty).toBe(false)
   })
 })
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { userEvent } from '@testing-library/user-event';
-import { render, screen } from '../../test/render';
+import { render, screen, within } from '../../test/render';
 import { AdjustementsModal } from './Adjustments.modal';
 
 afterEach(() => {
@@ -22,7 +22,9 @@ describe('AdjustementsModal', () => {
   it('shows the General panel by default', () => {
     render(<AdjustementsModal />);
 
-    expect(screen.getByRole('radio', { name: 'Right' })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('radiogroup', { name: 'Panel position' })).getByRole('radio', { name: 'Right' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Dark theme' })).toBeInTheDocument();
     expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toBeInTheDocument();
   });

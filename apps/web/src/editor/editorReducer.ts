@@ -78,6 +78,7 @@ export type EditorAction =
   | { type: 'SET_MASK_RADIAL',  id: string; radial: RadialShape}
   | { type: 'SET_MASK_PROMPT'; id: string; prompt: ObjectPrompt }
   | { type: 'APPLY_PRESET'; preset: Preset }
+  | { type: 'SET_ROTATION_ANGLE', angleDeg: number }
 
 /**
  * Construye el mapa inicial de sliders a partir de los cuatro grupos (Basic,
@@ -142,6 +143,13 @@ export function editorReducer(
       return {
         ...state,
         orientation: { ...state.orientation, flipV: !state.orientation.flipV },
+        imageDirty: true
+      }
+    case 'SET_ROTATION_ANGLE':
+      // Transient, like SET: fires on every drag tick; commit() at drag end.
+      return {
+        ...state,
+        orientation: { ...state.orientation, angleDeg: action.angleDeg },
         imageDirty: true
       }
     case 'SET_MASK_RADIAL':

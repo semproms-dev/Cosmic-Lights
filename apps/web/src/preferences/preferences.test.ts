@@ -12,6 +12,8 @@ const CUSTOM: Preferences = {
   fontSize: 18,
   language: 'es',
   helper: false,
+  menuPosition: 'right',
+  navBarPosition: 'bottom',
 }
 
 afterEach(() => {

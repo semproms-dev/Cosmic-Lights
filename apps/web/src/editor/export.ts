@@ -1,6 +1,6 @@
 import type { CropRegion } from './image'
 import type { ExportFormat } from './exportFormats'
-import type { Orientation } from './rotation'
+import { rotatedBoundingBox, type Orientation } from './rotation'
 
 /**
  * File extension per export format. JPEG collapses to the conventional 'jpg';
@@ -26,7 +26,8 @@ export interface ExportSize {
  * sees it**. That is the crop (rounded to whole pixels — a drag leaves
  * sub-pixel sizes), or the full frame when there is no crop, with the two axes
  * **swapped on an odd quarter turn**, because a quarter turn stands the frame on
- * its end.
+ * its end. A free straighten angle then expands the result to the rotated
+ * bounding box, or the exported corners would be clipped.
  *
  * Sizing the export canvas to these values makes its aspect match the displayed
  * aspect, so the renderer's letterbox collapses to identity — the frame fills
@@ -49,9 +50,14 @@ export function exportDimensions(
 ): ExportSize {
   const width = crop ? Math.round(crop.width) : imageWidth
   const height = crop ? Math.round(crop.height) : imageHeight
-  return orientation.quarterTurns % 2 === 1
+  const frame = orientation.quarterTurns % 2 === 1
     ? { width: height, height: width }
     : { width, height }
+  // With a free angle the exported canvas must fit the ROTATED frame, or the
+  // corners get clipped. Same bounding box `uvTransform` letterboxes to, so the
+  // letterbox still collapses: no bars, and the preview and export agree.
+  const bbox = rotatedBoundingBox(frame.width, frame.height, orientation.angleDeg)
+  return { width: Math.round(bbox.width), height: Math.round(bbox.height) }
 }
 
 /**

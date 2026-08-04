@@ -143,6 +143,22 @@ describe('shader sources', () => {
     // Interpolated from TypeScript: a bare `5` would be an int and
     // `float RANGE = 5;` does not compile in GLSL ES 3.00.
     expect(AMOUNT_MAP_FRAGMENT_SHADER).toContain(`const float RANGE = ${AMOUNT_MAP_RANGE.toFixed(1)};`)
-    expect(AMOUNT_MAP_FRAGMENT_SHADER).toMatch(/const float RANGE = \d+\.\d+;/)
+    expect(AMOUNT_MAP_FRAGMENT_SHADER).toMatch(/const float RANGE = \d+\.\d+/)
+  })
+
+  it('paints a backdrop where the free angle leaves the frame', () => {
+    // A rotated quad's corners sample outside [0,1]²; the composite must return
+    // the backdrop colour there rather than clamping the image's edge texels.
+    expect(CLARITY_FRAGMENT_SHADER).toContain('uniform vec3 uBackdrop')
+    expect(CLARITY_FRAGMENT_SHADER).toContain('vec4(uBackdrop, 1.0)')
+    expect(CLARITY_FRAGMENT_SHADER).toContain('texture(uDeveloped, uv)')
+  })
+
+  it('keeps the frame edge inside the backdrop guard (inclusive bounds)', () => {
+    // uv == 0.0 / 1.0 exactly is the edge texel of the FRAME, not the backdrop:
+    // strict `<`/`>` comparisons would paint the four corners of every unrotated
+    // photo with the backdrop colour.
+    expect(CLARITY_FRAGMENT_SHADER).toMatch(/all\(greaterThanEqual\(uv, vec2\(0\.0\)\)\)/)
+    expect(CLARITY_FRAGMENT_SHADER).toMatch(/all\(lessThanEqual\(uv, vec2\(1\.0\)\)\)/)
   })
 })

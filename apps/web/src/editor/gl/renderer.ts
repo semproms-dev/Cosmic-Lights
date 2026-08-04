@@ -219,6 +219,7 @@ export class WebGLRenderer {
   private readonly uVignetteMid: WebGLUniformLocation | null
   private readonly uVignetteFeather: WebGLUniformLocation | null
   private readonly uFrameAspect: WebGLUniformLocation | null
+  private readonly uBackdrop: WebGLUniformLocation | null
   private readonly uGrain: WebGLUniformLocation | null
   private readonly uGrainSize: WebGLUniformLocation | null
   private readonly uGrainRoughness: WebGLUniformLocation | null
@@ -357,6 +358,11 @@ export class WebGLRenderer {
   private cropRegion: CropRegion | null = null
   private cropImageSize: [number, number] | null = null
   private orientation: Orientation = IDENTITY_ORIENTATION
+  // Colour behind the frame where the free-angle rotation uncovers the
+  // letterbox corners. Matches the surrounding panel so the backdrop reads as a
+  // mat, not a hole. Inert until a free angle is set: with angleDeg = 0 the
+  // quad always stays inside the image, so nothing ever samples it.
+  private backdrop: [number, number, number] = [0, 0, 0]
 
   // Interactive view (zoom/pan), applied to the final composite on top of the
   // letterbox. viewScale multiplies the fit-to-canvas scale; viewOffset pans the
@@ -522,6 +528,7 @@ export class WebGLRenderer {
     this.uVignetteMid = gl.getUniformLocation(this.clarityProgram, 'uVignetteMid')
     this.uVignetteFeather = gl.getUniformLocation(this.clarityProgram, 'uVignetteFeather')
     this.uFrameAspect = gl.getUniformLocation(this.clarityProgram, 'uFrameAspect')
+    this.uBackdrop = gl.getUniformLocation(this.clarityProgram, 'uBackdrop')
     this.uGrain = gl.getUniformLocation(this.clarityProgram, 'uGrain')
     this.uGrainSize = gl.getUniformLocation(this.clarityProgram, 'uGrainSize')
     this.uGrainRoughness = gl.getUniformLocation(this.clarityProgram, 'uGrainRoughness')
@@ -780,6 +787,22 @@ export class WebGLRenderer {
    */
   setOrientation(orientation: Orientation): void {
     this.orientation = orientation
+  }
+
+  /**
+   * Sets the colour painted behind the frame where the free-angle rotation
+   * leaves the quad short of the letterbox corners.
+   *
+   * The letterbox is sized to the rotated bounding box, so with no free angle
+   * nothing ever shows through and the uniform is inert. Defaults to black; the
+   * host should match it to its panel background for a Lightroom-style mat.
+   *
+   * @param red - Red channel, 0..1.
+   * @param green - Green channel, 0..1.
+   * @param blue - Blue channel, 0..1.
+   */
+  setBackdrop(red: number, green: number, blue: number): void {
+    this.backdrop = [red, green, blue]
   }
 
   /**
@@ -1994,6 +2017,11 @@ export class WebGLRenderer {
     gl.uniform1f(this.uVignetteMid, adjustments.vignetteMidpoint)
     gl.uniform1f(this.uVignetteFeather, adjustments.vignetteFeather)
     gl.uniform1f(this.uFrameAspect, imageAspect)
+    // Backdrop for the letterbox corners a free angle uncovers. Only visible
+    // while angleDeg ≠ 0; the shader returns it unprocessed (see the shader's
+    // `inFrame` guard) so it stays the panel colour instead of collecting the
+    // image's edge texels.
+    gl.uniform3f(this.uBackdrop, this.backdrop[0], this.backdrop[1], this.backdrop[2])
     // Film grain. No extra pass and no size to compute here: the shader sizes
     // the cells as a fraction of the frame (and squares them with the same
     // `imageAspect`), which is what keeps the preview, the export and the preset

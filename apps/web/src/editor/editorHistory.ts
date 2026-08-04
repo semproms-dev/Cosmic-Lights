@@ -87,7 +87,8 @@ const masksEqual = (a: Mask[], b: Mask[]): boolean =>
 
 const orientationEquals = (a: Orientation, b: Orientation): boolean =>
   a === b || // RESET_ORIENTATION reparte la misma ref (IDENTITY_ORIENTATION)
-  (a.quarterTurns === b.quarterTurns && a.flipH === b.flipH && a.flipV === b.flipV)
+  (a.quarterTurns === b.quarterTurns &&
+   a.flipH === b.flipH && a.flipV === b.flipV && a.angleDeg === b.angleDeg)
 
 const sliceEquals = (a: HistorySlice, b: HistorySlice): boolean =>
   a.cropRatio === b.cropRatio &&

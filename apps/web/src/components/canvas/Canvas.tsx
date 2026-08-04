@@ -6,6 +6,7 @@ import { buildInitialAdjustments } from '../../editor/editorReducer'
 import { WebGLRenderer } from '../../editor/gl/renderer'
 import { toRenderAdjustments } from '../../editor/renderAdjustments'
 import { logger } from '../../logger'
+import { useComputedColorScheme } from '@mantine/core'
 import { useContextMenu } from 'mantine-contextmenu'
 import { IconZoomReset } from '@tabler/icons-react'
 import { ConfirmDialog } from '../window/ConfirmDialog'
@@ -113,8 +114,9 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     resetAdjustements, 
     resetCurves, 
     loadImage, 
-    cropRegion, 
-    clearCrop, 
+    cropRegion,
+    clearCrop,
+    setCropRatio,
     resetDialogOpen, 
     openResetDialog, 
     closeResetDialog, 
@@ -138,6 +140,9 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   const spinRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<WebGLRenderer | null>(null)
   const { showContextMenu } = useContextMenu()
+  // 'auto' resolved to what is actually on screen, which is what the backdrop
+  // has to match. Falls back to the provider's own default scheme.
+  const colorScheme = useComputedColorScheme('dark')
   // Holds the last pointer position while panning; null when not dragging.
   const panRef = useRef<{ x: number; y: number } | null>(null)
   // Redraws the scene on demand (set by the render effect). Live brush painting
@@ -277,6 +282,27 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     // `maskAlphas` is a stable ref-backed Map, so it never fires this effect on
     // its own: `masks` (via each mask's `version`) is what signals a new alpha.
   }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId, orientation, showOriginal])
+
+  // Backdrop for the corners a free-angle rotation uncovers: whatever is painted
+  // behind the canvas (the Mantine body colour) so the letterbox reads as a mat,
+  // not a hole. Read from the DOM rather than hardcoded, so it tracks whatever
+  // the theme says the page is.
+  //
+  // Keyed on the colour scheme, and it has to be: read it once at startup and
+  // the mat keeps the colour of the theme the canvas mounted under, so switching
+  // to light leaves dark corners (and back). Placed after the redraw effect so
+  // `drawRef` is already set on mount — a colour is not React state the renderer
+  // watches, so the frame has to be asked for.
+  useEffect(() => {
+    // `rgb(26, 27, 30)` → 0..255 per channel, and setBackdrop takes 0..1: pass
+    // them raw and every channel saturates, painting the corners white.
+    const channels = getComputedStyle(document.body).backgroundColor.match(/\d+/g)?.map(Number)
+    if (channels === undefined || channels.length < 3) {
+      return
+    }
+    rendererRef.current?.setBackdrop(channels[0] / 255, channels[1] / 255, channels[2] / 255)
+    drawRef.current()
+  }, [colorScheme])
 
   // Promote the denoise to its slow, much better filter once the noise controls
   // stop moving.
@@ -630,13 +656,22 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
+  // Back to how the photo opened: sliders, curves, crop, orientation and the
+  // fitted view. The ratio goes with the crop — leave it behind and the next
+  // crop the user drags is still locked to a 16:9 they thought they had undone.
   const resetSettings = () => {
     resetAdjustements();
     resetCurves();
     clearCrop();
+    setCropRatio('Original');
     closeResetDialog();
     setView(IDENTITY_VIEW);
     resetOrientation();
+    // Last, and it has to be last: COMMIT snapshots whatever the dispatches
+    // above left behind. Without it the history's checkpoint stays on the
+    // pre-reset photo, so the reset is not undoable and the next commit files
+    // the stale checkpoint as if it were the state the user came from.
+    commit();
   }
 
   return <>

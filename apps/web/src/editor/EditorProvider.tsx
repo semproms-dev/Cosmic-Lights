@@ -45,7 +45,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
       resetDialogOpen: false,
       masks: [],
       activeMaskId: null,
-      orientation: {flipH: false, flipV: false, quarterTurns: 0}
+      orientation: {flipH: false, flipV: false, quarterTurns: 0, angleDeg: 0}
     }),
   )
   // The full live state lives in `history.present`; everything below reads it.
@@ -438,6 +438,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
     dispatch({ type: 'SET_MASK_GRADIENT', id, gradient })
   }
 
+  const setRotationAngle = (angleDeg: number) => {
+    dispatch({ type: 'SET_ROTATION_ANGLE', angleDeg })
+  }
+
   /**
    * Decodes a photo and stores the result for the canvas to draw. Runs the async
    * decode off the reducer (which stays pure); reports failures through
@@ -539,7 +543,9 @@ export function EditorProvider({ children }: EditorProviderProps) {
         flipV,
         flipH,
         rotationSpin,
-        setMaskRadial
+        setMaskRadial,
+        setRotationAngle,
+        angle: state.orientation.angleDeg
       }}
     >
       {children}

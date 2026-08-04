@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { CropRegion } from './image'
 import {
+  applyInverseUvTransform,
   applyUvTransform,
   cropToUvTransform,
   IDENTITY_ORIENTATION,
+  rotatedBoundingBox,
   turn,
   uvTransform,
   type Orientation,
@@ -273,5 +275,131 @@ describe('uvTransform — crop and orientation together', () => {
       bottomRight: { x: 200, y: 50 },
       bottomLeft: { x: 200, y: 100 },
     })
+  })
+})
+
+describe('rotatedBoundingBox', () => {
+  it('is the identity at 0°', () => {
+    expect(rotatedBoundingBox(100, 50, 0)).toEqual({ width: 100, height: 50 })
+  })
+
+  it('swaps the axes at 90°', () => {
+    const bbox = rotatedBoundingBox(100, 50, 90)
+    expect(bbox.width).toBeCloseTo(50)
+    expect(bbox.height).toBeCloseTo(100)
+  })
+
+  it('sweeps the widest box at 45°, where the frame stands on its corner', () => {
+    const bbox = rotatedBoundingBox(100, 50, 45)
+    const c = Math.SQRT1_2
+    expect(bbox.width).toBeCloseTo(100 * c + 50 * c)
+    expect(bbox.height).toBeCloseTo(100 * c + 50 * c)
+  })
+})
+
+describe('uvTransform — free angle', () => {
+  it('bakes cos/sin entries into the matrix, scaled by the bounding box', () => {
+    const t = uvTransform(orientation({ angleDeg: 30 }), null, W, H)
+    const rad = (30 * Math.PI) / 180
+    const bbox = rotatedBoundingBox(W, H, 30)
+    // Full frame, even turn: matrix = diag(1/W, 1/H) · R(−30°) · diag(bbox).
+    // The bbox factors are the fix for the squashed straighten: vUv runs across
+    // the drawn quad, which is the bounding box, not the unrotated frame.
+    expect(t.matrix[0]).toBeCloseTo((Math.cos(rad) * bbox.width) / W, 10)
+    expect(t.matrix[3]).toBeCloseTo((Math.cos(rad) * bbox.height) / H, 10)
+    expect(t.matrix[2]).toBeCloseTo((Math.sin(rad) * bbox.height) / W, 10)
+    expect(t.matrix[1]).toBeCloseTo((-Math.sin(rad) * bbox.width) / H, 10)
+  })
+
+  // The regression guard for the distorted straighten. In image PIXELS the
+  // matrix must stay a rotation of the bounding box: perpendicular columns whose
+  // lengths are bboxW and bboxH. Scale by the unrotated frame instead and the
+  // ratio comes out as outW/outH — the anisotropic stretch that made the photo
+  // squashed and its corners non-square on screen.
+  describe.each([-42, -12, 12, 30, 45, 77])('at %i°', (angleDeg) => {
+    it.each([
+      { label: 'full frame', crop: null, o: {} },
+      { label: 'cropped', crop: CROP, o: {} },
+      { label: 'cropped, odd turn', crop: CROP, o: { quarterTurns: 1 as QuarterTurns } },
+      { label: 'cropped, flipped', crop: CROP, o: { flipH: true } },
+    ])('maps the quad to a similar rectangle ($label)', ({ crop, o }) => {
+      const t = uvTransform(orientation({ ...o, angleDeg }), crop, W, H)
+      const [m00, m10, m01, m11] = t.matrix
+      // Undo the UV normalisation: image UV → image pixels.
+      const col0 = { x: m00 * W, y: m10 * H }
+      const col1 = { x: m01 * W, y: m11 * H }
+      const region = crop ?? { width: W, height: H }
+      const turned = (o.quarterTurns ?? 0) % 2 === 1
+      const bbox = rotatedBoundingBox(
+        turned ? region.height : region.width,
+        turned ? region.width : region.height,
+        angleDeg,
+      )
+
+      expect(col0.x * col1.x + col0.y * col1.y).toBeCloseTo(0, 8)
+      expect(Math.hypot(col0.x, col0.y)).toBeCloseTo(bbox.width, 8)
+      expect(Math.hypot(col1.x, col1.y)).toBeCloseTo(bbox.height, 8)
+    })
+  })
+
+  /**
+   * The on-screen slope of a horizontal source line, in the drawn quad's own
+   * units — the quad is the bounding box, so a vUv delta has to be scaled by it
+   * before the angle means anything. Positive is "falls to the right" (y-down).
+   */
+  const horizonSlope = (o: Partial<Orientation>): number => {
+    const t = uvTransform(orientation(o), null, W, H)
+    const left = applyInverseUvTransform(t, { x: 0.4, y: 0.5 })
+    const right = applyInverseUvTransform(t, { x: 0.6, y: 0.5 })
+    const turned = (o.quarterTurns ?? 0) % 2 === 1
+    const bbox = rotatedBoundingBox(turned ? H : W, turned ? W : H, o.angleDeg ?? 0)
+    return ((right.y - left.y) * bbox.height) / ((right.x - left.x) * bbox.width)
+  }
+
+  it('tilts the horizon the same way whether or not the image is mirrored', () => {
+    // R_free sits inside the mirror (`F · R(θ) = R(−θ) · F`), so hoisting it out
+    // of the flip would send the straighten the other way round with exactly one
+    // flip on. A mirror reverses the *direction* the line is traversed, never the
+    // direction it leans.
+    expect(horizonSlope({ angleDeg: 20 })).toBeCloseTo(Math.tan((20 * Math.PI) / 180), 10)
+    expect(horizonSlope({ angleDeg: 20, flipH: true })).toBeCloseTo(horizonSlope({ angleDeg: 20 }), 10)
+    expect(horizonSlope({ angleDeg: 20, flipV: true })).toBeCloseTo(horizonSlope({ angleDeg: 20 }), 10)
+  })
+
+  it('adds the free angle on top of a quarter turn, not underneath it', () => {
+    // A quarter turn stands that same horizon on its end, so it comes out
+    // perpendicular to the unturned one — still leaning by the free angle, which
+    // is what "the straighten applies to the displayed frame" means.
+    const rad = (20 * Math.PI) / 180
+    expect(horizonSlope({ angleDeg: 20, quarterTurns: 1 })).toBeCloseTo(-1 / Math.tan(rad), 10)
+  })
+
+  it('turns the display clockwise on a positive angle', () => {
+    const t = uvTransform(orientation({ angleDeg: 90 }), null, W, H)
+    const topMid = applyUvTransform(t, { x: 0.5, y: 0 })
+    const bottomMid = applyUvTransform(t, { x: 0.5, y: 1 })
+    // Clockwise: the source's left half rides up to the top edge.
+    expect(topMid.x).toBeLessThan(0.5)
+    expect(bottomMid.x).toBeGreaterThan(0.5)
+  })
+
+  it('turns anticlockwise on a negative angle', () => {
+    const t = uvTransform(orientation({ angleDeg: -90 }), null, W, H)
+    const topMid = applyUvTransform(t, { x: 0.5, y: 0 })
+    const bottomMid = applyUvTransform(t, { x: 0.5, y: 1 })
+    expect(topMid.x).toBeGreaterThan(0.5)
+    expect(bottomMid.x).toBeLessThan(0.5)
+  })
+
+  it('letterboxes to the rotated bounding box', () => {
+    const t = uvTransform(orientation({ angleDeg: 30 }), CROP, W, H)
+    const bbox = rotatedBoundingBox(CROP.width, CROP.height, 30)
+    expect(t.displayedAspect).toBeCloseTo(bbox.width / bbox.height, 10)
+  })
+
+  it('letterboxes to the bbox of the SWAPPED frame on an odd turn', () => {
+    const t = uvTransform(orientation({ quarterTurns: 1, angleDeg: 30 }), CROP, W, H)
+    const bbox = rotatedBoundingBox(CROP.height, CROP.width, 30)
+    expect(t.displayedAspect).toBeCloseTo(bbox.width / bbox.height, 10)
   })
 })
