@@ -1,10 +1,11 @@
-import { Group, Slider, Stack, Text, Tooltip } from '@mantine/core';
+import { Group, Slider, Stack, Text, TextInput, Tooltip } from '@mantine/core';
 import classes from '../styles/ControlSlider.module.css';
-import { useHover } from '@mantine/hooks';
+import { useHover, useWindowEvent } from '@mantine/hooks';
 import { useEditor } from '../../../editor/editorContext';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { usePreferences } from '../../../preferences/preferences';
+import { useState, type ChangeEvent } from 'react';
 
 interface ControlSliderProps {
   label: string;
@@ -27,9 +28,11 @@ interface ControlSliderProps {
 }
 
 /**
- * A single labelled adjustment row: the control's name, its current value and a
- * Mantine `Slider`. Purely presentational and controlled — it owns no state and
- * reports every change to the parent via `onChange`.
+ * A single labelled adjustment row: the control's name, its current value, a
+ * Mantine `Slider` and a compact numeric `TextInput` for typing an exact value.
+ * The slider is fully controlled; the input keeps a local string mirror of the
+ * value so partial or invalid text is safe to type, committing the parsed,
+ * clamped number back through `onChange` on Enter or blur.
  */
 export function ControlSlider({
   label,
@@ -47,6 +50,65 @@ export function ControlSlider({
   const { t } = useTranslation(['common']);
   const { preferences } = usePreferences();
   const showReset = hovered && onReset !== undefined;
+  const [prevValue, setPrevValue] = useState(value);
+  const [inputValue, setInputValue] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+  const [input, setInput] = useState(false);
+
+  useWindowEvent('keydown', (event) => {
+    if(!input || event.key !== 'Escape') return;
+    setInputValue(String(value));
+    setInput(false);
+  })
+
+  /**
+   * Keeps the typed text in step with the slider. The input mirrors an external
+   * value (drag, reset, auto-denoise), so the mirror must follow it. Adjusting
+   * state during render is the React-endorsed alternative to a `useEffect` that
+   * calls `setState`: React re-renders with the fresh prop before the browser
+   * paints, so the text never shows a stale value for a frame.
+   *
+   * While the input is focused the sync stands down: the user's own keystrokes
+   * are the only writer, and a committed value echoing back would fight text
+   * that is not yet a complete number (a trailing dot, a leading minus).
+   */
+  if (!focused && prevValue !== value) {
+    setPrevValue(value);
+    setInputValue(String(value));
+  }
+
+  /**
+   * Applies the typed number through `onChange` so the preview moves the moment
+   * the text changes. Blur or Enter mark the end of the gesture: then the value
+   * also gets its single undo checkpoint (`onChangeEnd`) and the text is
+   * normalised to the clamped number. While typing, invalid text is left alone
+   * instead of being reverted mid-keystroke.
+   */
+  const commitInput = (text: string, checkpoint: boolean) => {
+    const parsed = Number(text);
+    if (Number.isNaN(parsed) || text.trim() === '') {
+      if (checkpoint) setInputValue(String(value));
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, parsed));
+    if (clamped !== value) {
+      onChange(clamped);
+      if (checkpoint) onChangeEnd?.();
+    }
+    if (checkpoint) setInputValue(String(clamped));
+  };
+
+  /**
+   * Steps the committed value by ±0.01, clamped to the range. Shared by the
+   * `TextInput` and the focusable value readout so both answer the arrow keys.
+   */
+  const nudge = (direction: 1 | -1) => {
+    const stepped = Math.min(max, Math.max(min, value + direction * 0.01));
+    // Rounding keeps repeated presses from showing float noise
+    // (0.05 + 0.01 prints as "0.060000000000000005").
+    commitInput(String(Math.round(stepped * 100) / 100), true);
+  };
+
   return (
     <Stack gap={4} className={classes.control}>
       <Group justify="space-between" gap="xs">
@@ -77,9 +139,73 @@ export function ControlSlider({
             <span style={{ visibility: showReset ? 'visible' : 'hidden' }}>{t('common.reset')}</span>
           </Text>
         </Group> 
-        <Text size="sm" c="dimmed">
-          {value}
-        </Text>
+        {input ? 
+          <TextInput
+            size="xs"
+            w={46}
+            aria-label={label}
+            disabled={image === null}
+            value={inputValue}
+            onChange={(event) => {
+              setInputValue(event.currentTarget.value);
+              commitInput(event.currentTarget.value, false);
+            }}
+            onFocus={() => setFocused(true)}
+            onBlur={(event) => {
+              setFocused(false);
+              commitInput(event.currentTarget.value, true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                commitInput(event.currentTarget.value, true);
+                event.currentTarget.blur();
+              }
+              if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                nudge(event.key === 'ArrowUp' ? 1 : -1);
+              }
+
+              if (event.key === 'Escape') {
+                // Cancel the edit: discard the typed text without committing and
+                // close the input. Escape must not be an undo-point, so no
+                // `commitInput` here.
+                setInputValue(String(value));
+                setInput(false);
+              }
+            }}
+          /> :         
+          <Text
+            size="sm"
+            c="dimmed"
+            role="spinbutton"
+            aria-label={label}
+            aria-valuemin={min}
+            aria-valuemax={max}
+            aria-valuenow={value}
+            tabIndex={image === null ? -1 : 0}
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              // Re-seed the mirror from the committed value on open, so a
+              // cancelled edit never shows up next time the input appears.
+              setInputValue(String(value));
+              setInput(!input);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                nudge(event.key === 'ArrowUp' ? 1 : -1);
+              }
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setInputValue(String(value));
+                setInput(true);
+              }
+            }}
+          >
+            {value}
+          </Text>
+        }
+
       </Group>
       <Slider
         value={value}
