@@ -48,11 +48,12 @@
   "topNav": {
     "file": "Datei",
     "open": "Öffnen...",
+    "openFile": "Datei öffnen",
     "exportJpg": "Als JPG exportieren...",
     "showOriginal": "Original anzeigen",
     "showEdited": "Bearbeitete Version anzeigen",
     "undo": "Rückgängig",
-    "undoAll": "Réinitialiser l'image",
+    "undoAll": "Bild zurücksetzen",
     "redo": "Wiederholen",
     "settings": "Einstellungen",
     "about": "Über"

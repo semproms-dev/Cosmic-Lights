@@ -48,6 +48,7 @@
   "topNav": {
     "file": "File",
     "open": "Open...",
+    "openFile": "Open file",
     "exportJpg": "Export JPG...",
     "showOriginal": "Show original",
     "showEdited": "Show edited",

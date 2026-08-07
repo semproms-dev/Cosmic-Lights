@@ -2,12 +2,10 @@ import { useState } from 'react';
 
 import {
   IconSettings,
-  IconFile,
   IconFolderOpen,
-  IconPhoto,
   IconInfoCircle,
 } from '@tabler/icons-react';
-import { Group, Tooltip, UnstyledButton, Menu, ActionIcon } from '@mantine/core';
+import { Group, Tooltip, ActionIcon } from '@mantine/core';
 import classes from '../styles/TopNavBar.module.css';
 import { FaRedoAlt, FaUndoAlt } from "react-icons/fa";
 import { useEditor } from '../../../editor/editorContext';
@@ -20,18 +18,18 @@ import { IconViewfinder } from '@tabler/icons-react';
 import { IconViewfinderOff } from '@tabler/icons-react';
 import { usePreferences } from '../../../preferences/preferences';
 
-interface MenuItem {
+/*interface MenuItem {
   label: string;
   icon: typeof IconFile,
   onClick: () => void
 }
 
-interface MainLink {
+/*interface MainLink {
   label: string;
   icon: typeof IconFile,
   items: MenuItem[],
   onClick: () => void
-}
+}*/
 
 
 interface NavBarProps {
@@ -40,8 +38,8 @@ interface NavBarProps {
 }
 
 export function NavBar({ onOpenImage }: NavBarProps = {}) {
-  const [active, setActive] = useState('File');
-  const [openedLabel, setOpenedLabel] = useState('');
+  /*const [active, setActive] = useState('File');
+  const [openedLabel, setOpenedLabel] = useState('');*/
   const {redo, undo, canRedo, canUndo, openResetDialog, image, imageDirty, showOriginal, setShowOriginal} = useEditor();
   const modals = useModals();
   const { t } = useTranslation(['common']);
@@ -63,15 +61,14 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
       children: <AboutModal />
     })
   }
-
-  const mainLinksMockdata: MainLink[] = [
+  // TODO: When we implement stacking options I will group some elements inside a menu
+  /*const mainLinksMockdata: MainLink[] = [
   { icon: IconFile, label: t('topNav.file'), items: [
     { icon: IconFolderOpen, label: t('topNav.open'), onClick: () => onOpenImage?.()},
-    { icon: IconPhoto, label: t('topNav.exportJpg'), onClick: () => {} }
   ], onClick: () => {}}
-];
+];*/
 
-  const mainLinks = mainLinksMockdata.map((link) => (
+  /*const mainLinks = mainLinksMockdata.map((link) => (
     <Menu
       key={link.label}
       trigger='click'
@@ -117,7 +114,7 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
         </Menu.Dropdown>
     </Menu>
     
-  ));
+  ));*/
 
   return (
     <nav
@@ -125,7 +122,11 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
       style={isBottom ? { order: 1 } : undefined}
     >
       <Group gap="xs" w="100%" justify={preferences.menuPosition === 'right' ? 'flex-end' : 'flex-start'}>
-        <Group gap="xs">{mainLinks}</Group>
+        <Tooltip label={t('topNav.openFile')} withArrow>
+          <ActionIcon size='lg' variant='subtle' onClick={() => onOpenImage?.()} aria-label={t('topNav.openFile')}>
+            <IconFolderOpen />
+          </ActionIcon>
+        </Tooltip>
         <Tooltip label={t(showOriginal ? 'topNav.showEdited' : 'topNav.showOriginal')} withArrow>
           <ActionIcon size="lg" variant='subtle' onClick={() => setShowOriginal(!showOriginal)} disabled={image === null || !imageDirty}>
             {showOriginal ? <IconViewfinderOff /> : <IconViewfinder />}

@@ -6,8 +6,8 @@ describe('NavBar', () => {
   it('renders the main navigation links', () => {
     render(<NavBar />)
 
-    // The menu buttons expose their label via aria-label.
-    expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument()
+    // The toolbar buttons expose their label via aria-label.
+    expect(screen.getByRole('button', { name: 'Open file' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument()
   })

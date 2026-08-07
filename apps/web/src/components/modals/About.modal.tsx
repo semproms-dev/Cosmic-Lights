@@ -1,10 +1,10 @@
-import { Badge, Text, Title } from '@mantine/core';
-import { SiLens } from 'react-icons/si';
+import { Badge, Text, Title, Image } from '@mantine/core';
 import {
   IconBrandGithub,
   IconWorld,
 } from '@tabler/icons-react';
 import classes from './styles/About.modal.module.css';
+import logoCosmicLights from '../../assets/CosmicLightsLogo.png';
 import { useTranslation } from 'react-i18next';
 
 const APP_VERSION = '1.0.0';
@@ -19,9 +19,7 @@ export function AboutModal() {
   return (
     <div>
       <div className={classes.hero}>
-        <div className={classes.logo}>
-          <SiLens size={40} />
-        </div>
+          <Image src={logoCosmicLights} alt='Cosmic Lights' h={160} w={160} />
         <Title order={3}>CosmicLights</Title>
         <Text className={classes.tagline}>
           {t('about.tagline')}
