@@ -59,19 +59,6 @@ export function DistortionComponent() {
         the moment either moved, and the second one to be dragged would silently
         win. One value, two views.
       */}
-      <Stack gap={2}>
-        <Text size="xs" c="dimmed">{t('masks.axisRotate')}</Text>
-        <Slider
-          value={angle}
-          disabled={disabled}
-          onChange={setRotationAngle}
-          onChangeEnd={commit}
-          min={-45}
-          max={45}
-          step={0.1}
-          thumbLabel={t('masks.axisRotate')}
-        />
-      </Stack>
 
       <Title order={6}>{t('masks.offset')}</Title>
       {control('offsetX', t('masks.axisX'))}
