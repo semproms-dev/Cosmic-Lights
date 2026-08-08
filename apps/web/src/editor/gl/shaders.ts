@@ -95,6 +95,79 @@ vec3 applyExposure(vec3 c, float ev) {
 `
 
 /**
+ * Contrast, shared by the pipeline pass and the mask pass.
+ *
+ * **Why this is not the straight line it replaces.** The old form was
+ * `(x - 0.5) * k + 0.5` with `k = 1 + slider/100`, and its problem was not the
+ * range but that both ends of the range were unusable:
+ *
+ * - Upward it is a hard clip. At +50 everything above 0.833 burns to white and
+ *   everything below 0.167 crushes to black; at +100 that is **half the tonal
+ *   range gone**. And it is gone for good — pass 1 writes RGBA8, so neither
+ *   Highlights nor a mask can bring any of it back.
+ * - Downward `k` reaches 0 at −100, i.e. a flat grey frame, and is already fog
+ *   by −70.
+ *
+ * So the useful travel was roughly −50…+40 out of −100…+100, which is what
+ * "the slider runs out too fast" actually was.
+ *
+ * The replacement is the same idea as the exposure shoulder, made symmetric: a
+ * curve asymptotic at BOTH ends, so nothing ever clips.
+ *
+ * **Why this particular curve.** It has the four properties that matter, and the
+ * third is what makes it the right one rather than merely a working one:
+ *
+ * 1. `f(0) = 0` and `f(1) = 1` exactly — the range is preserved, always.
+ * 2. It is a bijection of [0,1], and `k` and `1/k` undo each other, so the
+ *    negative half of the slider is exactly as usable as the positive half.
+ * 3. It is **C¹ at the pivot**: the slope is exactly `k` on both sides, so there
+ *    is no visible kink through the midtones. That seam is what betrays a
+ *    hand-rolled S-curve, the same reason `shoulderCurve` above is a hyperbola
+ *    and not Reinhard.
+ * 4. The slope at the pivot is `k`, so the strength through the midtones matches
+ *    what the old line already had. What changes is everything either side.
+ *
+ * **Why it stays in encoded values, unlike the exposure.** Tempting to conclude
+ * that this needs the same linear-light wrapper. It does not: an S-curve is a
+ * perceptual operation, and the pivot here is already right — 0.5 encoded is
+ * `0.5^2.2 = 0.218` in light, i.e. middle grey. Only cause 2 of
+ * `docs/exposure-response.technical.md` applies to contrast, never cause 1.
+ */
+const CONTRAST_GLSL = `
+/** Slider → the curve's exponent, which is also its slope at the pivot. */
+float contrastGain(float contrast) {
+  // exp2, so ±100 are exact reciprocals (x2 and /2) and the slider is symmetric
+  // about its middle. A linear 1 + s/100 is not: it bottoms out at a flat grey.
+  return exp2(contrast / 100.0);
+}
+
+/**
+ * One channel through the S-curve. THE ONE CONSTANT TO TUNE if the whole slider
+ * wants to be stronger or weaker is the divisor in contrastGain, not this.
+ */
+float contrastCurve(float x, float k) {
+  // max(): pow of a negative is undefined in GLSL, and x can leave [0,1] here —
+  // the exposure rolloff can hand back a hair over 1, and the four zone offsets
+  // add up to another 0.25 either way. Out-of-range values pin to 0 or 1, which
+  // costs nothing: applyCurve clamps them a few lines later regardless.
+  return x < 0.5
+    ? 0.5 * pow(max(2.0 * x, 0.0), k)
+    : 1.0 - 0.5 * pow(max(2.0 - 2.0 * x, 0.0), k);
+}
+
+/** Contrast about mid grey, asymptotic at 0 and 1 so it can never clip. */
+vec3 applyContrast(vec3 c, float contrast) {
+  // Exact identity at rest, and it also skips three pow() per pixel on every
+  // frame the slider has not been touched. Not optional: pow(x, 1.0) is
+  // typically exp2(1.0 * log2(x)), which does NOT return x bit for bit, so
+  // without this guard an untouched photo would be restyled.
+  if (contrast == 0.0) { return c; }
+  float k = contrastGain(contrast);
+  return vec3(contrastCurve(c.r, k), contrastCurve(c.g, k), contrastCurve(c.b, k));
+}
+`
+
+/**
  * Colour grading: a tint per tonal zone, the three wheels of the Color panel.
  *
  * Only in the pipeline pass, not in the mask one. Grading is global for now (so
@@ -916,12 +989,12 @@ uniform float uSaturation;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 ${EXPOSURE_GLSL}
+${CONTRAST_GLSL}
 
 void main() {
   vec4 texel = texture(uImage, vUv);
   vec3 base = texel.rgb;
   vec3 rgb = applyExposure(base, uExposure);
-  float k = 1.0 + uContrast / 100.0;
   float hi = uHighlights / 100.0;
   float sh = uShadows / 100.0;
   float wh = uWhites / 100.0;
@@ -936,7 +1009,7 @@ void main() {
   rgb += sh * 0.25 * (dark * dark);
   rgb += wh * 0.25 * (luma * luma * luma * luma);
   rgb += bl * 0.25 * (dark * dark * dark * dark);
-  rgb = (rgb - 0.5) * k + 0.5;
+  rgb = applyContrast(rgb, uContrast);
   rgb.r *= 1.0 + t * 0.3;
   rgb.b *= 1.0 - t * 0.3;
   rgb.g *= 1.0 - ti * 0.3;
@@ -1187,12 +1260,12 @@ float applyCurve(float v, float row) {
   return texture(uCurveLut, vec2(u, (row + 0.5) / 4.0)).r;
 }
 ${EXPOSURE_GLSL}
+${CONTRAST_GLSL}
 ${GRADING_GLSL}
 
 void main() {
   vec4 texel = texture(uImage, vUv);
   vec3 rgb = applyExposure(texel.rgb, uExposure);
-  float k = 1.0 + uContrast / 100.0;
   float hi = uHighlights / 100.0;
   float sh = uShadows / 100.0;
   float wh = uWhites / 100.0;
@@ -1211,7 +1284,7 @@ void main() {
   rgb += sh * 0.25 * (dark * dark);
   rgb += wh * 0.25 * (luma * luma * luma * luma);
   rgb += bl * 0.25 * (dark * dark * dark * dark);
-  rgb = (rgb - 0.5) * k + 0.5;
+  rgb = applyContrast(rgb, uContrast);
   rgb.r *= 1.0 + t * 0.3;
   rgb.b *= 1.0 - t * 0.3;
   rgb.g *= 1.0 - ti * 0.3;

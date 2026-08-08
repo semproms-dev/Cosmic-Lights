@@ -71,6 +71,64 @@ describe('shader sources', () => {
     expect(FRAGMENT_SHADER).toContain('if (ev == 0.0) { return c; }')
   })
 
+  it('shares one contrast implementation between the two develop passes', () => {
+    // Same risk as the exposure above: the mask pass is a copy of the tone
+    // block, so a fix landing in one and not the other means a mask's contrast
+    // stops matching the global slider. Both call the shared helper, and neither
+    // may keep the straight line it replaced.
+    for (const source of [FRAGMENT_SHADER, MASK_FRAGMENT_SHADER]) {
+      expect(source).toContain('applyContrast(rgb, uContrast)')
+      expect(source).toContain('float contrastCurve(float x, float k)')
+      expect(source).not.toContain('(rgb - 0.5) * k + 0.5')
+      expect(source).not.toContain('1.0 + uContrast / 100.0')
+    }
+  })
+
+  it('keeps contrast an exact identity at rest', () => {
+    // pow(x, 1.0) is typically exp2(1.0 * log2(x)) and does NOT return x bit for
+    // bit, so without the early out a slider at 0 would still restyle the photo.
+    expect(FRAGMENT_SHADER).toContain('if (contrast == 0.0) { return c; }')
+  })
+
+  it('guards the contrast curve against the pow of a negative', () => {
+    // x leaves [0,1] here: the exposure rolloff can hand back a hair over 1 and
+    // the four zone offsets add another 0.25 either way. pow of a negative is
+    // undefined in GLSL, which is a garbage pixel, not an error.
+    expect(FRAGMENT_SHADER).toContain('pow(max(2.0 * x, 0.0), k)')
+    expect(FRAGMENT_SHADER).toContain('pow(max(2.0 - 2.0 * x, 0.0), k)')
+  })
+
+  it('maps the contrast slider through exp2, so its two halves are reciprocal', () => {
+    // A linear 1 + s/100 is what made the negative half unusable: it reaches a
+    // flat grey frame at -100 and is already fog by -70.
+    expect(FRAGMENT_SHADER).toContain('return exp2(contrast / 100.0);')
+  })
+
+  it('keeps contrast in encoded values, unlike the exposure', () => {
+    // The tempting wrong conclusion from the exposure fix. An S-curve is a
+    // perceptual operation and the pivot is already right: 0.5 encoded is
+    // 0.5^2.2 = 0.218 in light, i.e. middle grey. Wrapping this in the gamma
+    // round trip too would move the pivot off middle grey.
+    const contrast = FRAGMENT_SHADER.slice(
+      FRAGMENT_SHADER.indexOf('float contrastCurve'),
+      FRAGMENT_SHADER.indexOf('vec3 applyContrast'),
+    )
+    expect(contrast).not.toContain('EXPOSURE_GAMMA')
+  })
+
+  it('applies contrast after the zone offsets and before white balance', () => {
+    // Unchanged from the straight line it replaces. The zones shape which tones
+    // exist; contrast then stretches them; the WB multiplies come after so a
+    // warm tint is not itself S-curved.
+    const zones = FRAGMENT_SHADER.indexOf('rgb += bl * 0.25')
+    const contrast = FRAGMENT_SHADER.indexOf('rgb = applyContrast(rgb, uContrast);')
+    const balance = FRAGMENT_SHADER.indexOf('rgb.r *= 1.0 + t * 0.3;')
+
+    expect(zones).toBeGreaterThan(-1)
+    expect(contrast).toBeGreaterThan(zones)
+    expect(balance).toBeGreaterThan(contrast)
+  })
+
   it('grades between saturation and the curves', () => {
     // After saturation, or a later global saturation would amplify the tint the
     // wheels just laid down; before the curves, or moving a curve point would
