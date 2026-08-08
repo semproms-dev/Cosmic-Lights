@@ -48,9 +48,10 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
 
   const openSettings = () => {
     modals.openModal({
+      modalId: 'settings',
       title: t('topNav.settings'),
       size: 'lg',
-      children: <AdjustementsModal />,
+      children: <AdjustementsModal modalId="settings" />,
     });
   };
 

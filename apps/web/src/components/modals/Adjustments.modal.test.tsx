@@ -13,14 +13,14 @@ const VISIBLE_INPUT = { selector: 'input:not([type="hidden"])' } as const;
 
 describe('AdjustementsModal', () => {
   it('lists the General and Language categories', () => {
-    render(<AdjustementsModal />);
+    render(<AdjustementsModal modalId="settings" />);
 
     expect(screen.getByRole('tab', { name: 'General' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Language' })).toBeInTheDocument();
   });
 
   it('shows the General panel by default', () => {
-    render(<AdjustementsModal />);
+    render(<AdjustementsModal modalId="settings" />);
 
     expect(
       within(screen.getByRole('radiogroup', { name: 'Panel position' })).getByRole('radio', { name: 'Right' }),
@@ -31,7 +31,7 @@ describe('AdjustementsModal', () => {
 
   it('reveals the Language panel when its tab is selected', async () => {
     const user = userEvent.setup();
-    render(<AdjustementsModal />);
+    render(<AdjustementsModal modalId="settings" />);
 
     await user.click(screen.getByRole('tab', { name: 'Language' }));
 
