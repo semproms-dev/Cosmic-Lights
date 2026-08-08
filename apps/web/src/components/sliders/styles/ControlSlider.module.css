@@ -8,10 +8,77 @@
  * the text instead made the label flicker: it shrank, the pointer fell outside,
  * the hover dropped, and the long label came back under the pointer again.
  */
+/*
+ * The side that gives way when the row is too narrow. `min-width: 0` on both the
+ * group and the text is the part that is easy to miss: a flex item refuses by
+ * default to shrink below its content's intrinsic width, so without it the long
+ * grading labels would just overflow the rail instead of wrapping.
+ */
+.labelGroup {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The helper icon is not the one that should absorb the squeeze. */
+.labelGroup svg {
+  flex-shrink: 0;
+}
+
 .label {
   display: grid;
+  min-width: 0;
 }
 
 .label > span {
   grid-area: 1 / 1;
+}
+
+/*
+ * The value readout and its editable input share one grid cell, the same trick
+ * the label uses above and for the same reason: the row must not resize when the
+ * two swap. The cell has a fixed width so the number cannot widen the row either
+ * while the slider is dragged from "0" to "-100".
+ */
+.value {
+  display: grid;
+  width: 54px;
+  /* Fixed means fixed: in a `nowrap` row it must not be the one that shrinks. */
+  flex: none;
+}
+
+.value > * {
+  grid-area: 1 / 1;
+  width: 100%;
+}
+
+/*
+ * `variant="unstyled"` only zeroes the input's padding — Mantine still pins it to
+ * `--input-height-xs` (30px) through `height` and `min-height`, which is the 8px
+ * that used to push the slider down. Released here, the box collapses to exactly
+ * one line of text: the same 20.3px (0.875rem x 1.45) the readout occupies, so
+ * the shared cell keeps the height it has when nothing is being edited.
+ */
+/*
+ * Written as a descendant pair, not a bare `.valueInput`: Mantine's own rule for
+ * the input is a single class too, so at equal specificity the winner would be
+ * whichever stylesheet Vite happened to inject last — and that order is not the
+ * same in dev as in a build. Two classes settle it outright.
+ */
+.value .valueInput {
+  height: auto;
+  min-height: 0;
+  font-size: var(--mantine-font-size-sm);
+  line-height: var(--mantine-line-height-sm);
+  text-align: right;
+  color: var(--mantine-color-dimmed);
+  /*
+   * The affordance without the geometry: an inset shadow paints inside the box,
+   * so unlike a border it cannot add its pixel back to the row.
+   */
+  box-shadow: inset 0 -1px 0 var(--mantine-color-default-border);
+}
+
+.value .valueInput:focus {
+  color: var(--mantine-color-text);
+  box-shadow: inset 0 -1px 0 var(--mantine-primary-color-filled);
 }

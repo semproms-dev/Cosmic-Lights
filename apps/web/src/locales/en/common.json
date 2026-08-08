@@ -82,7 +82,7 @@
     "grainSize": "Size",
     "grainRoughness": "Roughness",
     "noAutoDenoise": "The file records neither an ISO reading nor measurable noise",
-    "denoiseButton": "Auto denoise",
+    "denoiseButton": "Auto reduction",
     "gradeShadow": "Shadows",
     "gradeMid": "Midtones",
     "gradeHigh": "Highlights",

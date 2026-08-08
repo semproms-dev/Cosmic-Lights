@@ -82,7 +82,7 @@
     "grainSize": "Taille",
     "grainRoughness": "Rugosité",
     "noAutoDenoise": "Le fichier n'enregistre ni ISO ni bruit mesurable",
-    "denoiseButton": "Débruitage auto",
+    "denoiseButton": "Réduction automatique",
     "gradeShadow": "Ombres",
     "gradeMid": "Tons moyens",
     "gradeHigh": "Hautes lumières",

@@ -51,7 +51,7 @@ function renderPanel(): void {
   });
 }
 
-const autoButton = () => screen.getByRole('button', { name: 'Auto denoise', ...INCLUDING_COLLAPSED });
+const autoButton = () => screen.getByRole('button', { name: 'Auto reduction', ...INCLUDING_COLLAPSED });
 
 describe('AdjustmentsPanel Auto denoise', () => {
   beforeEach(() => {

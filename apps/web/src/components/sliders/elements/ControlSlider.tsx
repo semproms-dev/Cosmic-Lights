@@ -5,7 +5,7 @@ import { useEditor } from '../../../editor/editorContext';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { usePreferences } from '../../../preferences/preferences';
-import { useState, type ChangeEvent } from 'react';
+import { useState } from 'react';
 
 interface ControlSliderProps {
   label: string;
@@ -111,9 +111,17 @@ export function ControlSlider({
 
   return (
     <Stack gap={4} className={classes.control}>
-      <Group justify="space-between" gap="xs">
-         <Group gap={6}>
-         {preferences.helper ? 
+      {/*
+        `nowrap` because Mantine's default lets the value drop to a line of its
+        own once the label stops fitting, which is what the grading rows do:
+        their labels are two keys concatenated ("Altas luces Luminosidad"), the
+        longest in the app, and in a rail this narrow they overrun. The value
+        must stay pinned to the right of its label, so it is the label that
+        gives way — see `.label`, which wraps onto a second line instead.
+      */}
+      <Group justify="space-between" gap="xs" wrap="nowrap" align="flex-start">
+         <Group gap={6} wrap="nowrap" align="flex-start" className={classes.labelGroup}>
+         {preferences.helper ?
           <Tooltip label={description ?? label}>
               <IconInfoCircle size={16} stroke={2} color="var(--mantine-color-dimmed)"  />
             </Tooltip>: null
@@ -139,10 +147,27 @@ export function ControlSlider({
             <span style={{ visibility: showReset ? 'visible' : 'hidden' }}>{t('common.reset')}</span>
           </Text>
         </Group> 
-        {input ? 
+        {/*
+          Readout and input are both mounted, stacked in one grid cell, and only
+          their visibility swaps — the same arrangement as the label above, for
+          the same reason. Swapping one for the other could not be made to hold
+          still: the input is a different size from the text, so whichever was
+          showing set the row's height and the slider moved under it. Sharing a
+          cell sizes the row to the taller of the two, and the CSS then flattens
+          the input down to a single line so that taller *is* the text.
+
+          `visibility` is inline, and whichever is hidden also carries
+          `aria-hidden`, so the one not showing leaves the accessibility tree:
+          otherwise every row would offer two controls under the same name, and
+          jsdom — which never applies the stylesheet — would find both.
+        */}
+        <div className={classes.value}>
           <TextInput
-            size="xs"
-            w={46}
+            variant="unstyled"
+            size="sm"
+            classNames={{ input: classes.valueInput }}
+            style={{ visibility: input ? 'visible' : 'hidden' }}
+            aria-hidden={input ? undefined : true}
             aria-label={label}
             disabled={image === null}
             value={inputValue}
@@ -173,17 +198,21 @@ export function ControlSlider({
                 setInput(false);
               }
             }}
-          /> :         
+          />
           <Text
             size="sm"
             c="dimmed"
+            ta="right"
             role="spinbutton"
+            aria-hidden={input ? true : undefined}
             aria-label={label}
             aria-valuemin={min}
             aria-valuemax={max}
             aria-valuenow={value}
-            tabIndex={image === null ? -1 : 0}
-            style={{ cursor: 'pointer' }}
+            // Hidden, it must also leave the tab order, or a Tab through the
+            // panel would stop on a readout nobody can see.
+            tabIndex={image === null || input ? -1 : 0}
+            style={{ visibility: input ? 'hidden' : 'visible', cursor: 'pointer' }}
             onClick={() => {
               // Re-seed the mirror from the committed value on open, so a
               // cancelled edit never shows up next time the input appears.
@@ -204,8 +233,7 @@ export function ControlSlider({
           >
             {value}
           </Text>
-        }
-
+        </div>
       </Group>
       <Slider
         value={value}

@@ -82,7 +82,7 @@
     "grainSize": "Dimensione",
     "grainRoughness": "Irregolarità",
     "noAutoDenoise": "Il file non registra né ISO né rumore misurabile",
-    "denoiseButton": "Riduzione rumore auto",
+    "denoiseButton": "Riduzione automatica",
     "gradeShadow": "Ombre",
     "gradeMid": "Mezzitoni",
     "gradeHigh": "Luci",

@@ -72,7 +72,7 @@ describe('AdjustmentsPanel', () => {
     // computes from that ISO is covered in editor/noise.test.ts.
     render(<AdjustmentsPanel />);
 
-    const auto = screen.getByRole('button', { name: 'Auto denoise', ...INCLUDING_COLLAPSED });
+    const auto = screen.getByRole('button', { name: 'Auto reduction', ...INCLUDING_COLLAPSED });
     // ARIA rather than the `disabled` attribute on purpose: a natively disabled
     // button emits no pointer events, and the tooltip explaining why it is
     // unavailable would never get a chance to appear.
@@ -84,7 +84,7 @@ describe('AdjustmentsPanel', () => {
     // refuse by itself.
     render(<AdjustmentsPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Auto denoise', ...INCLUDING_COLLAPSED }));
+    fireEvent.click(screen.getByRole('button', { name: 'Auto reduction', ...INCLUDING_COLLAPSED }));
 
     const at = (name: string) =>
       screen.getByRole('slider', { name, ...INCLUDING_COLLAPSED }).getAttribute('aria-valuenow');
