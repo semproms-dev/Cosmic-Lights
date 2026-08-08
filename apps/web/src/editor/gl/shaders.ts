@@ -234,6 +234,9 @@ uniform float uDehaze;          // -5..5
 uniform float uTexture;         // -5..5
 uniform mat2 uUvMatrix;         // crop size + 90° turns + flips, about the centre
 uniform vec2 uUvCenter;         // UV of the crop centre (0.5,0.5 = no crop)
+uniform mat3 uGeometry;         // perspective + scale + offset, in frame space
+uniform float uLensK1;          // radial lens coefficient (0 = off)
+uniform vec2 uLensScale;        // aspect correction for the lens radius
 uniform sampler2D uOverlayMask; // active mask alpha, for the editing overlay
 uniform float uOverlay;         // 1 → tint the masked area red so it's visible
 uniform float uOverlayInvert;   // 1 → invert the overlay alpha (mask affects outside)
@@ -280,10 +283,33 @@ float valueNoise(vec2 p) {
 }
 
 void main() {
-  // Non-destructive crop + orientation: remap the quad onto the selected region,
-  // turned/mirrored about its centre. Built on the CPU by uvTransform()
-  // (editor/rotation.ts); identity (mat2(1.0), centre 0.5) means uv == vUv.
-  vec2 uv = uUvCenter + uUvMatrix * (vUv - 0.5);
+  // ── The whole geometric remap, in one place and ONE sample. ──
+  // Chaining "keystone → turn → crop → lens" through separate passes would cost
+  // a bilinear interpolation each, blurring the photo three times over; and
+  // because every other texture below (uBlur, uAmountMap, uOverlayMask) is read
+  // with this same uv, resolving it here is also what makes the masks deform
+  // along with the image for free.
+  //
+  // 1. Geometry, in frame space. mat3 rather than mat2 because a keystone is a
+  //    homography: it only becomes a straight-line map after the divide by w.
+  //    With the identity matrix h.z is exactly 1.0, so this is a no-op.
+  vec3 h = uGeometry * vec3(vUv - 0.5, 1.0);
+  vec2 frame = h.xy / h.z;
+  // 2. Non-destructive crop + orientation: remap the quad onto the selected
+  //    region, turned/mirrored about its centre. Built on the CPU by
+  //    uvTransform() (editor/rotation.ts); identity (mat2(1.0), centre 0.5)
+  //    means uv == vUv.
+  vec2 uv = uUvCenter + uUvMatrix * frame;
+  // 3. The lens, last of all: its centre is the SOURCE image's centre, so it
+  //    must not be dragged around by the crop or the turn. Branch on the
+  //    uniform (uniform control flow, so no divergence) to keep an untouched
+  //    photo bit-for-bit identical instead of paying a 0.5 + (uv - 0.5) round
+  //    trip on every pixel.
+  if (uLensK1 != 0.0) {
+    vec2 d = uv - 0.5;
+    vec2 q = d * uLensScale;   // circle in q == circle on the sensor
+    uv = 0.5 + d * (1.0 + uLensK1 * dot(q, q));
+  }
   // A free angle can push the sample outside the image: the letterbox is sized
   // to the rotated bounding box, so the corners of the quad leave [0,1]². Paint
   // them with the backdrop — and return it untouched, before grading/vignette/

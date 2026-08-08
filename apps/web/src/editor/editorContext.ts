@@ -15,6 +15,7 @@ import type {
 import type { Preset } from './presets'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
 import type { Orientation, TurnDirection } from './rotation'
+import type { Geometry } from './geometry'
 
 /**
  * One-shot signal that a 90° rotation was just applied, so the canvas can play
@@ -223,6 +224,16 @@ export interface EditorState {
   setMaskRadial: (id: string, radial: RadialShape) => void;
   setRotationAngle: (angleDeg: number) => void
   angle: number
+  /** Distorsión de lente, perspectiva, escala y desplazamiento. */
+  geometry: Geometry
+  /**
+   * Mueve un control de geometría. Transitoria como {@link setAdjustment}: el
+   * `commit` va en el `onChangeEnd` del slider, no aquí, o cada tick del
+   * arrastre sería un paso de deshacer.
+   */
+  setGeometry: (key: keyof Geometry, value: number) => void
+  /** Devuelve los siete controles de geometría a cero. */
+  resetGeometry: () => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

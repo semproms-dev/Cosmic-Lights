@@ -6,6 +6,7 @@ import type { LoadedImage } from './image'
 import { undoable, initHistory, canUndo, canRedo } from './editorHistory'
 import { createMask } from './masks'
 import { IDENTITY_ORIENTATION } from './rotation'
+import { IDENTITY_GEOMETRY } from './geometry'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TDD contract for `editor/editorHistory.ts` — a snapshot history wrapper around
@@ -48,6 +49,7 @@ const makeState = (): EditorStoreState => ({
   masks: [],
   activeMaskId: null,
   orientation: IDENTITY_ORIENTATION,
+  geometry: IDENTITY_GEOMETRY,
 })
 
 const wrapped = undoable(editorReducer)
@@ -260,6 +262,43 @@ describe('scope of undo', () => {
     let h = initHistory(makeState())
 
     h = wrapped(h, { type: 'RESET_ORIENTATION' })
+    h = wrapped(h, { type: 'COMMIT' })
+
+    expect(h.past).toHaveLength(0)
+  })
+
+  it('includes the geometry in history and restores it on undo/redo', () => {
+    let h = initHistory(makeState())
+
+    h = wrapped(h, { type: 'SET_GEOMETRY', key: 'perspectiveV', value: 40 })
+    h = wrapped(h, { type: 'COMMIT' })
+    expect(h.present.geometry.perspectiveV).toBe(40)
+
+    h = wrapped(h, { type: 'UNDO' })
+    expect(h.present.geometry.perspectiveV).toBe(0)
+
+    h = wrapped(h, { type: 'REDO' })
+    expect(h.present.geometry.perspectiveV).toBe(40)
+  })
+
+  it('files ONE undo step for a drag, not one per tick', () => {
+    // SET_GEOMETRY is transient by design: the slider commits on release. If it
+    // committed per change, undoing a single drag would take eighty presses.
+    let h = initHistory(makeState())
+
+    for (let v = 1; v <= 20; v += 1) h = wrapped(h, { type: 'SET_GEOMETRY', key: 'scaleX', value: v })
+    h = wrapped(h, { type: 'COMMIT' })
+
+    expect(h.past).toHaveLength(1)
+    h = wrapped(h, { type: 'UNDO' })
+    expect(h.present.geometry.scaleX).toBe(0)
+  })
+
+  it('COMMIT is a no-op when a drag ends where it started', () => {
+    let h = initHistory(makeState())
+
+    h = wrapped(h, { type: 'SET_GEOMETRY', key: 'offsetY', value: 30 })
+    h = wrapped(h, { type: 'SET_GEOMETRY', key: 'offsetY', value: 0 })
     h = wrapped(h, { type: 'COMMIT' })
 
     expect(h.past).toHaveLength(0)

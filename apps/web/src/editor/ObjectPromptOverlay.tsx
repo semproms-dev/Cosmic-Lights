@@ -30,7 +30,7 @@ const PIN_HIT_RADIUS = 14
  * unconditionally — gating it on `size > 0` would deadlock the ResizeObserver.
  */
 export function ObjectPromptOverlay({ maskId }: ObjectPromptOverlayProps) {
-  const { image, masks, cropRegion, setObjectPrompt, commit, view, orientation } = useEditor()
+  const { image, masks, cropRegion, setObjectPrompt, commit, view, orientation, geometry } = useEditor()
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
 
@@ -54,7 +54,7 @@ export function ObjectPromptOverlay({ maskId }: ObjectPromptOverlayProps) {
   const toScreen = (n: NormalizedPoint): MaskPoint =>
     imagePointToPointer(
       { x: n.x * image.width, y: n.y * image.height },
-      size.w, size.h, image.width, image.height, cropRegion, view, orientation,
+      size.w, size.h, image.width, image.height, cropRegion, view, orientation, geometry,
     )
 
   // Removing a point re-prompts the model, so it is one undo step like adding

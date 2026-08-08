@@ -39,6 +39,7 @@ import {
   nlmOffsets,
   nlmParams,
 } from '../nlm'
+import { IDENTITY_GEOMETRY, type Geometry } from '../geometry'
 import { IDENTITY_ORIENTATION, uvTransform, type Orientation } from '../rotation'
 import { MASK_TONE_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint, type RadialShape } from '../masks'
 import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
@@ -212,6 +213,9 @@ export class WebGLRenderer {
   private readonly uClarity: WebGLUniformLocation | null
   private readonly uUvMatrix: WebGLUniformLocation | null
   private readonly uUvCenter: WebGLUniformLocation | null
+  private readonly uGeometry: WebGLUniformLocation | null
+  private readonly uLensK1: WebGLUniformLocation | null
+  private readonly uLensScale: WebGLUniformLocation | null
   private readonly uClarityOffset: WebGLUniformLocation | null
   private readonly uDehaze: WebGLUniformLocation | null
   private readonly uTexture: WebGLUniformLocation | null
@@ -358,6 +362,9 @@ export class WebGLRenderer {
   private cropRegion: CropRegion | null = null
   private cropImageSize: [number, number] | null = null
   private orientation: Orientation = IDENTITY_ORIENTATION
+  // Lens and framing geometry, stored alongside them for the same reason: it is
+  // the third input to the one transform the composite pass applies.
+  private geometry: Geometry = IDENTITY_GEOMETRY
   // Colour behind the frame where the free-angle rotation uncovers the
   // letterbox corners. Matches the surrounding panel so the backdrop reads as a
   // mat, not a hole. Inert until a free angle is set: with angleDeg = 0 the
@@ -534,6 +541,9 @@ export class WebGLRenderer {
     this.uGrainRoughness = gl.getUniformLocation(this.clarityProgram, 'uGrainRoughness')
     this.uUvMatrix = gl.getUniformLocation(this.clarityProgram, 'uUvMatrix')
     this.uUvCenter = gl.getUniformLocation(this.clarityProgram, 'uUvCenter')
+    this.uGeometry = gl.getUniformLocation(this.clarityProgram, 'uGeometry')
+    this.uLensK1 = gl.getUniformLocation(this.clarityProgram, 'uLensK1')
+    this.uLensScale = gl.getUniformLocation(this.clarityProgram, 'uLensScale')
     this.uClarityOffset = gl.getUniformLocation(this.clarityProgram, 'uOffset')
     this.uOverlayMask = gl.getUniformLocation(this.clarityProgram, 'uOverlayMask')
     this.uOverlay = gl.getUniformLocation(this.clarityProgram, 'uOverlay')
@@ -787,6 +797,23 @@ export class WebGLRenderer {
    */
   setOrientation(orientation: Orientation): void {
     this.orientation = orientation
+  }
+
+  /**
+   * Sets the lens distortion, keystone, scale and offset for the next frame.
+   *
+   * Like the crop and the orientation this only moves sampling coordinates, so
+   * it costs nothing per frame and needs no re-upload. It deliberately does
+   * *not* change the displayed frame: the picture shifts inside the same
+   * rectangle, and the backdrop shows wherever it no longer reaches.
+   *
+   * Defaults to {@link IDENTITY_GEOMETRY}, so a caller that never touches this
+   * renders exactly as before.
+   *
+   * @param geometry - The geometry slice to display.
+   */
+  setGeometry(geometry: Geometry): void {
+    this.geometry = geometry
   }
 
   /**
@@ -1973,7 +2000,7 @@ export class WebGLRenderer {
     // Fold the crop and the orientation into the one UV remap the shader applies.
     // Falls back to the uploaded image's size until `setCrop` has run.
     const [transformWidth, transformHeight] = this.cropImageSize ?? [this.imageWidth, this.imageHeight]
-    const uv = uvTransform(this.orientation, this.cropRegion, transformWidth, transformHeight)
+    const uv = uvTransform(this.orientation, this.cropRegion, transformWidth, transformHeight, this.geometry)
     // Letterbox against the aspect as *displayed* (not the full frame's) so the
     // cropped region fills the canvas without stretching. A quarter turn stands
     // the frame on its end, so this is where a portrait/landscape swap lands.
@@ -2007,6 +2034,13 @@ export class WebGLRenderer {
     // matrix uniform would default to 0 and collapse the sample to a texel).
     gl.uniformMatrix2fv(this.uUvMatrix, false, uv.matrix)
     gl.uniform2f(this.uUvCenter, uv.center[0], uv.center[1])
+    // Geometry: applied to the quad before the crop remap, lens applied after
+    // it. Passed unconditionally for the same reason as the matrix above — an
+    // unset mat3 uniform is all zeroes, which would divide by w = 0 and blank
+    // the frame.
+    gl.uniformMatrix3fv(this.uGeometry, false, uv.geometryMatrix)
+    gl.uniform1f(this.uLensK1, uv.lens.k1)
+    gl.uniform2f(this.uLensScale, uv.lens.scale[0], uv.lens.scale[1])
     gl.uniform1f(this.uClarity, adjustments.clarity)
     gl.uniform1f(this.uDehaze, adjustments.dehaze)
     gl.uniform1f(this.uTexture, adjustments.texture)

@@ -12,6 +12,7 @@ import { IconZoomReset } from '@tabler/icons-react'
 import { ConfirmDialog } from '../window/ConfirmDialog'
 import { clampZoom } from '../../utils'
 import { displayScale, IDENTITY_VIEW, pointerToImagePoint } from '../../editor/crop'
+import { IDENTITY_GEOMETRY } from '../../editor/geometry'
 import {
   brushRadiusPx,
   EMPTY_OBJECT_PROMPT,
@@ -133,6 +134,8 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     resetOrientation,
     showOriginal,
     commitToken,
+    geometry,
+    resetGeometry,
   } = useEditor()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -242,6 +245,11 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
         // in the before/after preview, where the original has no crop either.
         renderer.setCrop(cropping || showOriginal ? null : cropRegion, image.width, image.height)
         renderer.setOrientation(orientation);
+        // The before/after preview shows the photo as it opened, so it must not
+        // carry the geometry either — same rule as the adjustments and masks
+        // below. The crop tool DOES keep it: the overlay is placed through the
+        // very same transform, so the two stay glued together.
+        renderer.setGeometry(showOriginal ? IDENTITY_GEOMETRY : geometry);
       }
       renderer.setView(view.scale, view.offsetX, view.offsetY)
       renderer.render(
@@ -281,7 +289,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     }
     // `maskAlphas` is a stable ref-backed Map, so it never fires this effect on
     // its own: `masks` (via each mask's `version`) is what signals a new alpha.
-  }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId, orientation, showOriginal])
+  }, [image, adjustments, curves, masks, maskAlphas, cropRegion, view, cropping, overlayMaskId, orientation, showOriginal, geometry])
 
   // Backdrop for the corners a free-angle rotation uncovers: whatever is painted
   // behind the canvas (the Mantine body colour) so the letterbox reads as a mat,
@@ -431,7 +439,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       { x: e.clientX - rect.left, y: e.clientY - rect.top },
       rect.width, rect.height,
       image.width, image.height,
-      shownCrop, view, orientation,
+      shownCrop, view, orientation, geometry,
     )
   }
 
@@ -656,8 +664,8 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
-  // Back to how the photo opened: sliders, curves, crop, orientation and the
-  // fitted view. The ratio goes with the crop — leave it behind and the next
+  // Back to how the photo opened: sliders, curves, crop, orientation, geometry
+  // and the fitted view. The ratio goes with the crop — leave it behind and the next
   // crop the user drags is still locked to a 16:9 they thought they had undone.
   const resetSettings = () => {
     resetAdjustements();
@@ -667,6 +675,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     closeResetDialog();
     setView(IDENTITY_VIEW);
     resetOrientation();
+    resetGeometry();
     // Last, and it has to be last: COMMIT snapshots whatever the dispatches
     // above left behind. Without it the history's checkpoint stays on the
     // pre-reset photo, so the reset is not undoable and the next commit files

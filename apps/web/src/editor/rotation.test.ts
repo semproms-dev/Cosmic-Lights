@@ -11,6 +11,7 @@ import {
   type Orientation,
   type QuarterTurns,
 } from './rotation'
+import { IDENTITY_GEOMETRY, IDENTITY_MAT3, type Geometry } from './geometry'
 
 /** A deliberately non-square image and crop: a square one hides axis-swap bugs. */
 const W = 200
@@ -401,5 +402,93 @@ describe('uvTransform — free angle', () => {
     const t = uvTransform(orientation({ quarterTurns: 1, angleDeg: 30 }), CROP, W, H)
     const bbox = rotatedBoundingBox(CROP.height, CROP.width, 30)
     expect(t.displayedAspect).toBeCloseTo(bbox.width / bbox.height, 10)
+  })
+})
+
+describe('uvTransform — geometry', () => {
+  const geometry = (o: Partial<Geometry>): Geometry => ({ ...IDENTITY_GEOMETRY, ...o })
+
+  // THE regression test for the whole geometry feature: with the panel
+  // untouched, the transform an existing photo gets must be the one it got
+  // before geometry existed — identically, not approximately. Every other test
+  // in this file asserts that transform, so this is what lets them keep passing
+  // untouched.
+  it('defaults to a no-op, so an untouched panel changes nothing', () => {
+    const withDefault = uvTransform(orientation({ quarterTurns: 1, flipH: true, angleDeg: 12 }), CROP, W, H)
+    const withExplicit = uvTransform(
+      orientation({ quarterTurns: 1, flipH: true, angleDeg: 12 }), CROP, W, H, IDENTITY_GEOMETRY,
+    )
+
+    expect(withDefault.geometryMatrix).toEqual(IDENTITY_MAT3)
+    expect(withDefault.lens.k1).toBe(0)
+    expect(withDefault).toEqual(withExplicit)
+  })
+
+  it('leaves the identity sampling exactly where it was', () => {
+    const t = uvTransform(IDENTITY_ORIENTATION, null, W, H, IDENTITY_GEOMETRY)
+
+    // Not toBeCloseTo: a no-op that merely rounds to the same place would still
+    // resample every pixel of every photo the user never touched.
+    expect(applyUvTransform(t, { x: 0.25, y: 0.75 })).toEqual({ x: 0.25, y: 0.75 })
+  })
+
+  // The design decision this feature rests on: geometry moves the picture
+  // INSIDE the frame, so the frame — and therefore the letterbox, the export
+  // size and the whole "letterbox collapses to identity" trick the export
+  // relies on — is untouched. Lightroom with 'Constrain to image' off.
+  it('does not change the displayed frame', () => {
+    const plain = uvTransform(orientation({ angleDeg: 20 }), CROP, W, H)
+    const warped = uvTransform(orientation({ angleDeg: 20 }), CROP, W, H, geometry({
+      distortion: 60, perspectiveV: 70, perspectiveH: -40, scaleX: 30, offsetY: 25,
+    }))
+
+    expect(warped.displayedAspect).toBe(plain.displayedAspect)
+    expect(warped.center).toEqual(plain.center)
+    expect(warped.matrix).toEqual(plain.matrix)
+  })
+
+  it('scales the sampled region without moving its centre', () => {
+    // Scaling up on screen means sampling a smaller patch, about the same point.
+    const t = uvTransform(IDENTITY_ORIENTATION, null, W, H, geometry({ scaleX: 100, scaleY: 100 }))
+
+    const centre = applyUvTransform(t, { x: 0.5, y: 0.5 })
+    expect(centre.x).toBeCloseTo(0.5, 12)
+    expect(centre.y).toBeCloseTo(0.5, 12)
+    expect(applyUvTransform(t, { x: 1, y: 1 })).toEqual(
+      expect.objectContaining({ x: expect.closeTo(0.75, 12), y: expect.closeTo(0.75, 12) }),
+    )
+  })
+
+  it('centres the lens on the SOURCE image, not on the crop', () => {
+    // The trap the whole ordering exists for. A crop in the corner must not drag
+    // the lens correction with it: the optical centre belongs to the lens, and a
+    // correction that slides as the crop moves is visibly wrong on any straight
+    // edge. So the image's own centre must come back untouched under distortion,
+    // whatever crop is active.
+    const corner: CropRegion = { x: 0, y: 0, width: 40, height: 20 }
+    const t = uvTransform(IDENTITY_ORIENTATION, corner, W, H, geometry({ distortion: 90 }))
+
+    // Find the output point that samples the image centre, and check the lens
+    // left it alone rather than displacing it.
+    const vUv = applyInverseUvTransform(t, { x: 0.5, y: 0.5 })
+    const back = applyUvTransform(t, vUv)
+    expect(back.x).toBeCloseTo(0.5, 9)
+    expect(back.y).toBeCloseTo(0.5, 9)
+  })
+
+  it('round-trips the pointer through every geometry family at once', () => {
+    // What the brush, the gradient handles and the object prompts all ride on:
+    // click a pixel, get that pixel. A drift here is a stroke landing away from
+    // the cursor the moment a geometry slider is touched.
+    const t = uvTransform(
+      orientation({ quarterTurns: 3, flipV: true, angleDeg: -9 }), CROP, W, H,
+      geometry({ distortion: 55, perspectiveV: -40, perspectiveH: 30, scaleX: 25, scaleY: -20, offsetX: 15, offsetY: -10 }),
+    )
+
+    for (const vUv of [{ x: 0.2, y: 0.3 }, { x: 0.5, y: 0.5 }, { x: 0.8, y: 0.65 }, { x: 0.35, y: 0.9 }]) {
+      const round = applyInverseUvTransform(t, applyUvTransform(t, vUv))
+      expect(round.x).toBeCloseTo(vUv.x, 9)
+      expect(round.y).toBeCloseTo(vUv.y, 9)
+    }
   })
 })

@@ -1,6 +1,7 @@
 import { clamp, MIN_CROP_SIZE } from "../utils";
 import type { CropRegion } from "./image";
 import { applyInverseUvTransform, applyUvTransform, uvTransform, type Orientation } from "./rotation";
+import { IDENTITY_GEOMETRY, type Geometry } from "./geometry";
 
 export const clampCropRegion =(region: CropRegion, imageWidth: number, imageHeight: number): CropRegion => {
     const width = clamp(region.width, MIN_CROP_SIZE, imageWidth);
@@ -211,6 +212,9 @@ export const canvasToImageCoords = (
  * full frame. Pass `null` while the crop tool is open: it shows the full frame.
  * @param view - The active zoom/pan.
  * @param orientation - The turns and mirroring the canvas is displaying.
+ * @param geometry - The lens/perspective/scale/offset the canvas is displaying.
+ * Defaults to the identity, so a caller with nothing to say about it behaves
+ * exactly as before.
  * @returns The position in full-image pixels.
  */
 export const pointerToImagePoint = (
@@ -222,6 +226,7 @@ export const pointerToImagePoint = (
   crop: CropRegion | null,
   view: CanvasView,
   orientation: Orientation,
+  geometry: Geometry = IDENTITY_GEOMETRY,
 ): { x: number; y: number } => {
   const base = viewToBasePoint(point, containerWidth, containerHeight, view)
 
@@ -244,7 +249,7 @@ export const pointerToImagePoint = (
     x: (base.x - disp.x) / disp.width,
     y: (base.y - disp.y) / disp.height,
   }
-  const uv = applyUvTransform(uvTransform(orientation, crop, imageWidth, imageHeight), vUv)
+  const uv = applyUvTransform(uvTransform(orientation, crop, imageWidth, imageHeight, geometry), vUv)
   return { x: uv.x * imageWidth, y: uv.y * imageHeight }
 }
 
@@ -266,6 +271,7 @@ export const pointerToImagePoint = (
  * @param crop - The crop the canvas is *currently displaying*, or `null`.
  * @param view - The active zoom/pan.
  * @param orientation - The turns and mirroring the canvas is displaying.
+ * @param geometry - The lens/perspective/scale/offset the canvas is displaying.
  * @returns The position in container/CSS pixels.
  */
 export const imagePointToPointer = (
@@ -277,11 +283,12 @@ export const imagePointToPointer = (
   crop: CropRegion | null,
   view: CanvasView,
   orientation: Orientation,
+  geometry: Geometry = IDENTITY_GEOMETRY,
 ): { x: number; y: number } => {
   // Image pixels → image UV → the point on the displayed quad (undoing crop and
   // orientation through the same transform the forward map applied).
   const uv = { x: point.x / imageWidth, y: point.y / imageHeight }
-  const vUv = applyInverseUvTransform(uvTransform(orientation, crop, imageWidth, imageHeight), uv)
+  const vUv = applyInverseUvTransform(uvTransform(orientation, crop, imageWidth, imageHeight, geometry), uv)
 
   // The displayed frame stands on its end on an odd turn, exactly as the forward
   // map's letterbox does.

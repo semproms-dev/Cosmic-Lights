@@ -3,6 +3,7 @@ import type { EditorAction, editorReducer, EditorStoreState } from "./editorRedu
 import type { CropRegion } from "./image";
 import type { BrushStroke, GradientLine, Mask } from "./masks";
 import type { Orientation } from "./rotation";
+import { geometryEquals, type Geometry } from "./geometry";
 
 
 
@@ -12,7 +13,8 @@ interface HistorySlice {
     curves: Curves,
     cropRegion: CropRegion | null,
     masks: Mask[],
-    orientation: Orientation
+    orientation: Orientation,
+    geometry: Geometry
 }
 
 interface HistoryState {
@@ -35,7 +37,8 @@ const sliceOf = (s: EditorStoreState): HistorySlice => ({
     cropRegion: s.cropRegion,
     curves: s.curves,
     masks: s.masks,
-    orientation: s.orientation
+    orientation: s.orientation,
+    geometry: s.geometry
 });
 
 const regionEquals = (a: CropRegion | null, b: CropRegion | null): boolean =>
@@ -96,7 +99,8 @@ const sliceEquals = (a: HistorySlice, b: HistorySlice): boolean =>
   recordEquals(a.adjustements, b.adjustements) &&
   curvesEqual(a.curves, b.curves) &&
   masksEqual(a.masks, b.masks) &&
-  orientationEquals(a.orientation, b.orientation)
+  orientationEquals(a.orientation, b.orientation) &&
+  geometryEquals(a.geometry, b.geometry)
 
 export const initHistory = (present: EditorStoreState): HistoryState => ({
   past: [], present, future: [], checkpoint: sliceOf(present),
@@ -112,6 +116,7 @@ const mergeSlice = (s: EditorStoreState, slice: HistorySlice): EditorStoreState 
   cropRatio: slice.cropRatio,
   masks: slice.masks,
   orientation: slice.orientation,
+  geometry: slice.geometry,
   // The restored mask set may not contain the currently-selected mask; drop a
   // dangling selection so the panel doesn't point at a mask that's gone.
   activeMaskId: slice.masks.some((m) => m.id === s.activeMaskId)

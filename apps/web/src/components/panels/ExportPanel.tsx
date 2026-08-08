@@ -53,7 +53,7 @@ const embedExif = async (
 };
 
 export function ExportPanel() {
-  const { image, adjustments, curves, cropRegion, masks, maskAlphas, orientation } = useEditor();
+  const { image, adjustments, curves, cropRegion, masks, maskAlphas, orientation, geometry } = useEditor();
   const [format, setFormat] = useState('JPEG');
   const [quality, setQuality] = useState(90);
   const [loading, setLoading] = useState(false);
@@ -107,6 +107,11 @@ export function ExportPanel() {
     renderer.uploadCurves(compileCurveTexture(curves));
     renderer.setCrop(cropRegion, image.width, image.height);
     renderer.setOrientation(orientation);
+    // The third consumer of the UV transform, and the one that has already been
+    // forgotten once (the first rotation shipped with an unrotated export).
+    // exportDimensions needs no geometry of its own: the geometry moves the
+    // picture inside the frame, never the frame itself.
+    renderer.setGeometry(geometry);
     renderer.render(
       toRenderAdjustments(adjustments),
       masks,

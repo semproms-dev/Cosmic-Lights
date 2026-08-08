@@ -53,7 +53,7 @@ function unrotate(v: MaskPoint, deg: number): MaskPoint {
  * ResizeObserver can mount; only its `<svg>` content is gated on a shape + size.
  */
 export function RadialOverlay({ maskId }: RadialOverlayProps) {
-  const { image, masks, cropRegion, setMaskRadial, commit, view, orientation } = useEditor()
+  const { image, masks, cropRegion, setMaskRadial, commit, view, orientation, geometry } = useEditor()
   const ref = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -78,11 +78,11 @@ export function RadialOverlay({ maskId }: RadialOverlayProps) {
     const box = ref.current!.getBoundingClientRect()
     return pointerToImagePoint(
       { x: e.clientX - box.left, y: e.clientY - box.top },
-      size.w, size.h, image.width, image.height, cropRegion, view, orientation,
+      size.w, size.h, image.width, image.height, cropRegion, view, orientation, geometry,
     )
   }
   const toScreen = (p: MaskPoint): MaskPoint =>
-    imagePointToPointer(p, size.w, size.h, image.width, image.height, cropRegion, view, orientation)
+    imagePointToPointer(p, size.w, size.h, image.width, image.height, cropRegion, view, orientation, geometry)
 
   const startDrag = (drag: Drag) => (e: React.PointerEvent) => {
     e.stopPropagation()

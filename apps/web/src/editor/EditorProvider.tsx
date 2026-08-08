@@ -7,6 +7,7 @@ import { IDENTITY_VIEW, type CanvasView } from './crop'
 import { decodeImage } from './decodeImage'
 import { EditorContext, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments } from './editorReducer'
+import { IDENTITY_GEOMETRY, type Geometry } from './geometry'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
 import type { Preset } from './presets'
@@ -45,7 +46,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
       resetDialogOpen: false,
       masks: [],
       activeMaskId: null,
-      orientation: {flipH: false, flipV: false, quarterTurns: 0, angleDeg: 0}
+      orientation: {flipH: false, flipV: false, quarterTurns: 0, angleDeg: 0},
+      geometry: IDENTITY_GEOMETRY,
     }),
   )
   // The full live state lives in `history.present`; everything below reads it.
@@ -442,6 +444,14 @@ export function EditorProvider({ children }: EditorProviderProps) {
     dispatch({ type: 'SET_ROTATION_ANGLE', angleDeg })
   }
 
+  const setGeometry = (key: keyof Geometry, value: number) => {
+    dispatch({ type: 'SET_GEOMETRY', key, value })
+  }
+
+  const resetGeometry = () => {
+    dispatch({ type: 'RESET_GEOMETRY' })
+  }
+
   /**
    * Decodes a photo and stores the result for the canvas to draw. Runs the async
    * decode off the reducer (which stays pure); reports failures through
@@ -545,7 +555,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
         rotationSpin,
         setMaskRadial,
         setRotationAngle,
-        angle: state.orientation.angleDeg
+        angle: state.orientation.angleDeg,
+        geometry: state.geometry,
+        setGeometry,
+        resetGeometry
       }}
     >
       {children}

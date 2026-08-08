@@ -12,6 +12,7 @@ import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
 import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask, type ObjectPrompt, type RadialShape } from './masks'
 import { presetAdjustments, presetCurves, type Preset } from './presets'
 import { IDENTITY_ORIENTATION, turn, type Orientation } from './rotation'
+import { IDENTITY_GEOMETRY, type Geometry } from './geometry'
 
 /**
  * Estado completo del editor: los valores de los sliders y las curvas de tono,
@@ -43,6 +44,15 @@ export interface EditorStoreState {
   /** Id de la máscara seleccionada en el panel, o `null` si ninguna. */
   activeMaskId: string | null
   orientation: Orientation,
+  /**
+   * Distorsión de lente, perspectiva, escala y desplazamiento del panel Crop.
+   *
+   * Slice propio y no parte de `orientation` a propósito: `orientation` es
+   * discreta y sin pérdida (salvo `angleDeg`), y hay código que se apoya en eso
+   * — `exportDimensions` ignora los espejos, `turn` razona sobre cuartos de
+   * vuelta. La geometría es continua y sí resamplea.
+   */
+  geometry: Geometry
 }
 
 export type EditorAction =
@@ -79,6 +89,8 @@ export type EditorAction =
   | { type: 'SET_MASK_PROMPT'; id: string; prompt: ObjectPrompt }
   | { type: 'APPLY_PRESET'; preset: Preset }
   | { type: 'SET_ROTATION_ANGLE', angleDeg: number }
+  | { type: 'SET_GEOMETRY'; key: keyof Geometry; value: number }
+  | { type: 'RESET_GEOMETRY' }
 
 /**
  * Construye el mapa inicial de sliders a partir de los cuatro grupos (Basic,
@@ -152,6 +164,16 @@ export function editorReducer(
         orientation: { ...state.orientation, angleDeg: action.angleDeg },
         imageDirty: true
       }
+    case 'SET_GEOMETRY':
+      // Transitoria, como SET y SET_ROTATION_ANGLE: salta en cada tick del
+      // arrastre y es `onChangeEnd` quien hace el commit().
+      return {
+        ...state,
+        geometry: { ...state.geometry, [action.key]: action.value },
+        imageDirty: true,
+      }
+    case 'RESET_GEOMETRY':
+      return { ...state, geometry: IDENTITY_GEOMETRY, imageDirty: false }
     case 'SET_MASK_RADIAL':
       // Changes the pixels → bump version, like SET_MASK_GRADIENT.
       return {
@@ -199,7 +221,8 @@ export function editorReducer(
       return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false,
            cropRegion: null, cropRatio: 'Original',
            adjustments: buildInitialAdjustments(), curves: buildDefaultCurves(),
-           masks: [], activeMaskId: null, orientation: IDENTITY_ORIENTATION }
+           masks: [], activeMaskId: null, orientation: IDENTITY_ORIENTATION,
+           geometry: IDENTITY_GEOMETRY }
     case 'SET_IMAGE_STATUS':
       return { ...state, imageStatus: action.status }
     case 'CLEAR_IMAGE':

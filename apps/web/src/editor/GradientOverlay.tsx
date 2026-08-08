@@ -33,7 +33,7 @@ interface GradientOverlayProps {
  * would never mount for the ResizeObserver to measure.
  */
 export function GradientOverlay({ maskId }: GradientOverlayProps) {
-  const { image, masks, cropRegion, setMaskGradient, commit, view, orientation } = useEditor()
+  const { image, masks, cropRegion, setMaskGradient, commit, view, orientation, geometry } = useEditor()
   const ref = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -58,11 +58,11 @@ export function GradientOverlay({ maskId }: GradientOverlayProps) {
     const box = ref.current!.getBoundingClientRect()
     return pointerToImagePoint(
       { x: e.clientX - box.left, y: e.clientY - box.top },
-      size.w, size.h, image.width, image.height, cropRegion, view, orientation,
+      size.w, size.h, image.width, image.height, cropRegion, view, orientation, geometry,
     )
   }
   const toScreen = (p: MaskPoint): MaskPoint =>
-    imagePointToPointer(p, size.w, size.h, image.width, image.height, cropRegion, view, orientation)
+    imagePointToPointer(p, size.w, size.h, image.width, image.height, cropRegion, view, orientation, geometry)
 
   const startDrag = (drag: Drag) => (e: React.PointerEvent) => {
     e.stopPropagation()

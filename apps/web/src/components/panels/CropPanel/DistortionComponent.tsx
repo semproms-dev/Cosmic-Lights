@@ -1,98 +1,81 @@
-import { Slider, Stack, Title } from '@mantine/core';
-import { useState } from 'react';
+import { Slider, Stack, Text, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useEditor } from '../../../editor/editorContext';
+import type { Geometry } from '../../../editor/geometry';
 
 /**
- * Geometry tool controls: distortion, perspective, transform and offset
- * sliders. Owns only local preview state for now — wire each slider to the
- * editor store when the geometry transform pipeline exists.
+ * Geometry tool controls: lens distortion, keystone perspective, per-axis scale
+ * and offset. Every slider writes straight to the editor store, which folds them
+ * into the composite pass' UV remap — no extra render pass, and the masks deform
+ * along with the image because they are sampled through the same coordinates.
+ *
+ * The sliders are transient while dragging (`setGeometry` on every tick) and
+ * commit once on release, so a drag is a single undo step rather than eighty.
  */
 export function DistortionComponent() {
   const { t } = useTranslation(['common']);
-  const [distortion, setDistortion] = useState(0);
-  const [perspectiveVertical, setPerspectiveVertical] = useState(0);
-  const [perspectiveHorizontal, setPerspectiveHorizontal] = useState(0);
-  const [transformVertical, setTransformVertical] = useState(0);
-  const [transformHorizontal, setTransformHorizontal] = useState(0);
-  const [transformRotate, setTransformRotate] = useState(0);
-  const [offsetX, setOffsetX] = useState(0);
-  const [offsetY, setOffsetY] = useState(0);
-  const {image} = useEditor()
+  const { image, geometry, setGeometry, commit, angle, setRotationAngle } = useEditor();
+  const disabled = image === null;
+
+  /**
+   * One geometry slider: the store is the only source of truth for its value.
+   *
+   * `label` doubles as the thumb label and as the caption above the track, and
+   * it is omitted for a group that holds a single slider — repeating the section
+   * title under itself reads as clutter, and it would put the same string on the
+   * screen twice.
+   */
+  const control = (key: keyof Geometry, label: string, caption = true) => (
+    <Stack gap={2} key={key}>
+      {caption && <Text size="xs" c="dimmed">{label}</Text>}
+      <Slider
+        value={geometry[key]}
+        disabled={disabled}
+        onChange={(value: number) => setGeometry(key, value)}
+        onChangeEnd={commit}
+        min={-100}
+        max={100}
+        thumbLabel={label}
+      />
+    </Stack>
+  );
 
   return (
     <Stack gap="sm">
       <Title order={6}>{t('masks.distortion')}</Title>
-      <Slider
-        value={distortion}
-        disabled={image === null}
-        onChange={setDistortion}
-        min={-100}
-        max={100}
-        thumbLabel={t('masks.distortion')}
-      />
+      {control('distortion', t('masks.distortion'), false)}
 
       <Title order={6}>{t('masks.perspective')}</Title>
-      <Slider
-        value={perspectiveVertical}
-        disabled={image === null}
-        onChange={setPerspectiveVertical}
-        min={-100}
-        max={100}
-        thumbLabel={t('masks.perspective')}
-      />
-      <Slider
-        value={perspectiveHorizontal}
-        disabled={image === null}
-        onChange={setPerspectiveHorizontal}
-        min={-100}
-        max={100}
-        thumbLabel={t('masks.perspective')}
-      />
+      {control('perspectiveV', t('masks.axisVertical'))}
+      {control('perspectiveH', t('masks.axisHorizontal'))}
 
       <Title order={6}>{t('masks.transform')}</Title>
-      <Slider
-        value={transformVertical}
-        disabled={image === null}
-        onChange={setTransformVertical}
-        min={-100}
-        max={100}
-        thumbLabel={t('masks.transform')}
-      />
-      <Slider
-        value={transformHorizontal}
-        disabled={image === null}
-        onChange={setTransformHorizontal}
-        min={-100}
-        max={100}
-        thumbLabel={t('masks.transform')}
-      />
-      <Slider
-        value={transformRotate}
-        disabled={image === null}
-        onChange={setTransformRotate}
-        min={-100}
-        max={100}
-        thumbLabel={t('masks.transform')}
-      />
+      {control('scaleY', t('masks.axisVertical'))}
+      {control('scaleX', t('masks.axisHorizontal'))}
+      {/*
+        Rotate is NOT a geometry slider: it is the same free-straighten angle
+        RotationComponent shows, on the same −45..45 degrees. Giving Geometry its
+        own rotation would put two controls on one value — they would disagree
+        the moment either moved, and the second one to be dragged would silently
+        win. One value, two views.
+      */}
+      <Stack gap={2}>
+        <Text size="xs" c="dimmed">{t('masks.axisRotate')}</Text>
+        <Slider
+          value={angle}
+          disabled={disabled}
+          onChange={setRotationAngle}
+          onChangeEnd={commit}
+          min={-45}
+          max={45}
+          step={0.1}
+          thumbLabel={t('masks.axisRotate')}
+        />
+      </Stack>
 
       <Title order={6}>{t('masks.offset')}</Title>
-      <Slider
-        value={offsetX}
-        disabled={image === null}
-        onChange={setOffsetX}
-        min={-100}
-        max={100}
-        thumbLabel={t('masks.offset')}
-      />
-      <Slider
-        value={offsetY}
-        disabled={image === null}
-        onChange={setOffsetY}
-        min={-100}
-        max={100}
-        thumbLabel={t('masks.offset')}
-      />
+      {control('offsetX', t('masks.axisX'))}
+      {control('offsetY', t('masks.axisY'))}
     </Stack>
   );
 }

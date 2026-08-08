@@ -1,3 +1,15 @@
+import {
+  applyMat3,
+  distort,
+  geometryMatrix,
+  IDENTITY_GEOMETRY,
+  inverseGeometryMatrix,
+  lensK1,
+  lensScale,
+  undistort,
+  type Geometry,
+  type Mat3,
+} from './geometry'
 import type { CropRegion } from './image'
 
 /**
@@ -112,6 +124,29 @@ export interface UvTransform {
   center: [number, number]
   /** Width / height of the frame *as displayed*, for the letterbox. */
   displayedAspect: number
+  /**
+   * The perspective/scale/offset sampling matrix, applied to `vUv − 0.5`
+   * **before** {@link UvTransform.matrix} — a `mat3` because a keystone needs
+   * the homogeneous divide. {@link IDENTITY_MAT3} when the panel is untouched,
+   * and then the whole step collapses to a no-op.
+   */
+  geometryMatrix: Mat3
+  /**
+   * The radial lens term, applied **after** everything else — the step closest
+   * to the source, because the lens' centre is the source image's centre and
+   * nothing downstream (crop, turn, keystone) may be allowed to move it.
+   */
+  lens: {
+    /** Radial coefficient; `0` means the step is skipped entirely. */
+    k1: number
+    /** Aspect correction, so the radius is round on a non-square image. */
+    scale: [number, number]
+  }
+  /**
+   * The slice the two matrices were built from, kept so the CPU inverse can
+   * rebuild the forward direction without a general 3×3 inversion.
+   */
+  geometry: Geometry
 }
 
 /**
@@ -206,10 +241,21 @@ export function rotatedBoundingBox(width: number, height: number, angleDeg: numb
  * short of it on the other, which reads as a squashed, cropped image on every
  * non-square photo.
  *
+ * The geometry panel rides on top of all of this without disturbing any of it.
+ * Its matrix is applied to `vUv − 0.5` *before* the crop remap and its lens term
+ * *after*, so the frame the letterbox draws — and therefore `displayedAspect`,
+ * the export size and the whole letterbox collapse the export relies on — is
+ * exactly the same frame as before. That is deliberate, and it is what Lightroom
+ * does with *Constrain to image* off: the frame stays put, the picture moves
+ * inside it, and wherever the picture no longer covers, the backdrop shows
+ * through (the shader's `inFrame` guard already paints it).
+ *
  * @param orientation - The turns and mirroring to apply.
  * @param crop - The active crop in image pixels, or `null` for the full frame.
  * @param imageWidth - Full image width in pixels.
  * @param imageHeight - Full image height in pixels.
+ * @param geometry - Distortion/perspective/transform/offset. Defaults to the
+ * identity, which reduces this to the crop-and-orientation remap it was before.
  * @returns The uniforms for the composite pass, and the displayed aspect.
  */
 export function uvTransform(
@@ -217,6 +263,7 @@ export function uvTransform(
   crop: CropRegion | null,
   imageWidth: number,
   imageHeight: number,
+  geometry: Geometry = IDENTITY_GEOMETRY,
 ): UvTransform {
   const region: CropRegion = crop ?? { x: 0, y: 0, width: imageWidth, height: imageHeight }
   const { offsetX, offsetY, scaleX, scaleY } = cropToUvTransform(region, imageWidth, imageHeight)
@@ -268,12 +315,15 @@ export function uvTransform(
     matrix: [m00, m10, m01, m11],
     center,
     displayedAspect: bbox.width / bbox.height,
+    geometryMatrix: geometryMatrix(geometry),
+    lens: { k1: lensK1(geometry), scale: lensScale(imageWidth, imageHeight) },
+    geometry,
   }
 }
 
 /**
  * Applies a {@link UvTransform} on the CPU — the exact twin of the composite
- * shader's `uv = uUvCenter + uUvMatrix * (vUv - 0.5)`.
+ * shader's three-step sample: geometry, then crop/orientation, then the lens.
  *
  * It exists so the transform's *meaning* can be asserted in tests (which corner
  * of the source lands where on screen) without a GL context, and so any drift
@@ -289,12 +339,15 @@ export function applyUvTransform(
   vUv: { x: number; y: number },
 ): { x: number; y: number } {
   const [m00, m10, m01, m11] = transform.matrix
-  const sx = vUv.x - 0.5
-  const sy = vUv.y - 0.5
-  return {
-    x: transform.center[0] + m00 * sx + m01 * sy,
-    y: transform.center[1] + m10 * sx + m11 * sy,
+  // Geometry first, in frame space: keystone, scale and pan all live on the
+  // quad the user sees, not on the sensor.
+  const s = applyMat3(transform.geometryMatrix, { x: vUv.x - 0.5, y: vUv.y - 0.5 })
+  const uv = {
+    x: transform.center[0] + m00 * s.x + m01 * s.y,
+    y: transform.center[1] + m10 * s.x + m11 * s.y,
   }
+  // The lens last: it is the only step measured from the source image's centre.
+  return distort(uv, transform.lens.k1, transform.lens.scale)
 }
 
 /**
@@ -316,12 +369,16 @@ export function applyInverseUvTransform(
   uv: { x: number; y: number },
 ): { x: number; y: number } {
   const [m00, m10, m01, m11] = transform.matrix
+  // Undo the three steps of applyUvTransform in reverse: lens, crop, geometry.
+  const undistorted = undistort(uv, transform.lens.k1, transform.lens.scale)
   const det = m00 * m11 - m01 * m10
-  const dx = uv.x - transform.center[0]
-  const dy = uv.y - transform.center[1]
-  // vUv − 0.5 = M⁻¹ · (uv − center), with M = [[m00, m01], [m10, m11]].
-  return {
-    x: (m11 * dx - m01 * dy) / det + 0.5,
-    y: (-m10 * dx + m00 * dy) / det + 0.5,
+  const dx = undistorted.x - transform.center[0]
+  const dy = undistorted.y - transform.center[1]
+  // s = M⁻¹ · (uv − center), with M = [[m00, m01], [m10, m11]].
+  const s = {
+    x: (m11 * dx - m01 * dy) / det,
+    y: (-m10 * dx + m00 * dy) / det,
   }
+  const p = applyMat3(inverseGeometryMatrix(transform.geometry), s)
+  return { x: p.x + 0.5, y: p.y + 0.5 }
 }

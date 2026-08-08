@@ -10,6 +10,7 @@ import {
 import { createMask, MAX_MASKS, type BrushStroke, type Mask } from './masks'
 import type { Preset } from './presets'
 import { IDENTITY_ORIENTATION } from './rotation'
+import { IDENTITY_GEOMETRY } from './geometry'
 
 /** Builds a fresh store state, letting a test override individual slices. */
 const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreState => ({
@@ -24,6 +25,7 @@ const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreStat
   masks: [],
   activeMaskId: null,
   orientation: IDENTITY_ORIENTATION,
+  geometry: IDENTITY_GEOMETRY,
   ...overrides,
 })
 
@@ -295,6 +297,48 @@ describe('editorReducer — orientation slice', () => {
 
     expect(next.orientation).toEqual(IDENTITY_ORIENTATION)
     expect(next.imageDirty).toBe(false)
+  })
+})
+
+describe('editorReducer — geometry slice', () => {
+  it('SET_GEOMETRY moves one control and leaves the other six alone', () => {
+    const state = createState({ geometry: { ...IDENTITY_GEOMETRY, offsetX: 20 } })
+
+    const next = editorReducer(state, { type: 'SET_GEOMETRY', key: 'perspectiveV', value: -35 })
+
+    expect(next.geometry).toEqual({ ...IDENTITY_GEOMETRY, offsetX: 20, perspectiveV: -35 })
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('RESET_GEOMETRY puts all seven controls back to zero', () => {
+    const state = createState({
+      geometry: { distortion: 10, perspectiveV: -20, perspectiveH: 30, scaleX: -40, scaleY: 50, offsetX: 60, offsetY: -70 },
+    })
+
+    const next = editorReducer(state, { type: 'RESET_GEOMETRY' })
+
+    expect(next.geometry).toEqual(IDENTITY_GEOMETRY)
+    expect(next.imageDirty).toBe(false)
+  })
+
+  it('SET_IMAGE clears the geometry, so the next photo opens undistorted', () => {
+    // Geometry is a lens correction for THIS shot; carrying it into the next
+    // file would silently warp a photo the user has not touched.
+    const state = createState({ geometry: { ...IDENTITY_GEOMETRY, distortion: 80 } })
+
+    const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
+
+    expect(next.geometry).toEqual(IDENTITY_GEOMETRY)
+  })
+
+  it('leaves the orientation alone — they are separate slices', () => {
+    // orientation is discrete and lossless; geometry is neither. Code leans on
+    // that difference (exportDimensions ignores flips, `turn` counts quarters).
+    const state = createState({ orientation: { quarterTurns: 2, flipH: true, flipV: false, angleDeg: 5 } })
+
+    const next = editorReducer(state, { type: 'SET_GEOMETRY', key: 'distortion', value: 50 })
+
+    expect(next.orientation).toBe(state.orientation)
   })
 })
 
