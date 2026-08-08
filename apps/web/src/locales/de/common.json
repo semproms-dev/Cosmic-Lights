@@ -82,7 +82,7 @@
     "grainSize": "Größe",
     "grainRoughness": "Rauheit",
     "noAutoDenoise": "Die Datei enthält weder ISO-Wert noch messbares Rauschen",
-    "denoiseButton": "Automatische Reduzierung",
+    "denoiseButton": "Automatische Reduktion",
     "gradeShadow": "Schatten",
     "gradeMid": "Mitteltöne",
     "gradeHigh": "Lichter",
