@@ -10,6 +10,7 @@ import {
   PreferencesContext,
 } from './preferences'
 import type {
+  Appearance,
   FocusRing,
   HighContrast,
   Language,
@@ -19,6 +20,7 @@ import type {
   Preferences,
   PreferencesStore,
 } from './preferences'
+import type { ThemePresetId } from './themePresets'
 
 interface PreferencesProviderProps {
   children: ReactNode
@@ -62,11 +64,13 @@ export function PreferencesProvider({
     root.toggleAttribute('data-reduce-motion', preferences.reduceMotion)
     root.setAttribute('data-high-contrast', preferences.highContrast)
     root.setAttribute('data-focus-ring', preferences.focusRing)
+    root.setAttribute('data-theme', preferences.theme)
   }, [
     preferences.fontSize,
     preferences.reduceMotion,
     preferences.highContrast,
     preferences.focusRing,
+    preferences.theme,
   ])
 
   const setPanelPosition = useCallback(
@@ -123,6 +127,16 @@ export function PreferencesProvider({
     [update],
   )
 
+  const setAppearance = useCallback(
+    (appearance: Appearance) => update({ appearance }),
+    [update],
+  )
+
+  const setTheme = useCallback(
+    (theme: ThemePresetId) => update({ theme }),
+    [update],
+  )
+
   const store = useMemo<PreferencesStore>(
     () => ({
       preferences,
@@ -135,6 +149,8 @@ export function PreferencesProvider({
       setReduceMotion,
       setHighContrast,
       setFocusRing,
+      setAppearance,
+      setTheme,
     }),
     [
       preferences,
@@ -147,6 +163,8 @@ export function PreferencesProvider({
       setReduceMotion,
       setHighContrast,
       setFocusRing,
+      setAppearance,
+      setTheme,
     ],
   )
 

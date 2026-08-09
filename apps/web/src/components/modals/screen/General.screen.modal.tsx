@@ -1,17 +1,27 @@
-import { Group, NumberInput, Radio, Stack, Switch, useMantineColorScheme } from '@mantine/core';
+import { Box, Group, NumberInput, Radio, Select, Stack, Switch, Text } from '@mantine/core';
 import { usePreferences, MIN_FONT_SIZE, MAX_FONT_SIZE } from '../../../preferences/preferences';
-import type { NavBarPosition, PanelPosition } from '../../../preferences/preferences';
+import type { Appearance, NavBarPosition, PanelPosition } from '../../../preferences/preferences';
+import { getThemePreset, THEME_PRESETS } from '../../../preferences/themePresets';
+import type { ThemePresetId } from '../../../preferences/themePresets';
 import { useTranslation } from 'react-i18next';
 
 /**
- * General preferences tab: tool-rail side, light/dark theme and the base font
- * size. Every control writes through to the persisted preferences store (theme
- * is delegated to Mantine's color-scheme manager, which persists on its own).
+ * General preferences tab: tool-rail side, colour appearance, accent theme and
+ * the base font size. Every control writes through to the persisted preferences
+ * store, which drives the Mantine colour scheme and theme in AppTheme.
  */
 export function General() {
   const { t } = useTranslation(['common']);
-  const { preferences, setPanelPosition, setFontSize, setHelpers, setMenuPosition, setNavBarPosition } = usePreferences();
-  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const {
+    preferences,
+    setPanelPosition,
+    setAppearance,
+    setTheme,
+    setFontSize,
+    setHelpers,
+    setMenuPosition,
+    setNavBarPosition,
+  } = usePreferences();
 
   return (
     <Stack gap="md" w={260}>
@@ -54,12 +64,46 @@ export function General() {
         </Group>
       </Radio.Group>
 
-      <Switch
-        label={t('settings.darkTheme')}
-        checked={colorScheme === 'dark'}
-        onChange={(event) =>
-          setColorScheme(event.currentTarget.checked ? 'dark' : 'light')
-        }
+      <Radio.Group
+        value={preferences.appearance}
+        onChange={(value) => value && setAppearance(value as Appearance)}
+        name="appearance"
+        label={t('settings.appearance')}
+        mt="xs"
+      >
+        <Group mt="xs">
+          <Radio value="light" label={t('settings.appearanceLight')} />
+          <Radio value="dark" label={t('settings.appearanceDark')} />
+          <Radio value="auto" label={t('settings.appearanceAuto')} />
+        </Group>
+      </Radio.Group>
+
+      <Select
+        data={THEME_PRESETS.map((theme) => ({
+          value: theme.id,
+          label: t(theme.labelKey),
+        }))}
+        renderOption={({ option }) => {
+          const preset = getThemePreset(option.value as ThemePresetId);
+          return (
+            <Group gap="sm" wrap="nowrap">
+              <Box
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 4,
+                  border: '1px solid var(--mantine-color-gray-4)',
+                  backgroundColor: `var(--mantine-color-${preset.primaryColor}-6)`,
+                }}
+              />
+              <Text>{option.label}</Text>
+            </Group>
+          );
+        }}
+        value={preferences.theme}
+        onChange={(value) => value && setTheme(value as ThemePresetId)}
+        label={t('settings.theme')}
+        mt="xs"
       />
 
       <Switch

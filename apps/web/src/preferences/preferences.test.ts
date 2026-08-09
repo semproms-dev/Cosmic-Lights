@@ -17,6 +17,8 @@ const CUSTOM: Preferences = {
   reduceMotion: true,
   highContrast: 'on',
   focusRing: 'always',
+  appearance: 'light',
+  theme: 'pink',
 }
 
 afterEach(() => {
@@ -91,6 +93,28 @@ describe('loadPreferences', () => {
     expect(loadPreferences()).toEqual({
       ...CUSTOM,
       reduceMotion: DEFAULT_PREFERENCES.reduceMotion,
+    })
+  })
+
+  it('falls back per field: an invalid appearance resets only that field', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...CUSTOM, appearance: 'bogus' }),
+    )
+    expect(loadPreferences()).toEqual({
+      ...CUSTOM,
+      appearance: DEFAULT_PREFERENCES.appearance,
+    })
+  })
+
+  it('falls back per field: an unknown theme resets only that field', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...CUSTOM, theme: 'chartreuse' }),
+    )
+    expect(loadPreferences()).toEqual({
+      ...CUSTOM,
+      theme: DEFAULT_PREFERENCES.theme,
     })
   })
 

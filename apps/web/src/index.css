@@ -29,24 +29,93 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* Dark appearance follows the Mantine theme (driven by the appearance
+   preference) rather than the OS, so the app's own tokens always match the
+   chosen colour scheme. */
+html[data-mantine-color-scheme='dark'] {
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.15);
+  --accent-border: rgba(192, 132, 252, 0.5);
+  --social-bg: rgba(47, 48, 58, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
+}
+
+/* Theme presets: accent tokens follow the selected `data-theme` (mirrored onto
+   <html> by PreferencesProvider). Values reuse Mantine's per-colour CSS
+   variables so a preset can never drift from its primary colour; the default
+   violet look lives in the base `:root` block above. */
+html[data-theme='pink'] {
+  --accent: var(--mantine-color-pink-7);
+  --accent-bg: color-mix(in srgb, var(--mantine-color-pink-7) 10%, transparent);
+  --accent-border: var(--mantine-color-pink-6);
+}
+html[data-theme='pink'][data-mantine-color-scheme='dark'] {
+  --accent: var(--mantine-color-pink-4);
+  --accent-border: var(--mantine-color-pink-4);
+}
+html[data-theme='yellow'] {
+  --accent: var(--mantine-color-yellow-7);
+  --accent-bg: color-mix(in srgb, var(--mantine-color-yellow-7) 10%, transparent);
+  --accent-border: var(--mantine-color-yellow-6);
+}
+html[data-theme='yellow'][data-mantine-color-scheme='dark'] {
+  --accent: var(--mantine-color-yellow-4);
+  --accent-border: var(--mantine-color-yellow-4);
+}
+html[data-theme='blue'] {
+  --accent: var(--mantine-color-blue-7);
+  --accent-bg: color-mix(in srgb, var(--mantine-color-blue-7) 10%, transparent);
+  --accent-border: var(--mantine-color-blue-6);
+}
+html[data-theme='blue'][data-mantine-color-scheme='dark'] {
+  --accent: var(--mantine-color-blue-4);
+  --accent-border: var(--mantine-color-blue-4);
+}
+html[data-theme='teal'] {
+  --accent: var(--mantine-color-teal-6);
+  --accent-bg: color-mix(in srgb, var(--mantine-color-teal-6) 10%, transparent);
+  --accent-border: var(--mantine-color-teal-5);
+}
+html[data-theme='teal'][data-mantine-color-scheme='dark'] {
+  --accent: var(--mantine-color-teal-4);
+  --accent-border: var(--mantine-color-teal-4);
+}
+html[data-theme='orange'] {
+  --accent: var(--mantine-color-orange-7);
+  --accent-bg: color-mix(in srgb, var(--mantine-color-orange-7) 10%, transparent);
+  --accent-border: var(--mantine-color-orange-6);
+}
+html[data-theme='orange'][data-mantine-color-scheme='dark'] {
+  --accent: var(--mantine-color-orange-4);
+  --accent-border: var(--mantine-color-orange-4);
+}
+html[data-theme='green'] {
+  --accent: var(--mantine-color-green-7);
+  --accent-bg: color-mix(in srgb, var(--mantine-color-green-7) 10%, transparent);
+  --accent-border: var(--mantine-color-green-6);
+}
+html[data-theme='green'][data-mantine-color-scheme='dark'] {
+  --accent: var(--mantine-color-green-4);
+  --accent-border: var(--mantine-color-green-4);
+}
+html[data-theme='grape'] {
+  --accent: var(--mantine-color-grape-7);
+  --accent-bg: color-mix(in srgb, var(--mantine-color-grape-7) 10%, transparent);
+  --accent-border: var(--mantine-color-grape-6);
+}
+html[data-theme='grape'][data-mantine-color-scheme='dark'] {
+  --accent: var(--mantine-color-grape-4);
+  --accent-border: var(--mantine-color-grape-4);
 }
 
 #root {
@@ -185,6 +254,6 @@ html[data-high-contrast='on'][data-mantine-color-scheme='dark'] {
 /* Focus ring: always-on mode supplements Mantine's theme.focusRing with a
    visible outline on every focused element, including custom widgets. */
 html[data-focus-ring='always'] :focus {
-  outline: 2px solid var(--mantine-color-blue-filled);
+  outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: 2px;
 }

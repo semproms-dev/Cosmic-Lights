@@ -18,6 +18,10 @@ const menuPositionGroup = () =>
   screen.getByRole('radiogroup', { name: 'Menu position' });
 const navBarPositionGroup = () =>
   screen.getByRole('radiogroup', { name: 'Toolbar position' });
+const appearanceGroup = () =>
+  screen.getByRole('radiogroup', { name: 'Appearance' });
+const themeSelect = () =>
+  screen.getByRole('combobox', { name: 'Theme' });
 
 describe('General preferences', () => {
   it('renders the controls at their default values', () => {
@@ -29,7 +33,10 @@ describe('General preferences', () => {
     expect(
       within(menuPositionGroup()).getByRole('radio', { name: 'Left', checked: true }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'Dark theme' })).toBeChecked();
+    expect(
+      within(appearanceGroup()).getByRole('radio', { name: 'Dark', checked: true }),
+    ).toBeInTheDocument();
+    expect(themeSelect()).toHaveValue('Violet');
     expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('16');
   });
 
@@ -73,16 +80,35 @@ describe('General preferences', () => {
     expect(loadPreferences().navBarPosition).toBe('bottom');
   });
 
-  it('toggles the color scheme via the theme switch', async () => {
+  it('persists the chosen appearance', async () => {
     const user = userEvent.setup();
     render(<General />);
 
-    const themeSwitch = screen.getByRole('switch', { name: 'Dark theme' });
-    expect(themeSwitch).toBeChecked();
+    await user.click(within(appearanceGroup()).getByRole('radio', { name: 'Light' }));
 
-    await user.click(themeSwitch);
+    expect(
+      within(appearanceGroup()).getByRole('radio', { name: 'Light', checked: true }),
+    ).toBeInTheDocument();
+    expect(loadPreferences().appearance).toBe('light');
+  });
 
-    expect(themeSwitch).not.toBeChecked();
+  it('persists the chosen theme preset', async () => {
+    const user = userEvent.setup();
+    render(<General />);
+
+    await user.click(themeSelect());
+    // jsdom gives the Select's reference element no layout, so floating-ui
+    // reports it hidden and the popover never becomes "visible" here. The
+    // options are still in the DOM, so select one directly.
+    const pinkOption = screen
+      .getAllByRole('option', { hidden: true })
+      .find((option) => option.textContent === 'Pink');
+    if (!pinkOption) {
+      throw new Error('Pink theme option not found');
+    }
+    fireEvent.click(pinkOption);
+
+    expect(loadPreferences().theme).toBe('pink');
   });
 
   it('persists the font size', () => {

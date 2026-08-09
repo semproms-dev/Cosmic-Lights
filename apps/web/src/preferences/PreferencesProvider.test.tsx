@@ -15,6 +15,7 @@ afterEach(() => {
   document.documentElement.removeAttribute('data-reduce-motion')
   document.documentElement.removeAttribute('data-high-contrast')
   document.documentElement.removeAttribute('data-focus-ring')
+  document.documentElement.removeAttribute('data-theme')
 })
 
 describe('PreferencesProvider setFontSize', () => {
@@ -73,6 +74,10 @@ describe('PreferencesProvider accessibility attributes', () => {
       'data-focus-ring',
       DEFAULT_PREFERENCES.focusRing,
     )
+    expect(document.documentElement).toHaveAttribute(
+      'data-theme',
+      DEFAULT_PREFERENCES.theme,
+    )
   })
 
   it('toggles the accessibility attributes when the preferences change', () => {
@@ -85,5 +90,13 @@ describe('PreferencesProvider accessibility attributes', () => {
     expect(document.documentElement).toHaveAttribute('data-reduce-motion')
     expect(document.documentElement).toHaveAttribute('data-high-contrast', 'off')
     expect(document.documentElement).toHaveAttribute('data-focus-ring', 'never')
+  })
+
+  it('mirrors the theme preset onto the document root', () => {
+    const { result } = renderHook(() => usePreferences(), { wrapper })
+
+    act(() => result.current.setTheme('pink'))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'pink')
   })
 })

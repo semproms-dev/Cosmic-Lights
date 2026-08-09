@@ -1,6 +1,8 @@
 import { createContext, use } from 'react'
 import { z } from 'zod'
 import { logger } from '../logger'
+import { DEFAULT_THEME, THEME_IDS } from './themePresets'
+import type { ThemePresetId } from './themePresets'
 
 /** Which side of the editor the tool rail and its panels live on. */
 export type PanelPosition = 'left' | 'right'
@@ -15,6 +17,8 @@ export type Language = 'de' | 'en' | 'es' | 'fr' | 'it'
 export type HighContrast = 'auto' | 'on' | 'off'
 /** When the focus ring is shown: keyboard only, always, or never. */
 export type FocusRing = 'auto' | 'always' | 'never'
+/** Colour appearance: light, dark, or follow the OS setting. */
+export type Appearance = 'light' | 'dark' | 'auto'
 
 /** User-facing application preferences, persisted across sessions. */
 export interface Preferences {
@@ -34,6 +38,10 @@ export interface Preferences {
   highContrast: HighContrast
   /** When the focus ring is shown on interactive elements. */
   focusRing: FocusRing
+  /** Colour appearance: light, dark, or follow the OS setting. */
+  appearance: Appearance
+  /** Accent-colour theme preset. */
+  theme: ThemePresetId
 }
 
 /** Values used before the user changes anything (and the persistence fallback). */
@@ -47,6 +55,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   reduceMotion: false,
   highContrast: 'auto',
   focusRing: 'auto',
+  appearance: 'dark',
+  theme: DEFAULT_THEME,
 }
 
 /** Bounds for the font-size control, shared by the UI and the parser. */
@@ -76,6 +86,10 @@ const preferencesSchema = z.object({
   focusRing: z
     .enum(['auto', 'always', 'never'])
     .catch(DEFAULT_PREFERENCES.focusRing),
+  appearance: z
+    .enum(['light', 'dark', 'auto'])
+    .catch(DEFAULT_PREFERENCES.appearance),
+  theme: z.enum(THEME_IDS).catch(DEFAULT_PREFERENCES.theme),
 })
 
 /** localStorage key under which the serialized preferences live. */
@@ -142,6 +156,10 @@ export interface PreferencesStore {
   setHighContrast: (highContrast: HighContrast) => void
   /** Sets when the focus ring is shown on interactive elements. */
   setFocusRing: (focusRing: FocusRing) => void
+  /** Sets the colour appearance (light, dark, or follow the OS). */
+  setAppearance: (appearance: Appearance) => void
+  /** Sets the accent-colour theme preset. */
+  setTheme: (theme: ThemePresetId) => void
 }
 
 export const PreferencesContext = createContext<PreferencesStore | null>(null)

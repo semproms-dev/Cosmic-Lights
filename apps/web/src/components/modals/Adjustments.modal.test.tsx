@@ -25,7 +25,8 @@ describe('AdjustementsModal', () => {
     expect(
       within(screen.getByRole('radiogroup', { name: 'Panel position' })).getByRole('radio', { name: 'Right' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'Dark theme' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Appearance' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Theme' })).toBeInTheDocument();
     expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toBeInTheDocument();
   });
 
