@@ -15,7 +15,10 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
+  /* Base size is driven by the user's font preference, applied to the root
+     element at runtime; only the family and line-height live here. */
+  font-family: var(--sans);
+  line-height: 1.45;
   letter-spacing: 0.18px;
   color-scheme: light dark;
   color: var(--text);
@@ -24,10 +27,6 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -108,4 +107,84 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* ===== Accessibility preferences (mirrored onto <html> by PreferencesProvider) ===== */
+
+/* Reduce motion: user toggle (html[data-reduce-motion]) or OS setting. The
+   0.01ms duration keeps elements' final states intact while skipping motion. */
+@media (prefers-reduced-motion: reduce) {
+  html *,
+  html *::before,
+  html *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-reduce-motion] *,
+html[data-reduce-motion] *::before,
+html[data-reduce-motion] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+
+/* High contrast: boost the app's own tokens and the key Mantine colour
+   variables. Light and dark follow the Mantine theme on <html>. */
+html[data-high-contrast='on'] {
+  --text: #1f1b24;
+  --text-h: #000000;
+  --border: #101018;
+  --accent: #7a1fa2;
+  --accent-border: #5e1180;
+  --mantine-color-text: #000000;
+  --mantine-color-dimmed: #1f1b24;
+  --mantine-color-default-border: #101018;
+}
+
+html[data-high-contrast='on'][data-mantine-color-scheme='dark'] {
+  --text: #f2f2f6;
+  --text-h: #ffffff;
+  --border: #d8d8e0;
+  --accent: #e0b3ff;
+  --accent-border: #e0b3ff;
+  --mantine-color-text: #ffffff;
+  --mantine-color-dimmed: #f2f2f6;
+  --mantine-color-default-border: #d8d8e0;
+}
+
+/* High contrast in "auto" mode follows the OS setting. */
+@media (prefers-contrast: more) {
+  html:not([data-high-contrast='off']) {
+    --text: #1f1b24;
+    --text-h: #000000;
+    --border: #101018;
+    --accent: #7a1fa2;
+    --accent-border: #5e1180;
+    --mantine-color-text: #000000;
+    --mantine-color-dimmed: #1f1b24;
+    --mantine-color-default-border: #101018;
+  }
+
+  html:not([data-high-contrast='off'])[data-mantine-color-scheme='dark'] {
+    --text: #f2f2f6;
+    --text-h: #ffffff;
+    --border: #d8d8e0;
+    --accent: #e0b3ff;
+    --accent-border: #e0b3ff;
+    --mantine-color-text: #ffffff;
+    --mantine-color-dimmed: #f2f2f6;
+    --mantine-color-default-border: #d8d8e0;
+  }
+}
+
+/* Focus ring: always-on mode supplements Mantine's theme.focusRing with a
+   visible outline on every focused element, including custom widgets. */
+html[data-focus-ring='always'] :focus {
+  outline: 2px solid var(--mantine-color-blue-filled);
+  outline-offset: 2px;
 }

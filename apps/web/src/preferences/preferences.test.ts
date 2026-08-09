@@ -14,6 +14,9 @@ const CUSTOM: Preferences = {
   helper: false,
   menuPosition: 'right',
   navBarPosition: 'bottom',
+  reduceMotion: true,
+  highContrast: 'on',
+  focusRing: 'always',
 }
 
 afterEach(() => {
@@ -55,6 +58,39 @@ describe('loadPreferences', () => {
     expect(loadPreferences()).toEqual({
       ...CUSTOM,
       language: DEFAULT_PREFERENCES.language,
+    })
+  })
+
+  it('falls back per field: an invalid high-contrast mode resets only that field', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...CUSTOM, highContrast: 'bogus' }),
+    )
+    expect(loadPreferences()).toEqual({
+      ...CUSTOM,
+      highContrast: DEFAULT_PREFERENCES.highContrast,
+    })
+  })
+
+  it('falls back per field: an invalid focus-ring mode resets only that field', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...CUSTOM, focusRing: 'bogus' }),
+    )
+    expect(loadPreferences()).toEqual({
+      ...CUSTOM,
+      focusRing: DEFAULT_PREFERENCES.focusRing,
+    })
+  })
+
+  it('falls back per field: a non-boolean reduce-motion value resets only that field', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...CUSTOM, reduceMotion: 'yes' }),
+    )
+    expect(loadPreferences()).toEqual({
+      ...CUSTOM,
+      reduceMotion: DEFAULT_PREFERENCES.reduceMotion,
     })
   })
 

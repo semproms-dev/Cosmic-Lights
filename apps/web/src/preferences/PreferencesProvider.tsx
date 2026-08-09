@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import i18n from '../i18n'
 import {
@@ -10,6 +10,8 @@ import {
   PreferencesContext,
 } from './preferences'
 import type {
+  FocusRing,
+  HighContrast,
   Language,
   MenuPosition,
   NavBarPosition,
@@ -37,10 +39,6 @@ export function PreferencesProvider({
     () => initialPreferences ?? loadPreferences(),
   )
 
-  useEffect(() => {
-    document.documentElement.style.fontSize = `${preferences.fontSize}px`;
-  }, [preferences.fontSize]);
-
   const update = useCallback((patch: Partial<Preferences>) => {
     setPreferences((prev) => {
       const next = { ...prev, ...patch }
@@ -48,6 +46,28 @@ export function PreferencesProvider({
       return next
     })
   }, [])
+
+  useEffect(() => {
+    void i18n.changeLanguage(preferences.language)
+  }, [preferences.language])
+
+  // Accessibility state lives on the document root so plain CSS can react to
+  // it. Mantine sizes everything in rem resolved against the html font-size,
+  // so the base font preference must also live here to scale the UI. A layout
+  // effect applies everything before first paint, avoiding a flash at the
+  // browser defaults on load.
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    root.style.fontSize = `${preferences.fontSize}px`
+    root.toggleAttribute('data-reduce-motion', preferences.reduceMotion)
+    root.setAttribute('data-high-contrast', preferences.highContrast)
+    root.setAttribute('data-focus-ring', preferences.focusRing)
+  }, [
+    preferences.fontSize,
+    preferences.reduceMotion,
+    preferences.highContrast,
+    preferences.focusRing,
+  ])
 
   const setPanelPosition = useCallback(
     (position: PanelPosition) => update({ panelPosition: position }),
@@ -73,10 +93,6 @@ export function PreferencesProvider({
     [update],
   )
 
-  useEffect(() => {
-    void i18n.changeLanguage(preferences.language)
-  }, [preferences.language])
-
   const setHelpers = useCallback(
     (helper: boolean) => update({ helper }),
     [update],
@@ -92,9 +108,46 @@ export function PreferencesProvider({
     [update],
   )
 
+  const setReduceMotion = useCallback(
+    (reduceMotion: boolean) => update({ reduceMotion }),
+    [update],
+  )
+
+  const setHighContrast = useCallback(
+    (highContrast: HighContrast) => update({ highContrast }),
+    [update],
+  )
+
+  const setFocusRing = useCallback(
+    (focusRing: FocusRing) => update({ focusRing }),
+    [update],
+  )
+
   const store = useMemo<PreferencesStore>(
-    () => ({ preferences, setPanelPosition, setFontSize, setLanguage, setHelpers, setMenuPosition, setNavBarPosition }),
-    [preferences, setPanelPosition, setFontSize, setLanguage, setHelpers, setMenuPosition, setNavBarPosition],
+    () => ({
+      preferences,
+      setPanelPosition,
+      setFontSize,
+      setLanguage,
+      setHelpers,
+      setMenuPosition,
+      setNavBarPosition,
+      setReduceMotion,
+      setHighContrast,
+      setFocusRing,
+    }),
+    [
+      preferences,
+      setPanelPosition,
+      setFontSize,
+      setLanguage,
+      setHelpers,
+      setMenuPosition,
+      setNavBarPosition,
+      setReduceMotion,
+      setHighContrast,
+      setFocusRing,
+    ],
   )
 
   return (

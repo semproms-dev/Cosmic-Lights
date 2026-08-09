@@ -691,7 +691,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
      <canvas onContextMenu={showContextMenu([
       {
         key: 'reset',
-        icon: <IconZoomReset/>,
+        icon: <IconZoomReset size="1.5rem" />,
         title: 'Reset changes',
         onClick: () => openResetDialog()
       },

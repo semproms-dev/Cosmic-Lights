@@ -55,7 +55,7 @@ export function LateralNavBar({ active, onChange }: RightNavBarProps) {
         data-active={tool.navKey === active || undefined}
         aria-label={tool.label}
       >
-        <tool.icon size={22} stroke={1.5} />
+        <tool.icon size="1.375rem" stroke={1.5} />
       </UnstyledButton>
     </Tooltip>
   ));

@@ -41,7 +41,7 @@ export function AboutModal() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <IconBrandGithub size={16} stroke={1.5} />
+          <IconBrandGithub size="1rem" stroke={1.5} />
           {t('about.sourceCode')}
         </a>
         <a
@@ -50,7 +50,7 @@ export function AboutModal() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <IconWorld size={16} stroke={1.5} />
+          <IconWorld size="1rem" stroke={1.5} />
           {t('about.website')}
         </a>
       </div>

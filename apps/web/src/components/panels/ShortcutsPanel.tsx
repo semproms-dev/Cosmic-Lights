@@ -22,7 +22,7 @@ export function ShortcutsPanel() {
           {items.map((shortcut) => (
             <Group key={shortcut.id} justify="space-between" wrap="nowrap">
               <Group gap="xs" wrap="nowrap">
-                <shortcut.icon size={18} stroke={1.5} />
+                <shortcut.icon size="1.125rem" stroke={1.5} />
                 <Text size="sm" c={shortcut.enabled === false ? 'dimmed' : undefined}>
                   {shortcut.label}
                   {shortcut.enabled === false ? ' (soon)' : ''}

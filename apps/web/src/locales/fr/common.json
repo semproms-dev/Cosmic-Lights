@@ -100,7 +100,17 @@
     "right": "Droite",
     "darkTheme": "Thème sombre",
     "helpers": "Activer les aides",
-    "font": "Police"
+    "font": "Police",
+    "accessibility": "Accessibilité",
+    "reduceMotion": "Réduire les animations",
+    "highContrast": "Contraste élevé",
+    "highContrastAuto": "Automatique",
+    "highContrastOn": "Activé",
+    "highContrastOff": "Désactivé",
+    "focusRing": "Anneau de focus",
+    "focusRingAuto": "Automatique",
+    "focusRingAlways": "Toujours",
+    "focusRingNever": "Jamais"
   },
   "export": {
     "title": "Exporter",

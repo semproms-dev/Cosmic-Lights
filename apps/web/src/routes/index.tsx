@@ -95,7 +95,6 @@ function HomePage() {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        fontSize: `${preferences.fontSize}px`,
       }}
     >
       <NavBar onOpenImage={() => fileInputRef.current?.click()} />

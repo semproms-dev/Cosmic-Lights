@@ -125,17 +125,17 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
       <Group gap="xs" w="100%" justify={preferences.menuPosition === 'right' ? 'flex-end' : 'flex-start'}>
         <Tooltip label={t('topNav.openFile')} withArrow>
           <ActionIcon size='lg' variant='subtle' onClick={() => onOpenImage?.()} aria-label={t('topNav.openFile')}>
-            <IconFolderOpen />
+            <IconFolderOpen size="1.5rem" />
           </ActionIcon>
         </Tooltip>
         <Tooltip label={t(showOriginal ? 'topNav.showEdited' : 'topNav.showOriginal')} withArrow>
           <ActionIcon size="lg" variant='subtle' onClick={() => setShowOriginal(!showOriginal)} disabled={image === null || !imageDirty}>
-            {showOriginal ? <IconViewfinderOff /> : <IconViewfinder />}
+            {showOriginal ? <IconViewfinderOff size="1.5rem" /> : <IconViewfinder size="1.5rem" />}
           </ActionIcon>
         </Tooltip>
         <Tooltip label={t('topNav.undoAll')} withArrow>
           <ActionIcon variant='subtle' size="lg" onClick={() => openResetDialog()} disabled={!canUndo}>
-            <IconRestore />
+            <IconRestore size="1.5rem" />
           </ActionIcon>
         </Tooltip>
         <Tooltip label={t('topNav.undo')} withArrow>
@@ -150,12 +150,12 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
         </Tooltip>
         <Tooltip label={t('topNav.settings')} withArrow>
           <ActionIcon variant='subtle' size="lg" onClick={openSettings} aria-label={t('topNav.settings')}>
-            <IconSettings size={22} stroke={1.5} />
+            <IconSettings size="1.375rem" stroke={1.5} />
           </ActionIcon>
         </Tooltip>
         <Tooltip label={t('topNav.about')} withArrow>
           <ActionIcon variant='subtle' size="lg" onClick={openAbout} aria-label={t('topNav.about')}>
-            <IconInfoCircle size={22} stroke={1.5} />
+            <IconInfoCircle size="1.375rem" stroke={1.5} />
         </ActionIcon>
         </Tooltip>
       </Group>

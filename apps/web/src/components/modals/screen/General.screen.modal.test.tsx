@@ -30,7 +30,7 @@ describe('General preferences', () => {
       within(menuPositionGroup()).getByRole('radio', { name: 'Left', checked: true }),
     ).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Dark theme' })).toBeChecked();
-    expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('14');
+    expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('16');
   });
 
   it('persists the chosen panel position', async () => {

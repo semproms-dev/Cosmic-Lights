@@ -3,6 +3,7 @@ import { Tabs } from '@mantine/core';
 import { useModals } from '@mantine/modals';
 import { General } from './screen/General.screen.modal';
 import { Language } from './screen/Language.screen.modal';
+import { Accessibility } from './screen/Accessibility.screen.modal';
 import { useTranslation } from 'react-i18next';
 
 interface AdjustementsModalProps {
@@ -28,6 +29,7 @@ export function AdjustementsModal({ modalId }: AdjustementsModalProps) {
       <Tabs.List>
         <Tabs.Tab value="general">{t('settings.general')}</Tabs.Tab>
         <Tabs.Tab value="language">{t('settings.language')}</Tabs.Tab>
+        <Tabs.Tab value="accessibility">{t('settings.accessibility')}</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="general" pl="md">
@@ -35,6 +37,9 @@ export function AdjustementsModal({ modalId }: AdjustementsModalProps) {
       </Tabs.Panel>
       <Tabs.Panel value="language" pl="md">
         <Language />
+      </Tabs.Panel>
+      <Tabs.Panel value="accessibility" pl="md">
+        <Accessibility />
       </Tabs.Panel>
     </Tabs>
   );

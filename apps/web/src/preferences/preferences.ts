@@ -11,6 +11,11 @@ export type NavBarPosition = 'top' | 'bottom'
 /** Interface language. Synced with the i18n runtime via PreferencesProvider. */
 export type Language = 'de' | 'en' | 'es' | 'fr' | 'it'
 
+/** High-contrast mode: `auto` follows the OS `prefers-contrast` setting. */
+export type HighContrast = 'auto' | 'on' | 'off'
+/** When the focus ring is shown: keyboard only, always, or never. */
+export type FocusRing = 'auto' | 'always' | 'never'
+
 /** User-facing application preferences, persisted across sessions. */
 export interface Preferences {
   /** Side of the screen for the tool rail and open panel. */
@@ -23,16 +28,25 @@ export interface Preferences {
   menuPosition: MenuPosition
   /** Where the top navigation bar is shown: top or bottom of the window. */
   navBarPosition: NavBarPosition
+  /** Whether motion and transitions are disabled app-wide. */
+  reduceMotion: boolean
+  /** High-contrast colour scheme. */
+  highContrast: HighContrast
+  /** When the focus ring is shown on interactive elements. */
+  focusRing: FocusRing
 }
 
 /** Values used before the user changes anything (and the persistence fallback). */
 export const DEFAULT_PREFERENCES: Preferences = {
   panelPosition: 'right',
-  fontSize: 14,
+  fontSize: 16,
   language: 'en',
   helper: false,
   menuPosition: 'left',
   navBarPosition: 'top',
+  reduceMotion: false,
+  highContrast: 'auto',
+  focusRing: 'auto',
 }
 
 /** Bounds for the font-size control, shared by the UI and the parser. */
@@ -55,6 +69,13 @@ const preferencesSchema = z.object({
   navBarPosition: z
     .enum(['top', 'bottom'])
     .catch(DEFAULT_PREFERENCES.navBarPosition),
+  reduceMotion: z.boolean().catch(DEFAULT_PREFERENCES.reduceMotion),
+  highContrast: z
+    .enum(['auto', 'on', 'off'])
+    .catch(DEFAULT_PREFERENCES.highContrast),
+  focusRing: z
+    .enum(['auto', 'always', 'never'])
+    .catch(DEFAULT_PREFERENCES.focusRing),
 })
 
 /** localStorage key under which the serialized preferences live. */
@@ -115,6 +136,12 @@ export interface PreferencesStore {
   setMenuPosition: (position: MenuPosition) => void
   /** Sets whether the top navigation bar is shown at the top or bottom. */
   setNavBarPosition: (position: NavBarPosition) => void
+  /** Sets whether motion and transitions are disabled app-wide. */
+  setReduceMotion: (reduceMotion: boolean) => void
+  /** Sets the high-contrast colour scheme. */
+  setHighContrast: (highContrast: HighContrast) => void
+  /** Sets when the focus ring is shown on interactive elements. */
+  setFocusRing: (focusRing: FocusRing) => void
 }
 
 export const PreferencesContext = createContext<PreferencesStore | null>(null)

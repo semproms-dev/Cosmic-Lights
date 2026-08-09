@@ -76,13 +76,13 @@ export function Presets() {
               background: 'var(--mantine-color-dark-6)',
             }}
           >
-            <IconFolder size={16} stroke={1.5} />
+            <IconFolder size="1rem" stroke={1.5} />
             <Text size="sm" fw={600} tt="uppercase" style={{ flex: 1 }}>
               {t(`presets.kind.${group}`)}
             </Text>
             <Text size="xs" c="dimmed">{presets.length}</Text>
             <IconChevronDown
-              size={14}
+              size="0.875rem"
               stroke={1.5}
               style={{
                 transform: collapsed.has(group) ? 'rotate(-90deg)' : 'none',

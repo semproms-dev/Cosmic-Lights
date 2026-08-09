@@ -140,7 +140,7 @@ export function MasksPanel() {
               cursor: disabled || opt.disabled || atCap ? 'not-allowed' : 'pointer',
             }}
           >
-            <opt.icon size={18} stroke={1.5} />
+            <opt.icon size="1.125rem" stroke={1.5} />
             <Text size="sm">{t(`masks.${opt.labelKey}`)}</Text>
           </UnstyledButton>
         ))}
@@ -163,7 +163,7 @@ export function MasksPanel() {
                       [
                         {
                           key: 'duplicateandinvert',
-                          icon: <IconDumpling/>,
+                          icon: <IconDumpling size="1.5rem" />,
                           title: t('masks.contextDuplicateInvert'),
                           onClick: () => {
                             // Only the selection is copied. Carrying the tone
@@ -178,13 +178,13 @@ export function MasksPanel() {
                         },
                         {
                           key: 'delete',
-                          icon: <IconTrash/>,
+                          icon: <IconTrash size="1.5rem" />,
                           title: t('masks.contextRemoveMask'),
                           onClick: () => {removeMask(mask.id); commit();}
                         },
                         {
                           key: 'duplicate',
-                          icon: <IconCopy/>,
+                          icon: <IconCopy size="1.5rem" />,
                           title: t('masks.contextDuplicate'),
                           onClick: () => {
                             // No invert override: a plain copy keeps whatever the
@@ -219,12 +219,12 @@ export function MasksPanel() {
                         aria-label={t('masks.retry')}
                         onClick={() => retryMask(mask.id)}
                       >
-                        <IconRefresh size={16} />
+                        <IconRefresh size="1rem" />
                       </ActionIcon>
                     </Tooltip>
                   )}
                   <ActionIcon variant="subtle" color="red" aria-label={`Delete ${mask.name}`} onClick={() => { removeMask(mask.id); commit() }}>
-                    <IconTrash size={16} />
+                    <IconTrash size="1rem" />
                   </ActionIcon>
                 </Group>
               )

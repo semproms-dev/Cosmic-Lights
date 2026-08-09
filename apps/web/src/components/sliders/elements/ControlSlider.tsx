@@ -123,7 +123,7 @@ export function ControlSlider({
          <Group gap={6} wrap="nowrap" align="flex-start" className={classes.labelGroup}>
          {preferences.helper ?
           <Tooltip label={description ?? label}>
-              <IconInfoCircle size={16} stroke={2} color="var(--mantine-color-dimmed)"  />
+              <IconInfoCircle size="1rem" stroke={2} color="var(--mantine-color-dimmed)"  />
             </Tooltip>: null
           }
           {/*

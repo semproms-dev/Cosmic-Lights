@@ -100,7 +100,17 @@
     "right": "Right",
     "darkTheme": "Dark theme",
     "helpers": "Activate helpers",
-    "font": "Font"
+    "font": "Font",
+    "accessibility": "Accessibility",
+    "reduceMotion": "Reduce motion",
+    "highContrast": "High contrast",
+    "highContrastAuto": "Auto",
+    "highContrastOn": "On",
+    "highContrastOff": "Off",
+    "focusRing": "Focus ring",
+    "focusRingAuto": "Auto",
+    "focusRingAlways": "Always",
+    "focusRingNever": "Never"
   },
   "export": {
     "title": "Export",

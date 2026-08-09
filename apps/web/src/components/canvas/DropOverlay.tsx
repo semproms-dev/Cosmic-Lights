@@ -109,7 +109,7 @@ export function DropOverlay({ imageLoaded, onDropFile }: DropOverlayProps) {
       />
       <div className={classes.content}>
         <Icon
-          size={52}
+          size="3.25rem"
           stroke={1.5}
           color={
             dragging
