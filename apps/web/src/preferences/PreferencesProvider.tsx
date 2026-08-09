@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import i18n from '../i18n'
 import {
   DEFAULT_PREFERENCES,
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
   loadPreferences,
   savePreferences,
   PreferencesContext,
@@ -35,6 +37,10 @@ export function PreferencesProvider({
     () => initialPreferences ?? loadPreferences(),
   )
 
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${preferences.fontSize}px`;
+  }, [preferences.fontSize]);
+
   const update = useCallback((patch: Partial<Preferences>) => {
     setPreferences((prev) => {
       const next = { ...prev, ...patch }
@@ -49,7 +55,13 @@ export function PreferencesProvider({
   )
 
   const setFontSize = useCallback(
-    (size: number) => update({ fontSize: Math.round(size) }),
+    (size: number) =>
+      update({
+        fontSize: Math.min(
+          MAX_FONT_SIZE,
+          Math.max(MIN_FONT_SIZE, Math.round(size)),
+        ),
+      }),
     [update],
   )
 

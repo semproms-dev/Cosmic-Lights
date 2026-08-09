@@ -78,6 +78,7 @@ export function General() {
         }
         min={MIN_FONT_SIZE}
         max={MAX_FONT_SIZE}
+        clampBehavior="strict"
       />
     </Stack>
   );

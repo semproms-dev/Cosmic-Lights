@@ -93,4 +93,20 @@ describe('General preferences', () => {
     expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('20');
     expect(loadPreferences().fontSize).toBe(20);
   });
+
+  it('rejects a font size outside the bounds', () => {
+    render(<General />);
+
+    const fontInput = screen.getByLabelText('Font', VISIBLE_INPUT);
+    fireEvent.change(fontInput, { target: { value: '20' } });
+    expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('20');
+
+    fireEvent.change(screen.getByLabelText('Font', VISIBLE_INPUT), { target: { value: '999' } });
+    expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('20');
+    expect(loadPreferences().fontSize).toBe(20);
+
+    fireEvent.change(screen.getByLabelText('Font', VISIBLE_INPUT), { target: { value: '1' } });
+    expect(screen.getByLabelText('Font', VISIBLE_INPUT)).toHaveValue('20');
+    expect(loadPreferences().fontSize).toBe(20);
+  });
 });

@@ -36,8 +36,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
 }
 
 /** Bounds for the font-size control, shared by the UI and the parser. */
-export const MIN_FONT_SIZE = 10
-export const MAX_FONT_SIZE = 24
+export const MIN_FONT_SIZE = 15;
+export const MAX_FONT_SIZE = 25;
 
 // Each field falls back to its default independently, so one bad value (e.g. a
 // font size left mid-edit before a reload) never wipes the other preferences.
