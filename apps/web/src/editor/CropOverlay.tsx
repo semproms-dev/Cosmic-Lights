@@ -260,6 +260,13 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
             onPointerDown={startMove}
           />
 
+          {/* Rule-of-thirds guides — two verticals and two horizontals dividing
+              the frame into a 3×3 grid, like Lightroom's third-overlay. */}
+          <line x1={rx + rw / 3} y1={ry}          x2={rx + rw / 3} y2={ry + rh}          stroke="white" strokeWidth={1} opacity={0.5} />
+          <line x1={rx + 2 * rw / 3} y1={ry}       x2={rx + 2 * rw / 3} y2={ry + rh}      stroke="white" strokeWidth={1} opacity={0.5} />
+          <line x1={rx}            y1={ry + rh / 3} x2={rx + rw}        y2={ry + rh / 3}   stroke="white" strokeWidth={1} opacity={0.5} />
+          <line x1={rx}            y1={ry + 2 * rh / 3} x2={rx + rw}   y2={ry + 2 * rh / 3} stroke="white" strokeWidth={1} opacity={0.5} />
+
           {/* Handles. With a locked ratio, only corners are shown: edge handles
               feel wrong under fit-inside (shrink-only) constraining. */}
           {HANDLES.filter(({ fx, fy }) => aspect === null || (fx !== 0.5 && fy !== 0.5)).map(({ fx, fy }) => (

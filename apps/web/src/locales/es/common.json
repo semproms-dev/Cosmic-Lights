@@ -63,7 +63,7 @@
   "lateralNavBar": {
     "exposure": "Exposición",
     "contrast": "Contraste",
-    "highlights": "Altas luces",
+    "highlights": "Luces altas",
     "shadows": "Sombras",
     "whites": "Blancos",
     "blacks": "Negros",
@@ -87,7 +87,7 @@
     "denoiseButton": "Reducción automática",
     "gradeShadow": "Sombras",
     "gradeMid": "Medios",
-    "gradeHigh": "Altas luces",
+    "gradeHigh": "Luces altas",
     "gradeLum": "Luminosidad"
   },
   "settings": {
