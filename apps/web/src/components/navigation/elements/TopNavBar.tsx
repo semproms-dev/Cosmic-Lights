@@ -1,13 +1,13 @@
-import { useState } from 'react';
-
 import {
   IconSettings,
   IconFolderOpen,
   IconInfoCircle,
+  IconMaximizeOff,
 } from '@tabler/icons-react';
 import { Group, Tooltip, ActionIcon } from '@mantine/core';
 import classes from '../styles/TopNavBar.module.css';
 import { FaRedoAlt, FaUndoAlt } from "react-icons/fa";
+import { TfiFullscreen } from "react-icons/tfi";
 import { useEditor } from '../../../editor/editorContext';
 import { useModals } from '@mantine/modals';
 import { AdjustementsModal } from '../../modals/Adjustments.modal';
@@ -35,9 +35,11 @@ import { usePreferences } from '../../../preferences/preferences';
 interface NavBarProps {
   /** Opens the image picker; wired to the shared file input by the host. */
   onOpenImage?: () => void;
+  fullScreen?: boolean;
+  onToggleFullScreen?: () => void;
 }
 
-export function NavBar({ onOpenImage }: NavBarProps = {}) {
+export function NavBar({ onOpenImage, fullScreen, onToggleFullScreen }: NavBarProps = {}) {
   /*const [active, setActive] = useState('File');
   const [openedLabel, setOpenedLabel] = useState('');*/
   const {redo, undo, canRedo, canUndo, openResetDialog, image, imageDirty, showOriginal, setShowOriginal} = useEditor();
@@ -126,6 +128,11 @@ export function NavBar({ onOpenImage }: NavBarProps = {}) {
         <Tooltip label={t('topNav.openFile')} withArrow>
           <ActionIcon size='lg' variant='subtle' onClick={() => onOpenImage?.()} aria-label={t('topNav.openFile')}>
             <IconFolderOpen size="1.5rem" />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label={t('topNav.fullScreen')} withArrow>
+          <ActionIcon variant='subtle' size={'lg'} disabled={image === null} onClick={() => onToggleFullScreen?.()} aria-label={t('topNav.fullScreen')}>
+            {!fullScreen ? <TfiFullscreen size="1.375rem"/> : <IconMaximizeOff size={"1.375rem"}/>}
           </ActionIcon>
         </Tooltip>
         <Tooltip label={t(showOriginal ? 'topNav.showEdited' : 'topNav.showOriginal')} withArrow>

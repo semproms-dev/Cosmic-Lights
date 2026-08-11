@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useFullscreenDocument } from '@mantine/hooks'
 import { NavBar } from '../components/navigation/elements/TopNavBar'
 import { LateralNavBar } from '../components/navigation/elements/LateralNavBar'
 import { AdjustmentsPanel } from '../components/sliders/elements/AdjustmentsPanel'
@@ -46,6 +47,7 @@ function HomePage() {
   const [activeTool, setActiveTool] = useState('adjustments')
   const {imageStatus, masks, activeMaskId, maskOverlayHidden} = useEditor();
   const { preferences } = usePreferences();
+  const { fullscreen, toggle } = useFullscreenDocument();
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // When the Masks tool is open and a brush mask is selected, the canvas paints
@@ -97,7 +99,7 @@ function HomePage() {
         height: '100vh',
       }}
     >
-      <NavBar onOpenImage={() => fileInputRef.current?.click()} />
+      <NavBar onOpenImage={() => fileInputRef.current?.click()} fullScreen={fullscreen} onToggleFullScreen={toggle} />
       <OpenImageButton fileInputRef={fileInputRef} />
       <div style={{ display: 'flex', flexDirection: rowDirection, flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
