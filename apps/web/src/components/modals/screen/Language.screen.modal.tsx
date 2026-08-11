@@ -3,10 +3,13 @@ import { usePreferences } from '../../../preferences/preferences';
 import type { Language as LanguageCode } from '../../../preferences/preferences';
 
 const LANGUAGES = [
+  { value: 'ca', label: 'Català' },
   { value: 'de', label: 'Deutsch' },
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Castellano' },
+  { value: 'eu', label: 'Euskara' },
   { value: 'fr', label: 'Français' },
+  { value: 'gl', label: 'Galego' },
   { value: 'it', label: 'Italiano' },
 ];
 

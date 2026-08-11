@@ -11,7 +11,7 @@ export type MenuPosition = 'left' | 'right'
 export type NavBarPosition = 'top' | 'bottom'
 
 /** Interface language. Synced with the i18n runtime via PreferencesProvider. */
-export type Language = 'de' | 'en' | 'es' | 'fr' | 'it'
+export type Language = 'ca' | 'de' | 'en' | 'es' | 'eu' | 'fr' | 'gl' | 'it'
 
 /** High-contrast mode: `auto` follows the OS `prefers-contrast` setting. */
 export type HighContrast = 'auto' | 'on' | 'off'
@@ -73,7 +73,9 @@ const preferencesSchema = z.object({
     .min(MIN_FONT_SIZE)
     .max(MAX_FONT_SIZE)
     .catch(DEFAULT_PREFERENCES.fontSize),
-  language: z.enum(['de', 'en', 'es', 'fr', 'it']).catch(DEFAULT_PREFERENCES.language),
+  language: z
+    .enum(['ca', 'de', 'en', 'es', 'eu', 'fr', 'gl', 'it'])
+    .catch(DEFAULT_PREFERENCES.language),
   helper: z.boolean().catch(DEFAULT_PREFERENCES.helper),
   menuPosition: z.enum(['left', 'right']).catch(DEFAULT_PREFERENCES.menuPosition),
   navBarPosition: z

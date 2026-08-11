@@ -63,6 +63,16 @@ describe('loadPreferences', () => {
     })
   })
 
+  it('accepts the recently added languages', () => {
+    for (const language of ['ca', 'eu', 'gl']) {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...CUSTOM, language }),
+      )
+      expect(loadPreferences().language).toBe(language)
+    }
+  })
+
   it('falls back per field: an invalid high-contrast mode resets only that field', () => {
     localStorage.setItem(
       STORAGE_KEY,

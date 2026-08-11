@@ -29,4 +29,15 @@ describe('Language preferences', () => {
     expect(screen.getByLabelText('Language', VISIBLE_INPUT)).toHaveValue('Castellano');
     expect(loadPreferences().language).toBe('es');
   });
+
+  it('persists Euskera as the chosen language', async () => {
+    const user = userEvent.setup();
+    render(<Language />);
+
+    await user.click(screen.getByLabelText('Language', VISIBLE_INPUT));
+    await user.click(await screen.findByRole('option', { name: 'Euskara', hidden: true }));
+
+    expect(screen.getByLabelText('Language', VISIBLE_INPUT)).toHaveValue('Euskara');
+    expect(loadPreferences().language).toBe('eu');
+  });
 });
