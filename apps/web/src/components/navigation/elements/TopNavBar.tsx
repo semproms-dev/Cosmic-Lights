@@ -130,8 +130,8 @@ export function NavBar({ onOpenImage, fullScreen, onToggleFullScreen }: NavBarPr
             <IconFolderOpen size="1.5rem" />
           </ActionIcon>
         </Tooltip>
-        <Tooltip label={t('topNav.fullScreen')} withArrow>
-          <ActionIcon variant='subtle' size={'lg'} disabled={image === null} onClick={() => onToggleFullScreen?.()} aria-label={t('topNav.fullScreen')}>
+        <Tooltip label={fullScreen ? t('topNav.exitFullScreen') : t('topNav.fullScreen')} withArrow>
+          <ActionIcon variant='subtle' size={'lg'} disabled={image === null} onClick={() => onToggleFullScreen?.()} aria-label={fullScreen ? t('topNav.exitFullScreen') : t('topNav.fullScreen')}>
             {!fullScreen ? <TfiFullscreen size="1.375rem"/> : <IconMaximizeOff size={"1.375rem"}/>}
           </ActionIcon>
         </Tooltip>

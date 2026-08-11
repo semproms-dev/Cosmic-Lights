@@ -10,6 +10,7 @@ import {
 import { Stack, Tooltip, UnstyledButton } from '@mantine/core';
 import classes from '../styles/LateralNavBar.module.css';
 import { useTranslation } from 'react-i18next';
+import { usePreferences } from '../../../preferences/preferences';
 
 interface RightNavBarProps {
     active: string;
@@ -41,6 +42,7 @@ const getLateralNavBarButtons = (t: (key: string) => string): ToolLink[] => [
  */
 export function LateralNavBar({ active, onChange }: RightNavBarProps) {
   const { t } = useTranslation(['common']);
+  const { preferences } = usePreferences();
   const tools = getLateralNavBarButtons(t).map((tool) => (
     <Tooltip
       key={tool.navKey}
@@ -54,6 +56,7 @@ export function LateralNavBar({ active, onChange }: RightNavBarProps) {
         className={classes.toolLink}
         data-active={tool.navKey === active || undefined}
         aria-label={tool.label}
+        style={{'--tool-color': preferences.theme ?? 'green'}}
       >
         <tool.icon size="1.375rem" stroke={1.5} />
       </UnstyledButton>

@@ -51,6 +51,7 @@
     "openFile": "Datei öffnen",
     "exportJpg": "Als JPG exportieren...",
     "fullScreen": "Vollbild",
+    "exitFullScreen": "Vollbild beenden",
     "showOriginal": "Original anzeigen",
     "showEdited": "Bearbeitete Version anzeigen",
     "undo": "Rückgängig",

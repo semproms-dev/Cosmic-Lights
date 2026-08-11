@@ -51,6 +51,7 @@
     "openFile": "Abrir archivo",
     "exportJpg": "Exportar JPG...",
     "fullScreen": "Pantalla completa",
+    "exitFullScreen": "Salir de pantalla completa",
     "showOriginal": "Mostrar original",
     "showEdited": "Mostrar editado",
     "undo": "Deshacer",
