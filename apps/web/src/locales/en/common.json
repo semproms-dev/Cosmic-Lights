@@ -85,6 +85,8 @@
     "grainRoughness": "Roughness",
     "noAutoDenoise": "The file records neither an ISO reading nor measurable noise",
     "denoiseButton": "Auto reduction",
+    "autoButton": "Auto adjust",
+    "noAutoAdjust": "No image open, or none that could be analysed",
     "gradeShadow": "Shadows",
     "gradeMid": "Midtones",
     "gradeHigh": "Highlights",

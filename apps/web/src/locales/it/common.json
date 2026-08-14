@@ -85,6 +85,8 @@
     "grainRoughness": "Irregolarità",
     "noAutoDenoise": "Il file non registra né ISO né rumore misurabile",
     "denoiseButton": "Riduzione automatica",
+    "autoButton": "Regolazione automatica",
+    "noAutoAdjust": "Nessuna immagine aperta, o nessuna che sia stata analizzabile",
     "gradeShadow": "Ombre",
     "gradeMid": "Mezzitoni",
     "gradeHigh": "Luci",

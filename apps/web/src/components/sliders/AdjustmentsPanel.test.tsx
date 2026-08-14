@@ -91,4 +91,23 @@ describe('AdjustmentsPanel', () => {
     expect(at('Color')).toBe('0');
     expect(at('Luminance')).toBe('0');
   });
+
+  it('offers Auto adjust, but only once there is an image to analyse', () => {
+    // Auto adjust reasons about the luma histogram measured at load time; with
+    // no image open there is none, so the button has nothing to work from. What
+    // it maps is covered in editor/autoAdjust.test.ts.
+    render(<AdjustmentsPanel />);
+
+    const auto = screen.getByRole('button', { name: 'Auto adjust' });
+    expect(auto).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('does nothing when Auto adjust is clicked with no image open', () => {
+    render(<AdjustmentsPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Auto adjust' }));
+
+    const exposure = screen.getByRole('slider', { name: 'Exposure' });
+    expect(exposure).toHaveAttribute('aria-valuenow', '0');
+  });
 });

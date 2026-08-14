@@ -44,6 +44,7 @@ vi.mock('../../editor/decodeImage', () => ({
     metadata: null,
     source: 'developed' as const,
     noise: null,
+    histogram: null,
   })),
 }))
 

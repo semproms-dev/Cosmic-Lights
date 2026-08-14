@@ -5,6 +5,7 @@ import { useEditor } from '../../../editor/editorContext';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { usePreferences } from '../../../preferences/preferences';
+import { roundAccurate } from '../../../utils';
 import { useState } from 'react';
 
 interface ControlSliderProps {
@@ -51,13 +52,13 @@ export function ControlSlider({
   const { preferences } = usePreferences();
   const showReset = hovered && onReset !== undefined;
   const [prevValue, setPrevValue] = useState(value);
-  const [inputValue, setInputValue] = useState(String(value));
+  const [inputValue, setInputValue] = useState(String(roundAccurate(value)));
   const [focused, setFocused] = useState(false);
   const [input, setInput] = useState(false);
 
   useWindowEvent('keydown', (event) => {
     if(!input || event.key !== 'Escape') return;
-    setInputValue(String(value));
+    setInputValue(String(roundAccurate(value)));
     setInput(false);
   })
 
@@ -74,7 +75,7 @@ export function ControlSlider({
    */
   if (!focused && prevValue !== value) {
     setPrevValue(value);
-    setInputValue(String(value));
+    setInputValue(String(roundAccurate(value)));
   }
 
   /**
@@ -87,15 +88,16 @@ export function ControlSlider({
   const commitInput = (text: string, checkpoint: boolean) => {
     const parsed = Number(text);
     if (Number.isNaN(parsed) || text.trim() === '') {
-      if (checkpoint) setInputValue(String(value));
+      if (checkpoint) setInputValue(String(roundAccurate(value)));
       return;
     }
     const clamped = Math.min(max, Math.max(min, parsed));
-    if (clamped !== value) {
-      onChange(clamped);
+    const rounded = roundAccurate(clamped);
+    if (rounded !== value) {
+      onChange(rounded);
       if (checkpoint) onChangeEnd?.();
     }
-    if (checkpoint) setInputValue(String(clamped));
+    if (checkpoint) setInputValue(String(rounded));
   };
 
   /**
@@ -106,7 +108,7 @@ export function ControlSlider({
     const stepped = Math.min(max, Math.max(min, value + direction * 0.01));
     // Rounding keeps repeated presses from showing float noise
     // (0.05 + 0.01 prints as "0.060000000000000005").
-    commitInput(String(Math.round(stepped * 100) / 100), true);
+    commitInput(String(roundAccurate(stepped)), true);
   };
 
   return (
@@ -194,7 +196,7 @@ export function ControlSlider({
                 // Cancel the edit: discard the typed text without committing and
                 // close the input. Escape must not be an undo-point, so no
                 // `commitInput` here.
-                setInputValue(String(value));
+                setInputValue(String(roundAccurate(value)));
                 setInput(false);
               }
             }}
@@ -216,7 +218,7 @@ export function ControlSlider({
             onClick={() => {
               // Re-seed the mirror from the committed value on open, so a
               // cancelled edit never shows up next time the input appears.
-              setInputValue(String(value));
+              setInputValue(String(roundAccurate(value)));
               setInput(!input);
             }}
             onKeyDown={(event) => {
@@ -226,12 +228,12 @@ export function ControlSlider({
               }
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                setInputValue(String(value));
+                setInputValue(String(roundAccurate(value)));
                 setInput(true);
               }
             }}
           >
-            {value}
+            {roundAccurate(value)}
           </Text>
         </div>
       </Group>

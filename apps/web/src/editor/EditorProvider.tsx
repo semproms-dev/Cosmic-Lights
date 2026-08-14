@@ -484,6 +484,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
           metadata: decoded.metadata,
           source: decoded.source,
           noise: decoded.noise,
+          histogram: decoded.histogram,
         },
       })
     } catch (error) {

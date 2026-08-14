@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { PreferencesProvider } from '../../preferences/PreferencesProvider';
 import { buildInitialAdjustments } from '../../editor/editorReducer';
 import { buildDefaultCurves } from '../../editor/curves';
+import type { LumaHistogram } from '../../editor/histogram';
 import '../../i18n';
 
 /**
@@ -24,8 +25,9 @@ const { setAdjustment, setCurve, commit, adjustments, curves, image } = vi.hoist
   const image: {
     metadata: { iso_speed?: number } | null;
     noise: { lumaSigma: number; chromaSigma: number } | null;
+    histogram: LumaHistogram | null;
     source: 'raw' | 'developed';
-  } = { metadata: null, noise: null, source: 'raw' };
+  } = { metadata: null, noise: null, histogram: null, source: 'raw' };
   return { setAdjustment: vi.fn(), setCurve: vi.fn(), commit: vi.fn(), adjustments, curves, image };
 });
 
@@ -53,6 +55,23 @@ function renderPanel(): void {
 
 const autoButton = () => screen.getByRole('button', { name: 'Auto reduction', ...INCLUDING_COLLAPSED });
 
+/**
+ * A well-exposed frame, from the worked example in `autoAdjust.test.ts`: the
+ * six tone sliders land at { exposure: 0, contrast: -7, highlights: 15,
+ * shadows: 0, whites: 0, blacks: 0 }.
+ */
+const WELL_EXPOSED: LumaHistogram = {
+  bins: [],
+  total: 0,
+  p0_1: 0.02,
+  p10: 0.25,
+  p50: 0.5,
+  p90: 0.75,
+  p99_9: 0.98,
+};
+
+const autoAdjustButton = () => screen.getByRole('button', { name: 'Auto adjust' });
+
 describe('AdjustmentsPanel Auto denoise', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,6 +79,7 @@ describe('AdjustmentsPanel Auto denoise', () => {
     Object.assign(curves, buildDefaultCurves());
     image.metadata = null;
     image.noise = null;
+    image.histogram = null;
     image.source = 'raw';
   });
 
@@ -137,5 +157,69 @@ describe('AdjustmentsPanel Auto denoise', () => {
 
     expect(setAdjustment).toHaveBeenCalledTimes(3);
     expect(commit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AdjustmentsPanel Auto adjust (tone)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(adjustments, buildInitialAdjustments());
+    Object.assign(curves, buildDefaultCurves());
+    image.metadata = null;
+    image.noise = null;
+    image.histogram = null;
+    image.source = 'raw';
+  });
+
+  it('stays disabled while the open image has no measured histogram', () => {
+    // The histogram is measured at load and stored on the image; without it the
+    // button has nothing to map. What it maps is covered in
+    // editor/autoAdjust.test.ts.
+    renderPanel();
+
+    expect(autoAdjustButton()).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('enables once the image carries a histogram', () => {
+    image.histogram = WELL_EXPOSED;
+
+    renderPanel();
+
+    expect(autoAdjustButton()).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('writes the six tone sliders from the histogram', () => {
+    image.histogram = WELL_EXPOSED;
+
+    renderPanel();
+    fireEvent.click(autoAdjustButton());
+
+    expect(setAdjustment).toHaveBeenCalledWith('exposure', 0);
+    expect(setAdjustment).toHaveBeenCalledWith('contrast', -7);
+    expect(setAdjustment).toHaveBeenCalledWith('highlights', 15);
+    expect(setAdjustment).toHaveBeenCalledWith('shadows', 0);
+    expect(setAdjustment).toHaveBeenCalledWith('whites', 0);
+    expect(setAdjustment).toHaveBeenCalledWith('blacks', 0);
+  });
+
+  it('lands the six writes as a single undo step', () => {
+    image.histogram = WELL_EXPOSED;
+
+    renderPanel();
+    fireEvent.click(autoAdjustButton());
+
+    expect(setAdjustment).toHaveBeenCalledTimes(6);
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to act when no histogram is available', () => {
+    // The flip side of aria-disabled: the handler really does run, so it has to
+    // refuse by itself.
+    renderPanel();
+
+    fireEvent.click(autoAdjustButton());
+
+    expect(setAdjustment).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
   });
 });

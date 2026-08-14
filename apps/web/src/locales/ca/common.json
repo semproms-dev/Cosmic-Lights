@@ -85,6 +85,8 @@
     "grainRoughness": "Rugositat",
     "noAutoDenoise": "El fitxer no registra cap lectura ISO ni soroll mesurable",
     "denoiseButton": "Reducció automàtica",
+    "autoButton": "Ajust automàtic",
+    "noAutoAdjust": "No hi ha cap imatge oberta, o cap que s'hagi pogut analitzar",
     "gradeShadow": "Ombres",
     "gradeMid": "Tons mitjans",
     "gradeHigh": "Llums",

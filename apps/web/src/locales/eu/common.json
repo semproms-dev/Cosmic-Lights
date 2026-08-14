@@ -85,6 +85,8 @@
     "grainRoughness": "Ehundura",
     "noAutoDenoise": "Fitxategiak ez du ISO irakurketarik ezta zarata neurgarririk ere jasotzen",
     "denoiseButton": "Murrizketa automatikoa",
+    "autoButton": "Doiketa automatikoa",
+    "noAutoAdjust": "Ez dago irudirik irekita, edo analizatu ezin den bat",
     "gradeShadow": "Itzalak",
     "gradeMid": "Erdi-tonuak",
     "gradeHigh": "Nabarmenak",

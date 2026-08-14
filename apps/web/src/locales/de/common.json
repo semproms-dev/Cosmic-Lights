@@ -85,6 +85,8 @@
     "grainRoughness": "Rauheit",
     "noAutoDenoise": "Die Datei enthält weder ISO-Wert noch messbares Rauschen",
     "denoiseButton": "Automatische Reduktion",
+    "autoButton": "Auto-Anpassung",
+    "noAutoAdjust": "Kein Bild geöffnet oder keines, das analysiert werden konnte",
     "gradeShadow": "Schatten",
     "gradeMid": "Mitteltöne",
     "gradeHigh": "Lichter",

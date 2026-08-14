@@ -7,10 +7,11 @@ import {
 } from '../../../editor/adjustments';
 import { useEditor } from '../../../editor/editorContext';
 import { autoDenoiseSliders, denoiseSlidersFromNoise } from '../../../editor/noise';
+import { autoAdjustSliders } from '../../../editor/autoAdjust';
 import { ControlSlider } from './ControlSlider';
 import { GradientSlider } from './GradientSlider';
 import { CurvesPanel } from '../../panels/CurvesPanel/CurvesPanel';
-import { groupBy } from '../../../utils';
+import { groupBy, roundAccurate } from '../../../utils';
 import { useTranslation } from 'react-i18next';
 import { GradingWheels } from './GradingWheels';
 
@@ -35,6 +36,11 @@ export function AdjustmentsPanel() {
   // the button has nothing to propose.
   const iso = image?.metadata?.iso_speed ?? 0;
   const canAutoDenoise = iso > 0 || image?.noise != null;
+  // Auto adjust works from the luma histogram measured at load time. It is only
+  // unavailable when no image is open or the decoder could not read pixels for
+  // it (no canvas, or a frame too small to measure) — never because of the
+  // current edits, which the histogram deliberately ignores.
+  const canAutoAdjust = image?.histogram != null;
 
   /**
    * Restores one slider to its default, for the click-the-label reset.
@@ -78,18 +84,54 @@ export function AdjustmentsPanel() {
     setAdjustment('luminanceDetail', auto.luminanceDetail);
     commit();
   };
+
+  /**
+   * Fills the six Basic tone sliders from the load-time histogram.
+   *
+   * The mapping is a *replacement* — exposure, contrast, highlights, shadows,
+   * whites and blacks are all recomputed from the original pixels, so the
+   * result is independent of what was set before (see `autoAdjustSliders`).
+   * It writes real slider values rather than a hidden "auto" flag, so the
+   * picture updates live and every value stays visible and draggable, and the
+   * single `commit()` at the end makes the six writes one undo step.
+   *
+   * Guards on its own: the button is only *aria*-disabled (see below), so unlike
+   * a natively disabled one it does fire this handler.
+   */
+  const applyAutoAdjust = () => {
+    if (!image || !canAutoAdjust) return;
+    const auto = autoAdjustSliders(image.histogram);
+    setAdjustment('exposure', auto.exposure);
+    setAdjustment('contrast', auto.contrast);
+    setAdjustment('highlights', auto.highlights);
+    setAdjustment('shadows', auto.shadows);
+    setAdjustment('whites', auto.whites);
+    setAdjustment('blacks', auto.blacks);
+    commit();
+  };
   return (
     <Accordion multiple defaultValue={['basic']}>
       <Accordion.Item value="basic">
         <Accordion.Control><Text fw={700}>{t('groups.basic')}</Text></Accordion.Control>
         <Accordion.Panel>
           <Stack gap="md">
+            {/* Auto adjust: same pattern as the denoise button — aria-disabled
+                rather than `disabled`, so the tooltip can say why it is off. */}
+            <Tooltip label={t('lateralNavBar.noAutoAdjust')} disabled={canAutoAdjust}>
+              <Button
+                data-disabled={!canAutoAdjust || undefined}
+                aria-disabled={!canAutoAdjust}
+                onClick={applyAutoAdjust}
+              >
+                {t('lateralNavBar.autoButton')}
+              </Button>
+            </Tooltip>
             {basicAdjustments.map((option) => (
               <ControlSlider
                 key={option.key}
                 label={t(`lateralNavBar.${option.key.toLowerCase()}`)}
                 description={t(`labels.${option.key.toLowerCase()}`)}
-                value={adjustments[option.key]}
+                value={roundAccurate(adjustments[option.key])}
                 min={option.min}
                 max={option.max}
                 step={option.step}

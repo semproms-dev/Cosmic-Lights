@@ -5,6 +5,7 @@ import { decodeRaw } from './decodeRaw'
 import { rgbToRgba } from './image'
 import { readJpegMetadata } from './jpegMetadata'
 import { estimateNoise, mergeNoiseEstimates, NOISE_WINDOW, type NoiseEstimate } from './noiseEstimate'
+import { computeHistogram, HISTOGRAM_MAX_EDGE, type LumaHistogram } from './histogram'
 
 /**
  * Which decoder produced the pixels.
@@ -29,6 +30,13 @@ export interface DecodedImage {
    * Auto denoise button later costs nothing to run.
    */
   noise: NoiseEstimate | null
+  /**
+   * Luma histogram measured from the decoded pixels, or `null` when the
+   * decoder could not read pixels for it (no canvas, or a frame too small to
+   * measure). Read once here — at load, where the pixels already exist in
+   * memory — so the Auto adjust button later costs nothing to run.
+   */
+  histogram: LumaHistogram | null
 }
 
 /**
@@ -54,6 +62,8 @@ async function decodeAsRaw(file: File): Promise<DecodedImage> {
       // denoise pass will filter — so the estimate is free and correct by
       // construction.
       noise: estimateNoise(rgba, decoded.width, decoded.height),
+      // The same RGBA doubles as the Auto adjust input; share the one pass.
+      histogram: computeHistogram(rgba, decoded.width, decoded.height),
     }
   } catch (error) {
     // Debug, not error: a rejection here is an ordinary step of the fallback, and
@@ -83,7 +93,7 @@ async function decodeAsDeveloped(file: File): Promise<DecodedImage> {
       createImageBitmap(file, { imageOrientation: 'from-image' }),
       readJpegMetadata(file),
     ])
-    return { bitmap, metadata, source: 'developed', noise: readNoiseFromBitmap(bitmap) }
+    return { bitmap, metadata, source: 'developed', noise: readNoiseFromBitmap(bitmap), histogram: readHistogramFromBitmap(bitmap) }
   } catch (error) {
     logger.debug(`the browser declined ${file.name}: ${String(error)}`)
     throw error
@@ -144,6 +154,47 @@ function readNoiseFromBitmap(bitmap: ImageBitmap): NoiseEstimate | null {
     return mergeNoiseEstimates(estimates)
   } catch {
     logger.warn(`could not measure the noise of ${bitmap.width}×${bitmap.height} frame`)
+    return null
+  }
+}
+
+/**
+ * Measures the luma histogram of a browser-decoded frame.
+ *
+ * Unlike the RAW path, the pixels are not in memory — only the bitmap — so the
+ * frame is drawn into a canvas at most {@link HISTOGRAM_MAX_EDGE} long. The
+ * browser's downscale filter *does* average, but unlike the noise estimator
+ * (which must never average, or the measurement reads too clean) a histogram
+ * is a robust statistic: the median and quartertone percentiles survive
+ * averaging, only the one-pixel tails grey away, and Auto accepts that rather
+ * than materialise a 45 MP frame in a buffer.
+ *
+ * @param bitmap - The frame to measure.
+ * @returns The luma histogram, or `null` when no canvas is available or the
+ *   frame is too small to read.
+ */
+function readHistogramFromBitmap(bitmap: ImageBitmap): LumaHistogram | null {
+  try {
+    const canvas =
+      typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(1, 1)
+        : document.createElement('canvas')
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (context === null) {
+      return null
+    }
+    // `getContext`'s return type is the union of every context kind; this branch
+    // only ever asks for a 2D one, which is what drawImage/getImageData need.
+    const ctx = context as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+    const scale = Math.min(1, HISTOGRAM_MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+    canvas.width = width
+    canvas.height = height
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    return computeHistogram(ctx.getImageData(0, 0, width, height).data, width, height)
+  } catch {
+    logger.warn(`could not measure the histogram of ${bitmap.width}×${bitmap.height} frame`)
     return null
   }
 }

@@ -34,3 +34,8 @@ export const formatAperture = (apperture: number): string => {
 }
 
 export const MIN_CROP_SIZE = 10;
+
+export const roundAccurate = (val: number, decimals: number = 2) => {
+  const factor = Math.pow(10, decimals);
+  return Math.round((val + Number.EPSILON) * factor) / factor;
+}

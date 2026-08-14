@@ -1,6 +1,7 @@
 import type { Metadata } from "libraw-wasm";
 import type { ImageSource } from "./decodeImage";
 import type { NoiseEstimate } from "./noiseEstimate";
+import type { LumaHistogram } from "./histogram";
 
 export interface LoadedImage {
     bitmap: ImageBitmap,
@@ -27,6 +28,14 @@ export interface LoadedImage {
      * even when the file records no ISO at all.
      */
     noise: NoiseEstimate | null,
+    /**
+     * Luma histogram measured from the pixels at decode time, or `null` when
+     * the decoder could not read them for it. Lets the Auto adjust button work
+     * from the actual tonal distribution of the original pixels instead of
+     * guessing — and it costs nothing at click time, since the measurement
+     * happened when the pixels were already in memory.
+     */
+    histogram: LumaHistogram | null,
 }
 
 export type ImageState = LoadedImage | null;
