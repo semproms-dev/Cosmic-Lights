@@ -110,4 +110,19 @@ describe('AdjustmentsPanel', () => {
     const exposure = screen.getByRole('slider', { name: 'Exposure' });
     expect(exposure).toHaveAttribute('aria-valuenow', '0');
   });
+
+  it('offers the classic templates, locked with no image open', () => {
+    // There is no image open in the real-store test, so the group is disabled —
+    // there is nothing to apply a template to yet. What the radios do once an
+    // image IS open (switching, turning the current one off) is covered in
+    // AdjustmentsPanelTemplates.test.tsx, which mocks the store with an image.
+    render(<AdjustmentsPanel />);
+
+    const bw = screen.getByRole('radio', { name: 'Black and White', ...INCLUDING_COLLAPSED });
+    const sepia = screen.getByRole('radio', { name: 'Sepia', ...INCLUDING_COLLAPSED });
+    expect(bw).not.toBeChecked();
+    expect(sepia).not.toBeChecked();
+    expect(bw).toBeDisabled();
+    expect(sepia).toBeDisabled();
+  });
 });

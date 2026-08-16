@@ -6,11 +6,12 @@ import {
   canvasToImageCoords,
   clampCropRegion,
   constrainAspectRatio,
+  effectiveAspect,
   imageToCanvasCoords,
   baseToViewRect,
   viewToBasePoint,
+  refitCrop,
   IDENTITY_VIEW,
-  parseAspectRatio,
 } from "./crop"
 
 /**
@@ -47,7 +48,7 @@ interface CropOverlayProps {
  * store and calls `onDone`, `Escape` discards it.
  */
 export function CropOverlay({ onDone }: CropOverlayProps) {
-  const { image, cropRegion, setCrop, cropRatio, commit, view, setView } = useEditor()
+  const { image, cropRegion, setCrop, cropRatio, cropOrientation, commit, view, setView } = useEditor()
   const ref = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -76,19 +77,22 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
     setDraft(cropRegion)
   }
 
-  // Re-impose the aspect ratio on the current draft the moment a new ratio is
-  // selected (same "adjust state during render" pattern). Anchored center so the
-  // shrink is symmetric; 'Free' (null aspect) leaves the draft as-is.
-  const [prevRatio, setPrevRatio] = useState(cropRatio)
-  if (prevRatio !== cropRatio) {
-    setPrevRatio(cropRatio)
-    if (image !== null && draft !== null) {
-      const a = parseAspectRatio(cropRatio, image.width, image.height)
-      if (a !== null) {
-        setDraft(clampCropRegion(
-          constrainAspectRatio(draft, a, 'center'),
-          image.width, image.height,
-        ))
+  // Re-impose the aspect ratio on the current draft the moment a new ratio or
+  // orientation is selected (same "adjust state during render" pattern). The key
+  // is the pair — a swap changes the orientation without touching the ratio, and
+  // must re-fit the draft just the same. `refitCrop` keeps the draft's area, so
+  // flipping back and forth never shrinks the frame; 'Free' (null aspect) leaves
+  // the draft as-is. Picking a ratio with no crop yet starts from the full
+  // frame, so a centered box of that ratio appears instead of no overlay at all.
+  const constraintKey = `${cropRatio}|${cropOrientation}`
+  const [prevConstraint, setPrevConstraint] = useState(constraintKey)
+  if (prevConstraint !== constraintKey) {
+    setPrevConstraint(constraintKey)
+    if (image !== null) {
+      const aspectRatio = effectiveAspect(cropRatio, cropOrientation, image.width, image.height)
+      if (aspectRatio !== null) {
+        const base: CropRegion = draft ?? { x: 0, y: 0, width: image.width, height: image.height }
+        setDraft(refitCrop(base, aspectRatio, image.width, image.height))
       }
     }
   }
@@ -133,8 +137,8 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
 
   if (image === null) return null
 
-  // Numeric aspect for the selected label, or null for a free crop.
-  const aspect = parseAspectRatio(cropRatio, image.width, image.height)
+  // Numeric aspect for the selected label and orientation, or null for a free crop.
+  const aspect = effectiveAspect(cropRatio, cropOrientation, image.width, image.height)
 
   // The draft, defaulting to the full frame when no crop is set yet.
   const region: CropRegion = draft ?? { x: 0, y: 0, width: image.width, height: image.height }

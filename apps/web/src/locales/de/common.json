@@ -155,7 +155,12 @@
     "title": "Zuschneiden",
     "aspectRatio": "Seitenverhältnis",
     "original": "Original",
-    "free": "Frei"
+    "free": "Frei",
+    "landscape": "Querformat",
+    "portrait": "Hochformat"
+  },
+  "cropPanel": {
+    "cropOrientation": "Zu {{orientation}} wechseln"
   },
   "masks": {
     "title": "Masken",
@@ -211,12 +216,17 @@
     "kind": {
       "style": "Stil",
       "color": "Farbe",
-      "bw": "S/W",
+      "bw": "Schwarzweiß",
       "lights": "Licht",
       "movies": "Kino"
     },
     "empty": "Öffne ein Bild, um die Presets in der Vorschau zu sehen.",
     "apply": "{{name}} anwenden"
+  },
+  "templates": {
+    "title": "Klassische Vorlagen",
+    "bw": "Schwarzweiß",
+    "sepia": "Sepia"
   },
   "curves": {
     "resetChannel": "Kanal zurücksetzen",

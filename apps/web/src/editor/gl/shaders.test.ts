@@ -142,6 +142,21 @@ describe('shader sources', () => {
     expect(curves).toBeGreaterThan(grading)
   })
 
+  it('applies classic templates after saturation and before grading', () => {
+    // The B&W/Sepia radios drive the uniform uTemplate, so the block must live in
+    // the main FRAGMENT_SHADER the renderer's Pass 1 uses — putting it in the
+    // mask pass (whose uTemplate is never set) silently does nothing.
+    const saturation = FRAGMENT_SHADER.indexOf('rgb = mix(vec3(lumaC), rgb, 1.0 + sat);')
+    const template = FRAGMENT_SHADER.indexOf('if (uTemplate == 1.0)')
+    const grading = FRAGMENT_SHADER.indexOf('rgb = applyGrading(')
+
+    expect(template).toBeGreaterThan(-1)
+    expect(template).toBeGreaterThan(saturation)
+    expect(grading).toBeGreaterThan(template)
+    expect(FRAGMENT_SHADER).toContain('uniform float uTemplate;')
+    expect(MASK_FRAGMENT_SHADER).not.toContain('uTemplate')
+  })
+
   it('keeps colour grading out of the mask pass', () => {
     // Grading is global on purpose (§5 of the doc): in the mask pass it would be
     // eight more uniforms per mask per pixel, and eight keys a mask could save,

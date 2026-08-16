@@ -1,4 +1,4 @@
-import { Accordion, Button, Group, Stack, Text, Tooltip } from '@mantine/core';
+import { Accordion, Button, Group, Radio, Stack, Text, Tooltip } from '@mantine/core';
 import {
   basicAdjustments,
   colorAdjustement,
@@ -147,6 +147,45 @@ export function AdjustmentsPanel() {
         <Accordion.Control><Text fw={700}>{t('groups.color')}</Text></Accordion.Control>
         <Accordion.Panel>
           <Stack gap="md">
+            <Radio.Group
+              label={t('templates.title')}
+              disabled={image === null}
+              value={String(adjustments.template)}
+              onChange={(value) => {
+                setAdjustment('template', Number(value));
+                commit();
+              }}
+            >
+              <Group mt="xs">
+                <Radio
+                  value="1"
+                  label={t('templates.bw')}
+                  onClick={(event) => {
+                    // Radio semantics never let a group sit empty, and this one
+                    // wants to: clicking the template that is already on turns
+                    // it off again (back to full colour). The click lands before
+                    // the native check, so preventDefault stops the radio being
+                    // re-checked and the controlled value carries the uncheck.
+                    if (adjustments.template === 1) {
+                      event.preventDefault();
+                      setAdjustment('template', 0);
+                      commit();
+                    }
+                  }}
+                />
+                <Radio
+                  value="2"
+                  label={t('templates.sepia')}
+                  onClick={(event) => {
+                    if (adjustments.template === 2) {
+                      event.preventDefault();
+                      setAdjustment('template', 0);
+                      commit();
+                    }
+                  }}
+                />
+              </Group>
+            </Radio.Group>
             {colorsByGroup.map(([group, options]) => (
               <Stack key={group} gap="xs">
                 <Text fw={500} size="sm">{t(`groups.${group}`)}</Text>

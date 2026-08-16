@@ -1226,6 +1226,7 @@ uniform float uTemperature;
 uniform float uTint;
 uniform float uVibrance;
 uniform float uSaturation;
+uniform float uTemplate;
 // Colour grading: one zone each, packed as (hue in degrees, saturation 0..100,
 // luminance -100..100), plus the two shape controls of the zone split.
 uniform vec3 uGradeShadow;
@@ -1297,6 +1298,20 @@ void main() {
   float curSat = max(rgb.r, max(rgb.g, rgb.b)) - min(rgb.r, min(rgb.g, rgb.b));
   rgb = mix(vec3(lumaC), rgb, 1.0 + vib * (1.0 - curSat));
   rgb = mix(vec3(lumaC), rgb, 1.0 + sat);
+  // Classic templates, after the global saturation and before the grading wheels
+  // so the templates always act on the "clean" colour. B&W keeps the Rec.709
+  // luma; Sepia uses the classic SVG/CSS matrix and is blended at 75% strength
+  // (Lightroom's preset force), then clamped like the rest of the pipeline.
+  if (uTemplate == 1.0) {
+    rgb = vec3(lumaC);
+  }
+  else if (uTemplate == 2.0) {
+    vec3 sepia;
+    sepia.r = dot(rgb, vec3(0.393, 0.769, 0.189));
+    sepia.g = dot(rgb, vec3(0.349, 0.686, 0.168));
+    sepia.b = dot(rgb, vec3(0.272, 0.534, 0.131));
+    rgb = mix(rgb, sepia, 0.75);
+  }
   // Colour grading, after saturation and before the curves. After, because a
   // global saturation applied later would amplify the tint the wheels just laid
   // down; before, because the curve is the last global shaper of tone and moving

@@ -155,7 +155,12 @@
     "title": "Recadrer",
     "aspectRatio": "Rapport hauteur/largeur",
     "original": "Original",
-    "free": "Libre"
+    "free": "Libre",
+    "landscape": "Paysage",
+    "portrait": "Portrait"
+  },
+  "cropPanel": {
+    "cropOrientation": "Passer en {{orientation}}"
   },
   "masks": {
     "title": "Masques",
@@ -211,12 +216,17 @@
     "kind": {
       "style": "Style",
       "color": "Couleur",
-      "bw": "N&B",
+      "bw": "Noir et blanc",
       "lights": "Lumière",
       "movies": "Cinéma"
     },
     "empty": "Ouvrez une image pour prévisualiser les préréglages.",
     "apply": "Appliquer {{name}}"
+  },
+  "templates": {
+    "title": "Modèles classiques",
+    "bw": "Noir et blanc",
+    "sepia": "Sépia"
   },
   "curves": {
     "resetChannel": "Réinitialiser le canal",

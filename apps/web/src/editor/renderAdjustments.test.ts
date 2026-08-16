@@ -37,6 +37,8 @@ describe('toRenderAdjustments', () => {
     expect(result.gradeShadowLum).toBe(0)
     expect(result.gradeMidLum).toBe(0)
     expect(result.gradeHighLum).toBe(0)
+    // Classic templates sit at 0 (none) like any other effect.
+    expect(result.template).toBe(0)
   })
 
   it('carries a zone luminance through with no tint on it', () => {

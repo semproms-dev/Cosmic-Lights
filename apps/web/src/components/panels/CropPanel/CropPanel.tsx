@@ -1,9 +1,12 @@
-import { SegmentedControl, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, Group, SegmentedControl, Stack, Text, Title, Tooltip } from '@mantine/core';
 import { useEditor } from '../../../editor/editorContext';
+import { IoMdPhonePortrait } from "react-icons/io";
 import { useTranslation } from 'react-i18next';
 import { DistortionComponent } from './DistortionComponent';
 import { OrientationComponent } from './OrientationComponent';
 import { RotationComponent } from './RotationComponent';
+import { IoPhoneLandscapeSharp } from 'react-icons/io5';
+import { MdOutlineGridGoldenratio } from 'react-icons/md';
 
 const aspectRatios = (t: (key: string) => string) => [
   { value: 'Original', label: t('crop.original') },
@@ -20,7 +23,7 @@ const aspectRatios = (t: (key: string) => string) => [
  * store so the crop overlay can constrain the draft to the chosen ratio.
  */
 export function CropPanel() {
-  const { cropRatio, setCropRatio, commit, image } = useEditor();
+  const { cropRatio, setCropRatio, commit, setCropOrientation, image, cropOrientation } = useEditor();
   const {t} = useTranslation(['common']);
 
   // Picking a ratio is a discrete edit: apply it, then checkpoint it as one undo step.
@@ -50,6 +53,18 @@ export function CropPanel() {
         data={aspectRatios(t)}
       />
         <Stack gap="xl">
+          <Group>
+            <Tooltip label={t('cropPanel.cropOrientation', { orientation: cropOrientation === 'portrait' ? t('crop.landscape') : t('crop.portrait') })}>
+              <ActionIcon size='lg' variant='subtle' onClick={() => {setCropOrientation(cropOrientation === 'portrait' ? 'landscape' : 'portrait'); commit()}} disabled={image === null}>
+                {cropOrientation === 'portrait' ? <IoMdPhonePortrait size="1.5rem" /> : <IoPhoneLandscapeSharp size="1.5rem" />}
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={undefined}>
+              <ActionIcon size='lg' variant='subtle' onClick={() => {}} disabled={image === null}>
+                <MdOutlineGridGoldenratio size="1.5rem" />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
           <OrientationComponent/>
           <RotationComponent/>
           <Stack gap={'sm'}>

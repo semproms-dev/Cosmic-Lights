@@ -4,12 +4,14 @@ import type { CropRegion } from "./image";
 import type { BrushStroke, GradientLine, Mask } from "./masks";
 import type { Orientation } from "./rotation";
 import { geometryEquals, type Geometry } from "./geometry";
+import type { CropOrientation } from "./editorReducer";
 
 
 
 interface HistorySlice {
     adjustements: Record<string, number>,
     cropRatio: string,
+    cropOrientation: CropOrientation,
     curves: Curves,
     cropRegion: CropRegion | null,
     masks: Mask[],
@@ -34,6 +36,7 @@ type HistoryAction =
 const sliceOf = (s: EditorStoreState): HistorySlice => ({
     adjustements: s.adjustments,
     cropRatio: s.cropRatio,
+    cropOrientation: s.cropOrientation,
     cropRegion: s.cropRegion,
     curves: s.curves,
     masks: s.masks,
@@ -95,6 +98,7 @@ const orientationEquals = (a: Orientation, b: Orientation): boolean =>
 
 const sliceEquals = (a: HistorySlice, b: HistorySlice): boolean =>
   a.cropRatio === b.cropRatio &&
+  a.cropOrientation === b.cropOrientation &&
   regionEquals(a.cropRegion, b.cropRegion) &&
   recordEquals(a.adjustements, b.adjustements) &&
   curvesEqual(a.curves, b.curves) &&
@@ -114,6 +118,7 @@ const mergeSlice = (s: EditorStoreState, slice: HistorySlice): EditorStoreState 
   curves: slice.curves,
   cropRegion: slice.cropRegion,
   cropRatio: slice.cropRatio,
+  cropOrientation: slice.cropOrientation,
   masks: slice.masks,
   orientation: slice.orientation,
   geometry: slice.geometry,

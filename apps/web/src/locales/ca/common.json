@@ -155,7 +155,12 @@
     "title": "Retall",
     "aspectRatio": "Proporció d'aspecte",
     "original": "Original",
-    "free": "Lliure"
+    "free": "Lliure",
+    "landscape": "Apaisat",
+    "portrait": "Vertical"
+  },
+  "cropPanel": {
+    "cropOrientation": "Canvia a {{orientation}}"
   },
   "masks": {
     "title": "Màscares",
@@ -211,12 +216,17 @@
     "kind": {
       "style": "Estil",
       "color": "Color",
-      "bw": "B&N",
+      "bw": "Blanc i negre",
       "lights": "Llums",
       "movies": "Pel·lícules"
     },
     "empty": "Obre una imatge per previsualitzar els predefinits.",
     "apply": "Aplica {{name}}"
+  },
+  "templates": {
+    "title": "Plantilles clàssiques",
+    "bw": "Blanc i negre",
+    "sepia": "Sèpia"
   },
   "curves": {
     "resetChannel": "Restableix el canal",

@@ -155,7 +155,12 @@
     "title": "Recorte",
     "aspectRatio": "Proporción de aspecto",
     "original": "Orixinal",
-    "free": "Libre"
+    "free": "Libre",
+    "landscape": "Horizontal",
+    "portrait": "Vertical"
+  },
+  "cropPanel": {
+    "cropOrientation": "Cambiar a {{orientation}}"
   },
   "masks": {
     "title": "Máscaras",
@@ -211,12 +216,17 @@
     "kind": {
       "style": "Estilo",
       "color": "Cor",
-      "bw": "B&N",
+      "bw": "Branco e negro",
       "lights": "Luces",
       "movies": "Películas"
     },
     "empty": "Abre unha imaxe para previsualizar os predefinidos.",
     "apply": "Aplicar {{name}}"
+  },
+  "templates": {
+    "title": "Modelos clásicos",
+    "bw": "Branco e negro",
+    "sepia": "Sepia"
   },
   "curves": {
     "resetChannel": "Restablecer a canle",

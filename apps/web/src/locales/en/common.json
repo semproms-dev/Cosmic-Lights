@@ -155,7 +155,12 @@
     "title": "Crop",
     "aspectRatio": "Aspect ratio",
     "original": "Original",
-    "free": "Free"
+    "free": "Free",
+    "landscape": "Landscape",
+    "portrait": "Portrait"
+  },
+  "cropPanel": {
+    "cropOrientation": "Change to {{orientation}}"
   },
   "masks": {
     "title": "Masks",
@@ -211,12 +216,17 @@
     "kind": {
       "style": "Style",
       "color": "Color",
-      "bw": "B&W",
+      "bw": "Black and White",
       "lights": "Lights",
       "movies": "Movies"
     },
     "empty": "Open an image to preview the presets.",
     "apply": "Apply {{name}}"
+  },
+  "templates": {
+    "title": "Classic templates",
+    "bw": "Black and White",
+    "sepia": "Sepia"
   },
   "curves": {
     "resetChannel": "Reset channel",

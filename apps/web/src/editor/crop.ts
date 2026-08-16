@@ -2,6 +2,7 @@ import { clamp, MIN_CROP_SIZE } from "../utils";
 import type { CropRegion } from "./image";
 import { applyInverseUvTransform, applyUvTransform, uvTransform, type Orientation } from "./rotation";
 import { IDENTITY_GEOMETRY, type Geometry } from "./geometry";
+import type { CropOrientation } from "./editorReducer";
 
 export const clampCropRegion =(region: CropRegion, imageWidth: number, imageHeight: number): CropRegion => {
     const width = clamp(region.width, MIN_CROP_SIZE, imageWidth);
@@ -253,6 +254,19 @@ export const pointerToImagePoint = (
   return { x: uv.x * imageWidth, y: uv.y * imageHeight }
 }
 
+export const effectiveAspect = (
+  ratio: string,
+  orientation: CropOrientation,
+  imageWidth: number,
+  imageHeight: number
+): number | null => {
+
+  const aspectRatio = parseAspectRatio(ratio, imageWidth, imageHeight);
+  if(aspectRatio === null) return null;
+  return orientation === 'portrait' ? 1 / aspectRatio : aspectRatio;
+
+}
+
 /**
  * Maps a point in full-image pixels to its pointer position in container/CSS
  * pixels — the exact inverse of {@link pointerToImagePoint}, in reverse order.
@@ -349,6 +363,10 @@ export const parseAspectRatio = (
   return w / h
 }
 
+/** The orientation a crop opens with: landscape, as the label reads it. */
+export const DEFAULT_CROP_ORIENTATION: CropOrientation = 'landscape'
+
+
 /**
  * The anchor (corner/edge that stays fixed) for the handle at `(fx, fy)`. It is
  * the position opposite the grabbed handle, so `constrainAspectRatio` shrinks the
@@ -412,4 +430,47 @@ export const constrainAspectRatio = (region: CropRegion, aspect: number, anchor:
 
     return { x, y: newY, width, height: newHeight }
   }
+}
+
+/**
+ * Re-fits a crop to a new target aspect keeping its area (and center), so the
+ * frame does not shrink every time the ratio or orientation changes. When the
+ * image cannot hold that area in the new orientation the overflowing axis is
+ * locked to the bound and the other derived from the ratio. The result is
+ * clamped and re-constrained, so it always matches `aspect` exactly.
+ *
+ * @param region - The crop before the constraint changed, in image pixels.
+ * @param aspect - The new target width/height ratio.
+ * @param imageWidth - Image width in pixels.
+ * @param imageHeight - Image height in pixels.
+ * @returns A centered region with the new aspect and the same area as `region`.
+ */
+export const refitCrop = (
+  region: CropRegion,
+  aspect: number,
+  imageWidth: number,
+  imageHeight: number,
+): CropRegion => {
+  const area = region.width * region.height
+  let width = Math.sqrt(area * aspect)
+  let height = area / width
+
+  if (width > imageWidth) {
+    width = imageWidth
+    height = width / aspect
+  }
+  if (height > imageHeight) {
+    height = imageHeight
+    width = height * aspect
+  }
+
+  const centered: CropRegion = {
+    x: region.x + (region.width - width) / 2,
+    y: region.y + (region.height - height) / 2,
+    width,
+    height,
+  }
+  // `clampCropRegion` may nudge a tiny region up to MIN_CROP_SIZE; re-constrain
+  // so the returned box still matches the target aspect exactly.
+  return constrainAspectRatio(clampCropRegion(centered, imageWidth, imageHeight), aspect, 'center')
 }

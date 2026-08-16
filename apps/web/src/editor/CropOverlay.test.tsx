@@ -13,6 +13,7 @@ const { setCrop, commit, setView, state } = vi.hoisted(() => ({
     image: null as { width: number; height: number } | null,
     cropRegion: null as CropRegion | null,
     cropRatio: 'Original',
+    cropOrientation: 'landscape' as 'landscape' | 'portrait',
     view: { scale: 1, offsetX: 0, offsetY: 0 },
   },
 }))
@@ -22,6 +23,7 @@ vi.mock('./editorContext', () => ({
     image: state.image,
     cropRegion: state.cropRegion,
     cropRatio: state.cropRatio,
+    cropOrientation: state.cropOrientation,
     view: state.view,
     setCrop,
     commit,
@@ -39,6 +41,7 @@ describe('CropOverlay', () => {
     state.image = { width: 4000, height: 3000 }
     state.cropRegion = null
     state.cropRatio = 'Original'
+    state.cropOrientation = 'landscape'
     state.view = { scale: 1, offsetX: 0, offsetY: 0 }
   })
 
@@ -75,5 +78,71 @@ describe('CropOverlay', () => {
     unmount()
     expect(setCrop).not.toHaveBeenCalled()
     expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('re-fits the draft to the swapped ratio when the orientation changes', () => {
+    // A 4000×3000 draft under 4:3 landscape, then the swap to portrait: the
+    // effective aspect becomes 3:4, and the draft shrinks toward its center.
+    state.cropRatio = '4:3'
+    state.cropOrientation = 'landscape'
+    state.cropRegion = { x: 0, y: 0, width: 4000, height: 3000 }
+    const { rerender, unmount } = render(<CropOverlay onDone={() => {}} />)
+
+    state.cropOrientation = 'portrait'
+    rerender(<CropOverlay onDone={() => {}} />)
+
+    // Leaving the tool commits the re-fitted draft: 2250×3000 = 3:4, centered.
+    unmount()
+    expect(setCrop).toHaveBeenCalledWith({ x: 875, y: 0, width: 2250, height: 3000 })
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('creates a centered crop box of the selected ratio when none exists yet', () => {
+    // Enter the tool with no crop; picking 16:9 must produce a visible overlay —
+    // the largest 16:9 box that fits the 4000×3000 image, centered (4000×2250).
+    state.cropRatio = 'Original'
+    state.cropOrientation = 'landscape'
+    state.cropRegion = null
+    const { rerender, unmount } = render(<CropOverlay onDone={() => {}} />)
+
+    state.cropRatio = '16:9'
+    rerender(<CropOverlay onDone={() => {}} />)
+
+    unmount()
+    expect(setCrop).toHaveBeenCalledWith({ x: 0, y: 375, width: 4000, height: 2250 })
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not keep shrinking the draft on repeated orientation flips', () => {
+    // 4000×3000 landscape 4:3 → portrait (2250×3000, area lost to the bounds),
+    // then back to landscape: the flip keeps that area (3000×2250) instead of
+    // constraining the already-fitted portrait box down to 2250×1687.5.
+    state.cropRatio = '4:3'
+    state.cropOrientation = 'landscape'
+    state.cropRegion = { x: 0, y: 0, width: 4000, height: 3000 }
+    const { rerender, unmount } = render(<CropOverlay onDone={() => {}} />)
+
+    state.cropOrientation = 'portrait'
+    rerender(<CropOverlay onDone={() => {}} />)
+
+    state.cropOrientation = 'landscape'
+    rerender(<CropOverlay onDone={() => {}} />)
+
+    unmount()
+    expect(setCrop).toHaveBeenCalledWith({ x: 500, y: 375, width: 3000, height: 2250 })
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves the draft alone when the ratio has no orientation (1:1)', () => {
+    state.cropRatio = '1:1'
+    state.cropOrientation = 'landscape'
+    state.cropRegion = { x: 100, y: 100, width: 2000, height: 2000 }
+    const { rerender, unmount } = render(<CropOverlay onDone={() => {}} />)
+
+    state.cropOrientation = 'portrait'
+    rerender(<CropOverlay onDone={() => {}} />)
+
+    unmount()
+    expect(setCrop).toHaveBeenCalledWith({ x: 100, y: 100, width: 2000, height: 2000 })
   })
 })

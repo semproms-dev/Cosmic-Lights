@@ -1,5 +1,6 @@
 import { createContext, use, type Dispatch, type RefObject, type SetStateAction } from 'react'
-import type { CanvasView } from './crop'
+import { type CanvasView } from './crop'
+import type { CropOrientation } from './editorReducer'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus } from './image'
 import type {
@@ -71,6 +72,10 @@ export interface EditorState {
   cropRatio: string
   /** Updates the selected aspect-ratio label. */
   setCropRatio: (ratio: string) => void
+  /** Whether the crop frame faces landscape or portrait for the selected ratio. */
+  cropOrientation: CropOrientation
+  /** Sets the crop frame to its landscape or portrait orientation. */
+  setCropOrientation: (orientation: CropOrientation) => void
   /** Whether the reset-confirmation dialog is open. */
   resetDialogOpen: boolean
   /** Opens the reset-confirmation dialog (from the Canvas menu or a shortcut). */

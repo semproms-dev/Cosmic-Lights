@@ -9,10 +9,13 @@ import {
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
 import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
+import { DEFAULT_CROP_ORIENTATION } from './crop'
 import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask, type ObjectPrompt, type RadialShape } from './masks'
 import { presetAdjustments, presetCurves, type Preset } from './presets'
 import { IDENTITY_ORIENTATION, turn, type Orientation } from './rotation'
 import { IDENTITY_GEOMETRY, type Geometry } from './geometry'
+
+export type CropOrientation = 'portrait' | 'landscape';
 
 /**
  * Estado completo del editor: los valores de los sliders y las curvas de tono,
@@ -33,6 +36,13 @@ export interface EditorStoreState {
   cropRegion: CropRegion | null
   /** Aspect ratio seleccionado en el panel: 'Original' | '1:1' | ... | 'Free'. */
   cropRatio: string
+  /**
+   * Orientación del recorte para el ratio actual: 'landscape' es el ratio tal
+   * cual (`a = W/H`), 'portrait' su recíproco (`1/a`). Flag aparte a propósito:
+   * el `SegmentedControl` del panel solo lista los ratios landscape, así que un
+   * swap no debe cambiar el label — solo cuál de los dos lados se recorta.
+   */
+  cropOrientation: CropOrientation
   /**
    * ¿Está abierto el diálogo de confirmación de reset? Vive en el store porque
    * se dispara desde varios sitios (menú del Canvas y atajo global), no solo
@@ -66,6 +76,7 @@ export type EditorAction =
   | { type: 'SET_CROP', cropRegion: CropRegion | null}
   | { type: 'CLEAR_CROP'}
   | { type: 'SET_CROP_RATIO'; ratio: string }
+  | { type: 'SET_CROP_ORIENTATION'; orientation: CropOrientation }
   | { type: 'OPEN_RESET_DIALOG' }
   | { type: 'CLOSE_RESET_DIALOG' }
   | { type: 'ADD_MASK'; mask: Mask }
@@ -107,6 +118,10 @@ export function buildInitialAdjustments(): Record<string, number> {
     // Las ruedas de grading no son `SliderOption`: cada una escribe dos claves
     // (tono y saturación), así que trae las suyas.
     ...buildGradingDefaults(),
+    // Las plantillas clásicas no son `SliderOption` (ni slider ni radio con
+    // rango): `0` = ninguna, `1` = B&W, `2` = Sepia. Sembrarla a mano evita que
+    // una clave ausente llegue al shader como `NaN` y tiña el fotograma.
+    template: 0,
   }
 }
 
@@ -219,7 +234,7 @@ export function editorReducer(
       return { ...state, curves: buildDefaultCurves(), imageDirty: false }
     case 'SET_IMAGE':
       return { ...state, image: action.image, imageStatus: 'idle', imageDirty: false,
-           cropRegion: null, cropRatio: 'Original',
+           cropRegion: null, cropRatio: 'Original', cropOrientation: DEFAULT_CROP_ORIENTATION,
            adjustments: buildInitialAdjustments(), curves: buildDefaultCurves(),
            masks: [], activeMaskId: null, orientation: IDENTITY_ORIENTATION,
            geometry: IDENTITY_GEOMETRY }
@@ -248,6 +263,10 @@ export function editorReducer(
       // Choosing a ratio with no active crop isn't a destructive change; the
       // dirty flag is owned by SET_CROP.
       return { ...state, cropRatio: action.ratio }
+    case 'SET_CROP_ORIENTATION':
+      // Igual que SET_CROP_RATIO: el swap es una restricción, no un cambio de
+      // píxeles; el dirty lo marca SET_CROP cuando se aplica el recorte.
+      return { ...state, cropOrientation: action.orientation }
     case 'OPEN_RESET_DIALOG':
       return { ...state, resetDialogOpen: true }
     case 'CLOSE_RESET_DIALOG':
@@ -335,6 +354,8 @@ export function editorReducer(
         })),
         imageDirty: true,
       }
+    case 'SET_CROP_ORIENTATION':
+      return { ...state, cropOrientation: action.orientation }
     default:
       return state
   }

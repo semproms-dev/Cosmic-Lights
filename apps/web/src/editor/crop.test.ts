@@ -8,6 +8,7 @@ import {
   clampCropRegion,
   constrainAspectRatio,
   displayScale,
+  effectiveAspect,
   IDENTITY_VIEW,
   pointerToImagePoint,
   imagePointToPointer,
@@ -15,6 +16,7 @@ import {
   getImageDisplayRect,
   imageToCanvasCoords,
   parseAspectRatio,
+  refitCrop,
 } from './crop'
 import {MIN_CROP_SIZE} from '../utils'
 import { cropToUvTransform, IDENTITY_ORIENTATION, type Orientation, type QuarterTurns } from './rotation'
@@ -211,6 +213,33 @@ describe('parseAspectRatio', () => {
   it('returns null for an unexpected label', () => {
     expect(parseAspectRatio('nonsense', 200, 100)).toBeNull()
     expect(parseAspectRatio('16:', 200, 100)).toBeNull()
+  })
+})
+
+describe('effectiveAspect', () => {
+  it('passes the parsed ratio through for landscape', () => {
+    expect(effectiveAspect('3:2', 'landscape', 200, 100)).toBe(1.5)
+    expect(effectiveAspect('Original', 'landscape', 300, 400)).toBe(0.75)
+  })
+
+  it('inverts the ratio for portrait', () => {
+    expect(effectiveAspect('3:2', 'portrait', 200, 100)).toBeCloseTo(2 / 3)
+    expect(effectiveAspect('16:9', 'portrait', 200, 100)).toBeCloseTo(9 / 16)
+    expect(effectiveAspect('Original', 'portrait', 300, 400)).toBeCloseTo(4 / 3)
+  })
+
+  it('returns null for a free crop in either orientation', () => {
+    expect(effectiveAspect('Free', 'landscape', 200, 100)).toBeNull()
+    expect(effectiveAspect('Free', 'portrait', 200, 100)).toBeNull()
+  })
+
+  it('returns 1 for a square ratio in both orientations — the swap is a no-op', () => {
+    expect(effectiveAspect('1:1', 'landscape', 200, 100)).toBe(1)
+    expect(effectiveAspect('1:1', 'portrait', 200, 100)).toBe(1)
+  })
+
+  it('returns null for an unexpected label', () => {
+    expect(effectiveAspect('nonsense', 'portrait', 200, 100)).toBeNull()
   })
 })
 
@@ -486,7 +515,6 @@ describe('displayScale', () => {
   it('is the fit-to-container scale with no crop and no zoom', () => {
     expect(displayScale(4000, 3000, 1000, 750, null, IDENTITY_VIEW)).toBeCloseTo(0.25, 6)
   })
-
   it('grows when a crop fills the container', () => {
     // Half-size crop => it is displayed twice as large as the full frame was.
     const crop = { x: 1000, y: 750, width: 2000, height: 1500 }
@@ -496,5 +524,39 @@ describe('displayScale', () => {
   it('multiplies by the zoom', () => {
     const view = { scale: 3, offsetX: 0, offsetY: 0 }
     expect(displayScale(4000, 3000, 1000, 750, null, view)).toBeCloseTo(0.75, 6)
+  })
+})
+
+describe('refitCrop', () => {
+  it('swaps a landscape crop to portrait keeping the area, centered', () => {
+    // 4000×3000 (4:3 landscape) → 3:4 portrait. The image cannot hold 3000×4000,
+    // so the height locks to the bound and the width derives from the ratio.
+    const result = refitCrop({ x: 0, y: 0, width: 4000, height: 3000 }, 3 / 4, 4000, 3000)
+
+    expect(result).toEqual({ x: 875, y: 0, width: 2250, height: 3000 })
+  })
+
+  it('flips back to landscape without shrinking the frame further', () => {
+    // After the portrait flip the draft is 2250×3000; re-fitting to 4:3 must
+    // keep that area (3000×2250), not shrink the already-fitted box again.
+    const result = refitCrop({ x: 875, y: 0, width: 2250, height: 3000 }, 4 / 3, 4000, 3000)
+
+    expect(result).toEqual({ x: 500, y: 375, width: 3000, height: 2250 })
+  })
+
+  it('round-trips a portrait box back to its original size', () => {
+    const original = { x: 500, y: 375, width: 3000, height: 2250 }
+    const portrait = refitCrop(original, 3 / 4, 4000, 3000)
+    const roundTrip = refitCrop(portrait, 4 / 3, 4000, 3000)
+
+    expect(roundTrip).toEqual(original)
+  })
+
+  it('preserves the area when both axes fit the image', () => {
+    const draft = { x: 100, y: 200, width: 1600, height: 900 }
+    const result = refitCrop(draft, 1, 4000, 3000)
+
+    expect(result.width * result.height).toBeCloseTo(draft.width * draft.height)
+    expect(result.width).toBeCloseTo(result.height)
   })
 })

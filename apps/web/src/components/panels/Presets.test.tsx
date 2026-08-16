@@ -9,7 +9,7 @@ import '../../i18n'
 const KIND_LABEL: Record<PresetKind, string> = {
   style: 'Style',
   color: 'Color',
-  bw: 'B&W',
+  bw: 'Black and White',
   lights: 'Lights',
   movies: 'Movies',
 }

@@ -3,10 +3,10 @@ import type { ReactNode } from 'react'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint } from './curves'
 import { type CropRegion } from './image'
-import { IDENTITY_VIEW, type CanvasView } from './crop'
+import { DEFAULT_CROP_ORIENTATION, IDENTITY_VIEW, type CanvasView } from './crop'
 import { decodeImage } from './decodeImage'
 import { EditorContext, type RotationSpin } from './editorContext'
-import { editorReducer, buildInitialAdjustments } from './editorReducer'
+import { editorReducer, buildInitialAdjustments, type CropOrientation } from './editorReducer'
 import { IDENTITY_GEOMETRY, type Geometry } from './geometry'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
@@ -43,6 +43,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
       imageDirty: false,
       cropRegion: null,
       cropRatio: 'Original',
+      cropOrientation: DEFAULT_CROP_ORIENTATION,
       resetDialogOpen: false,
       masks: [],
       activeMaskId: null,
@@ -151,6 +152,13 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const setCropRatio = (ratio: string) => {
     dispatch({ type: 'SET_CROP_RATIO', ratio })
+  }
+
+  const setCropOrientation = (orientation: CropOrientation) => {
+    dispatch({
+      type: 'SET_CROP_ORIENTATION',
+      orientation,
+    })
   }
 
   const openResetDialog = () => {
@@ -512,6 +520,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         clearCrop,
         cropRatio: state.cropRatio,
         setCropRatio,
+        cropOrientation: state.cropOrientation,
+        setCropOrientation,
         resetDialogOpen: state.resetDialogOpen,
         openResetDialog,
         closeResetDialog,

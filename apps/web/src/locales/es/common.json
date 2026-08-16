@@ -155,7 +155,12 @@
     "title": "Recortar",
     "aspectRatio": "Relación de aspecto",
     "original": "Original",
-    "free": "Libre"
+    "free": "Libre",
+    "landscape": "Horizontal",
+    "portrait": "Vertical"
+  },
+  "cropPanel": {
+    "cropOrientation": "Cambiar a {{orientation}}"
   },
   "masks": {
     "title": "Máscaras",
@@ -211,12 +216,17 @@
     "kind": {
       "style": "Estilo",
       "color": "Color",
-      "bw": "B/N",
+      "bw": "Blanco y negro",
       "lights": "Luz",
       "movies": "Cine"
     },
     "empty": "Abre una imagen para previsualizar los presets.",
     "apply": "Aplicar {{name}}"
+  },
+  "templates": {
+    "title": "Plantillas clásicas",
+    "bw": "Blanco y negro",
+    "sepia": "Sepia"
   },
   "curves": {
     "resetChannel": "Restablecer canal",

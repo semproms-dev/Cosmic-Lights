@@ -45,6 +45,7 @@ const makeState = (): EditorStoreState => ({
   imageDirty: false,
   cropRegion: null,
   cropRatio: 'Original',
+  cropOrientation: 'landscape',
   resetDialogOpen: false,
   masks: [],
   activeMaskId: null,
@@ -190,6 +191,33 @@ describe('scope of undo', () => {
 
     h = wrapped(h, { type: 'UNDO' })
     expect(h.present.cropRegion).toBeNull()
+  })
+
+  it('includes the crop orientation in history and restores it on undo/redo', () => {
+    let h = initHistory(makeState())
+
+    h = wrapped(h, { type: 'SET_CROP_ORIENTATION', orientation: 'portrait' })
+    h = wrapped(h, { type: 'COMMIT' })
+    expect(h.present.cropOrientation).toBe('portrait')
+
+    h = wrapped(h, { type: 'UNDO' })
+    expect(h.present.cropOrientation).toBe('landscape')
+
+    h = wrapped(h, { type: 'REDO' })
+    expect(h.present.cropOrientation).toBe('portrait')
+  })
+
+  it('COMMIT is a no-op when the crop orientation is unchanged', () => {
+    // The panel commits on every swap; one that ends where it started must not
+    // grow the past stack — and without the flag in the slice this comparison
+    // would be the only thing catching that the swap is even tracked.
+    let h = initHistory(makeState())
+
+    h = wrapped(h, { type: 'SET_CROP_ORIENTATION', orientation: 'portrait' })
+    h = wrapped(h, { type: 'SET_CROP_ORIENTATION', orientation: 'landscape' })
+    h = wrapped(h, { type: 'COMMIT' })
+
+    expect(h.past).toHaveLength(0)
   })
 
   it('includes the tone curves in history', () => {

@@ -155,7 +155,12 @@
     "title": "Ritaglia",
     "aspectRatio": "Proporzioni",
     "original": "Originale",
-    "free": "Libero"
+    "free": "Libero",
+    "landscape": "Orizzontale",
+    "portrait": "Verticale"
+  },
+  "cropPanel": {
+    "cropOrientation": "Cambia in {{orientation}}"
   },
   "masks": {
     "title": "Maschere",
@@ -211,12 +216,17 @@
     "kind": {
       "style": "Stile",
       "color": "Colore",
-      "bw": "B/N",
+      "bw": "Bianco e nero",
       "lights": "Luce",
       "movies": "Cinema"
     },
     "empty": "Apri un'immagine per vedere l'anteprima dei preset.",
     "apply": "Applica {{name}}"
+  },
+  "templates": {
+    "title": "Modelli classici",
+    "bw": "Bianco e nero",
+    "sepia": "Seppia"
   },
   "curves": {
     "resetChannel": "Reimposta canale",

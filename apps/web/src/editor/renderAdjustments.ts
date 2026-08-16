@@ -53,6 +53,9 @@ const RENDER_DEFAULTS: RenderAdjustments = {
   grain: 0,
   grainSize: 50,
   grainRoughness: 50,
+  // Plantilla clásica: 0 = ninguna, 1 = B&W, 2 = Sepia. Como las ruedas, no es
+  // un slider del store: el shader la espera igual y su neutro es 0.
+  template: 0,
 }
 
 /**

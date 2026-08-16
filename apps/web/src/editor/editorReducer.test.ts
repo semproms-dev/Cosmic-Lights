@@ -21,6 +21,7 @@ const createState = (overrides: Partial<EditorStoreState> = {}): EditorStoreStat
   imageDirty: false,
   cropRegion: null,
   cropRatio: 'Original',
+  cropOrientation: 'landscape',
   resetDialogOpen: false,
   masks: [],
   activeMaskId: null,
@@ -269,6 +270,23 @@ describe('editorReducer — crop slice', () => {
     const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
 
     expect(next.cropRatio).toBe('Original')
+  })
+
+  it('SET_CROP_ORIENTATION stores the orientation without marking the image dirty', () => {
+    const state = createState()
+
+    const next = editorReducer(state, { type: 'SET_CROP_ORIENTATION', orientation: 'portrait' })
+
+    expect(next.cropOrientation).toBe('portrait')
+    expect(next.imageDirty).toBe(false)
+  })
+
+  it('SET_IMAGE resets the crop orientation back to landscape', () => {
+    const state = createState({ cropOrientation: 'portrait' })
+
+    const next = editorReducer(state, { type: 'SET_IMAGE', image: fakeImage })
+
+    expect(next.cropOrientation).toBe('landscape')
   })
 
   it('SET_IMAGE resets the orientation, so a new photo does not inherit the turn', () => {

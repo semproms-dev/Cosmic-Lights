@@ -155,7 +155,12 @@
     "title": "Mozketa",
     "aspectRatio": "Erlazioa",
     "original": "Originala",
-    "free": "Askea"
+    "free": "Askea",
+    "landscape": "Horizontal",
+    "portrait": "Bertikal"
+  },
+  "cropPanel": {
+    "cropOrientation": "Aldatu hona: {{orientation}}"
   },
   "masks": {
     "title": "Maskarak",
@@ -211,12 +216,17 @@
     "kind": {
       "style": "Estiloa",
       "color": "Kolorea",
-      "bw": "B&W",
+      "bw": "Zuri-beltza",
       "lights": "Argiak",
       "movies": "Filmak"
     },
     "empty": "Ireki irudi bat aurrezarpenak ikusteko.",
     "apply": "Aplikatu {{name}}"
+  },
+  "templates": {
+    "title": "Txantiloi klasikoak",
+    "bw": "Zuri-beltza",
+    "sepia": "Sepia"
   },
   "curves": {
     "resetChannel": "Berrezarri kanala",

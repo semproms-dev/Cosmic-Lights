@@ -120,6 +120,7 @@ export interface RenderAdjustments {
   grainSize: number
   /** Grain roughness in [0, 100]; how clumped the grain is (0 = even). */
   grainRoughness: number
+  template: number
 }
 
 /**
@@ -190,6 +191,7 @@ export class WebGLRenderer {
   private readonly uTint: WebGLUniformLocation | null
   private readonly uVibrance: WebGLUniformLocation | null
   private readonly uSaturation: WebGLUniformLocation | null
+  private readonly uTemplate: WebGLUniformLocation | null
   // One vec3 per zone — (hue, saturation, luminance) — rather than nine floats:
   // a third of the locations, and it keeps one zone's controls together.
   private readonly uGradeShadow: WebGLUniformLocation | null
@@ -510,6 +512,7 @@ export class WebGLRenderer {
     this.uWhites = gl.getUniformLocation(this.program, 'uWhites')
     this.uBlacks = gl.getUniformLocation(this.program, 'uBlacks')
     this.uTemperature = gl.getUniformLocation(this.program, 'uTemperature')
+    this.uTemplate = gl.getUniformLocation(this.program, 'uTemplate')
     this.uTint = gl.getUniformLocation(this.program, 'uTint')
     this.uVibrance = gl.getUniformLocation(this.program, 'uVibrance')
     this.uSaturation = gl.getUniformLocation(this.program, 'uSaturation')
@@ -1892,6 +1895,7 @@ export class WebGLRenderer {
     gl.uniform1f(this.uWhites, adjustments.whites)
     gl.uniform1f(this.uBlacks, adjustments.blacks)
     gl.uniform1f(this.uTemperature, adjustments.temperature)
+    gl.uniform1f(this.uTemplate, adjustments.template)
     gl.uniform1f(this.uTint, adjustments.tint)
     gl.uniform1f(this.uVibrance, adjustments.vibrance)
     gl.uniform1f(this.uSaturation, adjustments.saturation)
