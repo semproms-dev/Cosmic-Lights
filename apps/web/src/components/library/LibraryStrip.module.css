@@ -1,0 +1,90 @@
+.strip {
+  border-top: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+  background-color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-6));
+}
+
+.header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-sm);
+  padding: calc(var(--mantine-spacing-xs)) var(--mantine-spacing-md);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.count {
+  font-weight: 400;
+  opacity: 0.65;
+}
+
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mantine-spacing-sm);
+  overflow-x: auto;
+  padding: 0 var(--mantine-spacing-md) var(--mantine-spacing-md);
+  min-height: 132px;
+}
+
+.item {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.thumb {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  display: block;
+  border-radius: var(--mantine-radius-sm);
+}
+
+.placeholder {
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--mantine-radius-sm);
+  background-color: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5));
+  opacity: 0.6;
+}
+
+.item[data-selected='true'] .thumb,
+.item[data-selected='true'] .placeholder {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: -2px;
+}
+
+.badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 0 6px;
+  border-radius: var(--mantine-radius-sm);
+  background-color: rgba(0, 0, 0, 0.72);
+  color: var(--mantine-color-white);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  opacity: 0.75;
+}

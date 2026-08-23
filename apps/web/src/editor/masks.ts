@@ -1,4 +1,5 @@
 import { basicAdjustments, buildDefaults, colorAdjustement, detailsAdjustement } from './adjustments'
+import { createId } from './createId'
 import type { MaskGranularity } from './segmentation/types'
 
 export type { MaskGranularity }
@@ -70,7 +71,7 @@ export interface DuplicateMaskOptions {
  */
 export const duplicateMask = (mask: Mask, name: string, options: DuplicateMaskOptions = {}): Mask => ({
   ...mask,
-  id: crypto.randomUUID(),
+  id: createId(),
   name,
   invert: options.invert ?? mask.invert,
   adjustments: options.resetAdjustments === true
@@ -404,7 +405,7 @@ export function buildMaskAdjustments(): Record<string, number> {
  */
 export function createMask(type: MaskType, name: string): Mask {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     type,
     name,
     adjustments: buildMaskAdjustments(),
