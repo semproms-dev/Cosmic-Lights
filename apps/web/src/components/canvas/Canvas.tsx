@@ -148,6 +148,11 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   const colorScheme = useComputedColorScheme('dark')
   // Holds the last pointer position while panning; null when not dragging.
   const panRef = useRef<{ x: number; y: number } | null>(null)
+  // Set to true by the pan/zoom handlers to signal that the next draw only
+  // changes the view transform (pan/zoom) and can skip the full GPU pipeline
+  // (denoise, develop, mask stacking, blurs) — only the composite pass needs
+  // to re-run with the new view matrix.
+  const viewOnlyRef = useRef(false)
   // Redraws the scene on demand (set by the render effect). Live brush painting
   // calls this after each stamp, since it changes no React state to react to.
   const drawRef = useRef<() => void>(() => {})
@@ -240,6 +245,12 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       const height = Math.round(canvas.offsetHeight * dpr)
       canvas.width = width
       canvas.height = height
+      // Consume and reset the view-only flag. When the pan/zoom handler set it,
+      // passes 0-3 (denoise, develop, mask stacking, blurs) are skipped and only
+      // the composite re-runs with the updated view transform — cutting the GPU
+      // work by ~80 % during interactive navigation.
+      const viewOnly = viewOnlyRef.current
+      viewOnlyRef.current = false
       if(image != null) {
         // While cropping, show the full frame so the overlay stays aligned. Same
         // in the before/after preview, where the original has no crop either.
@@ -259,6 +270,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
         showOriginal ? null : overlayMaskId,
         width,
         height,
+        viewOnly,
       )
       // The quality denoise hands back a slice of itself per frame rather than
       // locking the tab for a second, so keep the frames coming until it is
@@ -357,6 +369,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   // content under that point fixed. Clip space matches the renderer's view
   // transform, so the cursor stays locked to the same pixel as the image scales.
   const zoomAtPoint = useCallback((cursorX: number, cursorY: number, factor: number) => {
+    viewOnlyRef.current = true
     setView(v => {
       const newScale = clampZoom(v.scale * factor)
       // World (content) coordinate currently under the cursor.
@@ -603,6 +616,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     const dx = ((e.clientX - start.x) / rect.width) * 2
     const dy = -((e.clientY - start.y) / rect.height) * 2
     panRef.current = { x: e.clientX, y: e.clientY }
+    viewOnlyRef.current = true
     setView(v => ({ ...v, offsetX: v.offsetX + dx, offsetY: v.offsetY + dy }))
   }
 

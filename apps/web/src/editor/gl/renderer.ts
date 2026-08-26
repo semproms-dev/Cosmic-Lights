@@ -379,6 +379,17 @@ export class WebGLRenderer {
   private viewScale = 1
   private viewOffset: [number, number] = [0, 0]
 
+  // ── Blur-cache tracking ──
+  // When only the view (pan/zoom) changes, the developed image, blurs, mask
+  // stacking and amount map are all still valid from the previous frame. The
+  // renderer can skip passes 0-3 and only re-run the composite with the new
+  // view transform. `developedKey` captures the full pipeline input so we know
+  // when the cache is stale.
+  private developedKey: string | null = null
+  // The render target holding the most recent fully-masked developed image.
+  // Updated on every cache-miss frame; reused on view-only frames.
+  private finalDeveloped: RenderTarget | null = null
+
   // The developed image (tone/colour/details) rendered off-screen, so later
   // passes can sample it. Recreated whenever the image size changes.
   private developed: RenderTarget | null = null
@@ -716,6 +727,8 @@ export class WebGLRenderer {
     // The cached denoise belongs to the previous image; the sliders may not have
     // moved, but the pixels underneath them have.
     this.denoiseKey = null
+    this.developedKey = null
+    this.finalDeveloped = null
     this.developed = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.developed2 = createRenderTarget(gl, bitmap.width, bitmap.height)
     this.blurA = createRenderTarget(gl, bitmap.width, bitmap.height)
@@ -1809,7 +1822,7 @@ export class WebGLRenderer {
     this.stampDiscsAlong([from, to], radius, hardness, mode)
   }
 
-  render(adjustments: RenderAdjustments, masks: Mask[], maskAlphas: MaskAlphaCache, overlayMaskId: string | null, canvasWidth: number, canvasHeight: number): void {
+  render(adjustments: RenderAdjustments, masks: Mask[], maskAlphas: MaskAlphaCache, overlayMaskId: string | null, canvasWidth: number, canvasHeight: number, viewOnly = false): void {
     const gl = this.gl
     if (!this.hasImage || this.developed === null || this.developed2 === null || this.blurA === null || this.blurB === null || this.blurC === null || this.denoised === null || this.amountMap === null || canvasWidth === 0 || canvasHeight === 0) {
       // Nothing to draw: just clear the canvas.
@@ -1825,177 +1838,195 @@ export class WebGLRenderer {
     const denoised = this.denoised
     const amountMap = this.amountMap
 
-    // ── Pass 0: noise reduction, feeding the pipeline instead of the uploaded
-    // texture. It runs FIRST because everything downstream amplifies noise:
-    // exposure and shadows multiply it, clarity and the sharpen then lift
-    // whatever survived. Denoise-then-sharpen is also the only order that works —
-    // sharpening first turns noise into detail the filter can no longer tell
-    // apart. Skipped entirely at 0, exactly like the clarity blurs below. ──
-    const noise = denoiseParams(adjustments)
-    let pipelineSource = this.texture
-    if (noise.enabled) {
-      // CACHED, and this is what makes the feature usable rather than just
-      // correct. Alone in this pipeline, the denoise depends on nothing but its
-      // own three sliders — not exposure, not curves, not crop, not masks — so
-      // dragging any *other* slider reuses last frame's result and pays nothing.
-      // Only moving a noise slider (or loading an image, which clears the key)
-      // re-runs the passes. Without this, every frame would pay for the widest
-      // filter in the pipeline.
-      // Non-local means only earns its cost on the luminance half, and only if
-      // the context can hold its accumulator — otherwise this stays the
-      // interactive filter and the picture is merely less clean, not wrong.
-      const quality =
-        this.denoiseQuality === 'quality' && nlmParams(noise).enabled && this.ensureNlmTargets()
-      const key = `${noise.colorRadius}|${noise.lumaRadius}|${noise.lumaSigmaRange}|${noise.detail}|${quality ? 'q' : 'p'}`
-      if (this.denoiseKey !== key) {
-        // blur1D and the pipeline pass bind the VAO themselves further down, but
-        // this pass runs before either of them.
-        gl.bindVertexArray(this.vao)
-        // A small image may not have earned every level it asked for.
-        const levels = Math.min(noise.pyramidLevels, this.pyramid.length)
-        if (quality) {
-          if (this.nlmJob === null || this.nlmJob.key !== key) {
-            // Put the interactive filter's result up straight away, so the frame
-            // is never showing stale pixels while the slow one is computed. It is
-            // also the fallback if the job is abandoned half-way.
-            this.runPreviewDenoise(noise, levels, blurA, blurB, denoised)
-            this.startNlmJob(key)
-          }
-          // Only the last slice writes `denoised`; until then the key stays
-          // unset, which is what keeps the frames coming.
-          if (this.advanceNlmJob(noise, levels, blurA, blurB, blurC, denoised)) {
-            this.denoiseKey = key
-          }
-        } else {
-          // Any quality pass in flight was computing a picture for parameters
-          // that no longer apply. Dropping it costs the work already done, and
-          // finishing it would cost that plus the wrong answer.
-          this.nlmJob = null
-          this.runPreviewDenoise(noise, levels, blurA, blurB, denoised)
-          this.denoiseKey = key
-        }
-      }
-      pipelineSource = denoised.texture
-    }
-
-    // ── Pass 1: run the pixel pipeline into the developed target, at image
-    // resolution and filling the whole quad (no letterbox here). ──
-    gl.bindFramebuffer(gl.FRAMEBUFFER, developed.framebuffer)
-    gl.viewport(0, 0, developed.width, developed.height)
-    gl.useProgram(this.program)
-    gl.bindVertexArray(this.vao)
-    gl.uniform2f(this.uScale, 1, 1)
-    // No flip either way: pass 0 preserves the uploaded texture's orientation, so
-    // this is correct whether `pipelineSource` is the upload or the denoised FBO.
-    gl.uniform1f(this.uFlipV, 0)
-    gl.uniform1f(this.uExposure, adjustments.exposure)
-    gl.uniform1f(this.uContrast, adjustments.contrast)
-    gl.uniform1f(this.uHighlights, adjustments.highlights)
-    gl.uniform1f(this.uShadows, adjustments.shadows)
-    gl.uniform1f(this.uWhites, adjustments.whites)
-    gl.uniform1f(this.uBlacks, adjustments.blacks)
-    gl.uniform1f(this.uTemperature, adjustments.temperature)
-    gl.uniform1f(this.uTemplate, adjustments.template)
-    gl.uniform1f(this.uTint, adjustments.tint)
-    gl.uniform1f(this.uVibrance, adjustments.vibrance)
-    gl.uniform1f(this.uSaturation, adjustments.saturation)
-    gl.uniform3f(
-      this.uGradeShadow,
-      adjustments.gradeShadowHue,
-      adjustments.gradeShadowSat,
-      adjustments.gradeShadowLum,
-    )
-    gl.uniform3f(this.uGradeMid, adjustments.gradeMidHue, adjustments.gradeMidSat, adjustments.gradeMidLum)
-    gl.uniform3f(
-      this.uGradeHigh,
-      adjustments.gradeHighHue,
-      adjustments.gradeHighSat,
-      adjustments.gradeHighLum,
-    )
-    gl.uniform1f(this.uGradeBlending, adjustments.gradeBlending)
-    gl.uniform1f(this.uGradeBalance, adjustments.gradeBalance)
-    // Texel size in UV space so the sharpen can reach its neighbours.
-    gl.uniform2f(this.uTexel, 1 / this.imageWidth, 1 / this.imageHeight)
-    gl.uniform1f(this.uSharpness, adjustments.sharpness)
-    gl.uniform1f(this.uThreshold, adjustments.threshold)
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, pipelineSource)
-    gl.uniform1i(this.uImage, 0)
-    gl.activeTexture(gl.TEXTURE1)
-    gl.bindTexture(gl.TEXTURE_2D, this.curveLut)
-    gl.uniform1i(this.uCurveLut, 1)
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-
-    // ── Mask stacking: re-develop the image once per mask with that mask's own
-    // adjustments and blend by its alpha, ping-ponging between the two developed
-    // targets. `finalDeveloped` ends up holding the fully-masked result; with no
-    // masks it stays the base develop, so the passes below are unchanged. ──
-    this.syncMasks(masks, maskAlphas)
-    let finalDeveloped = developed
-    if (masks.length > 0) {
-      let src = developed
-      let dst: RenderTarget = this.developed2
-      gl.useProgram(this.maskProgram)
-      gl.bindVertexArray(this.vao)
-      gl.uniform2f(this.uMaskScale, 1, 1)
-      gl.uniform2f(this.uMaskOffset, 0, 0)
-      // No flip: this pass samples `developed` and its mask at the same vUv and
-      // writes developed2 as a straight in-place copy, so with an empty mask it
-      // is a no-op (developed2[v] == developed[v]) and the image never flips.
-      gl.uniform1f(this.uMaskFlipV, 0)
-      for (const mask of masks) {
-        const entry = this.maskTargets.get(mask.id)
-        if (entry === undefined) continue
-        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer)
-        gl.viewport(0, 0, dst.width, dst.height)
-        gl.uniform1f(this.uMaskInvert, mask.invert ? 1 : 0)
-        // Tone keys only: `texture` is a mask adjustment too, but this shader
-        // cannot apply it (it needs a blur). It rides to the composite instead,
-        // through the amount map built below.
-        for (const key of MASK_TONE_KEYS) {
-          gl.uniform1f(this.maskAdjLoc[key], mask.adjustments[key] ?? 0)
-        }
-        gl.activeTexture(gl.TEXTURE0)
-        gl.bindTexture(gl.TEXTURE_2D, src.texture)
-        gl.uniform1i(this.uMaskImage, 0)
-        gl.activeTexture(gl.TEXTURE1)
-        gl.bindTexture(gl.TEXTURE_2D, entry.target.texture)
-        gl.uniform1i(this.uMaskTex, 1)
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-        // The result becomes the source for the next mask (ping-pong).
-        const tmp = src
-        src = dst
-        dst = tmp
-      }
-      finalDeveloped = src
-    }
-
     // A mask carrying its own Texture needs the same small blur the global
     // slider does, so it has to count towards the skip below — otherwise the
     // composite would sample a `blurC` left over from an earlier frame.
     const hasMaskTexture = masks.some((mask) => (mask.adjustments.texture ?? 0) !== 0)
 
-    // ── Passes 2-5: two separable Gaussian blurs of the developed image. ──
-    // Large (clarity/dehaze) → blurB; small (texture) → blurC. blurA is the
-    // shared H-pass scratch, reused once the large blur has consumed it.
-    // Skipped when no local-contrast slider is active: the composite is then the
-    // identity regardless of the (unused) blur textures, so 4 passes are saved.
-    if (adjustments.clarity !== 0 || adjustments.dehaze !== 0 || adjustments.texture !== 0 || hasMaskTexture) {
-      const texelX = 1 / this.imageWidth
-      const texelY = 1 / this.imageHeight
-      const largeRadius = 40 // mid-sized structures (clarity/dehaze)
-      const smallRadius = 8 // fine detail (texture)
-      this.blur1D(finalDeveloped.texture, blurA, texelX, 0, largeRadius)
-      this.blur1D(blurA.texture, blurB, 0, texelY, largeRadius)
-      this.blur1D(finalDeveloped.texture, blurA, texelX, 0, smallRadius)
-      this.blur1D(blurA.texture, blurC, 0, texelY, smallRadius)
-    }
+    // ── Build the key that tracks whether the developed image and blurs are
+    // still valid. When only the view (pan/zoom) changes, all of passes 0-3
+    // produce the same output as the previous frame, so we can skip them and
+    // only re-run the composite. ──
+    const needsBlur = adjustments.clarity !== 0 || adjustments.dehaze !== 0 || adjustments.texture !== 0 || hasMaskTexture
+    const maskTextureKey = hasMaskTexture
+      ? masks.map((m) => `${m.id}:${m.adjustments.texture ?? 0}`).join('|')
+      : ''
+    const newKey = `${adjustments.exposure}|${adjustments.contrast}|${adjustments.highlights}|${adjustments.shadows}|${adjustments.whites}|${adjustments.blacks}|${adjustments.temperature}|${adjustments.tint}|${adjustments.vibrance}|${adjustments.saturation}|${adjustments.template}|${adjustments.gradeShadowHue}|${adjustments.gradeShadowSat}|${adjustments.gradeShadowLum}|${adjustments.gradeMidHue}|${adjustments.gradeMidSat}|${adjustments.gradeMidLum}|${adjustments.gradeHighHue}|${adjustments.gradeHighSat}|${adjustments.gradeHighLum}|${adjustments.gradeBlending}|${adjustments.gradeBalance}|${adjustments.sharpness}|${adjustments.threshold}|${adjustments.colorNoise}|${adjustments.luminanceNoise}|${adjustments.luminanceDetail}|${adjustments.clarity}|${adjustments.dehaze}|${adjustments.texture}|${needsBlur ? 'b' : 'n'}|${maskTextureKey}|${masks.length}|${masks.map((m) => `${m.id}:${m.version}`).join(',')}`
 
-    // ── Amount map: only when a mask carries a Texture of its own. With none,
-    // the composite keeps reading the plain `uTexture` uniform and this whole
-    // branch — a target and one draw per contribution — never happens. ──
-    if (hasMaskTexture) {
-      this.buildAmountMap(masks, adjustments.texture, amountMap)
+    const cacheValid = viewOnly && this.developedKey === newKey
+
+    // Only re-run passes 0-3 when something in the pipeline has changed.
+    if (!cacheValid) {
+      // ── Pass 0: noise reduction, feeding the pipeline instead of the uploaded
+      // texture. It runs FIRST because everything downstream amplifies noise:
+      // exposure and shadows multiply it, clarity and the sharpen then lift
+      // whatever survived. Denoise-then-sharpen is also the only order that works —
+      // sharpening first turns noise into detail the filter can no longer tell
+      // apart. Skipped entirely at 0, exactly like the clarity blurs below. ──
+      const noise = denoiseParams(adjustments)
+      let pipelineSource = this.texture
+      if (noise.enabled) {
+        // CACHED, and this is what makes the feature usable rather than just
+        // correct. Alone in this pipeline, the denoise depends on nothing but its
+        // own three sliders — not exposure, not curves, not crop, not masks — so
+        // dragging any *other* slider reuses last frame's result and pays nothing.
+        // Only moving a noise slider (or loading an image, which clears the key)
+        // re-runs the passes. Without this, every frame would pay for the widest
+        // filter in the pipeline.
+        // Non-local means only earns its cost on the luminance half, and only if
+        // the context can hold its accumulator — otherwise this stays the
+        // interactive filter and the picture is merely less clean, not wrong.
+        const quality =
+          this.denoiseQuality === 'quality' && nlmParams(noise).enabled && this.ensureNlmTargets()
+        const key = `${noise.colorRadius}|${noise.lumaRadius}|${noise.lumaSigmaRange}|${noise.detail}|${quality ? 'q' : 'p'}`
+        if (this.denoiseKey !== key) {
+          // blur1D and the pipeline pass bind the VAO themselves further down, but
+          // this pass runs before either of them.
+          gl.bindVertexArray(this.vao)
+          // A small image may not have earned every level it asked for.
+          const levels = Math.min(noise.pyramidLevels, this.pyramid.length)
+          if (quality) {
+            if (this.nlmJob === null || this.nlmJob.key !== key) {
+              // Put the interactive filter's result up straight away, so the frame
+              // is never showing stale pixels while the slow one is computed. It is
+              // also the fallback if the job is abandoned half-way.
+              this.runPreviewDenoise(noise, levels, blurA, blurB, denoised)
+              this.startNlmJob(key)
+            }
+            // Only the last slice writes `denoised`; until then the key stays
+            // unset, which is what keeps the frames coming.
+            if (this.advanceNlmJob(noise, levels, blurA, blurB, blurC, denoised)) {
+              this.denoiseKey = key
+            }
+          } else {
+            // Any quality pass in flight was computing a picture for parameters
+            // that no longer apply. Dropping it costs the work already done, and
+            // finishing it would cost that plus the wrong answer.
+            this.nlmJob = null
+            this.runPreviewDenoise(noise, levels, blurA, blurB, denoised)
+            this.denoiseKey = key
+          }
+        }
+        pipelineSource = denoised.texture
+      }
+
+      // ── Pass 1: run the pixel pipeline into the developed target, at image
+      // resolution and filling the whole quad (no letterbox here). ──
+      gl.bindFramebuffer(gl.FRAMEBUFFER, developed.framebuffer)
+      gl.viewport(0, 0, developed.width, developed.height)
+      gl.useProgram(this.program)
+      gl.bindVertexArray(this.vao)
+      gl.uniform2f(this.uScale, 1, 1)
+      // No flip either way: pass 0 preserves the uploaded texture's orientation, so
+      // this is correct whether `pipelineSource` is the upload or the denoised FBO.
+      gl.uniform1f(this.uFlipV, 0)
+      gl.uniform1f(this.uExposure, adjustments.exposure)
+      gl.uniform1f(this.uContrast, adjustments.contrast)
+      gl.uniform1f(this.uHighlights, adjustments.highlights)
+      gl.uniform1f(this.uShadows, adjustments.shadows)
+      gl.uniform1f(this.uWhites, adjustments.whites)
+      gl.uniform1f(this.uBlacks, adjustments.blacks)
+      gl.uniform1f(this.uTemperature, adjustments.temperature)
+      gl.uniform1f(this.uTemplate, adjustments.template)
+      gl.uniform1f(this.uTint, adjustments.tint)
+      gl.uniform1f(this.uVibrance, adjustments.vibrance)
+      gl.uniform1f(this.uSaturation, adjustments.saturation)
+      gl.uniform3f(
+        this.uGradeShadow,
+        adjustments.gradeShadowHue,
+        adjustments.gradeShadowSat,
+        adjustments.gradeShadowLum,
+      )
+      gl.uniform3f(this.uGradeMid, adjustments.gradeMidHue, adjustments.gradeMidSat, adjustments.gradeMidLum)
+      gl.uniform3f(
+        this.uGradeHigh,
+        adjustments.gradeHighHue,
+        adjustments.gradeHighSat,
+        adjustments.gradeHighLum,
+      )
+      gl.uniform1f(this.uGradeBlending, adjustments.gradeBlending)
+      gl.uniform1f(this.uGradeBalance, adjustments.gradeBalance)
+      // Texel size in UV space so the sharpen can reach its neighbours.
+      gl.uniform2f(this.uTexel, 1 / this.imageWidth, 1 / this.imageHeight)
+      gl.uniform1f(this.uSharpness, adjustments.sharpness)
+      gl.uniform1f(this.uThreshold, adjustments.threshold)
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, pipelineSource)
+      gl.uniform1i(this.uImage, 0)
+      gl.activeTexture(gl.TEXTURE1)
+      gl.bindTexture(gl.TEXTURE_2D, this.curveLut)
+      gl.uniform1i(this.uCurveLut, 1)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+      // ── Mask stacking: re-develop the image once per mask with that mask's own
+      // adjustments and blend by its alpha, ping-ponging between the two developed
+      // targets. `finalDeveloped` ends up holding the fully-masked result; with no
+      // masks it stays the base develop, so the passes below are unchanged. ──
+      this.syncMasks(masks, maskAlphas)
+      let finalDev: RenderTarget = developed
+      if (masks.length > 0) {
+        let src = developed
+        let dst: RenderTarget = this.developed2
+        gl.useProgram(this.maskProgram)
+        gl.bindVertexArray(this.vao)
+        gl.uniform2f(this.uMaskScale, 1, 1)
+        gl.uniform2f(this.uMaskOffset, 0, 0)
+        // No flip: this pass samples `developed` and its mask at the same vUv and
+        // writes developed2 as a straight in-place copy, so with an empty mask it
+        // is a no-op (developed2[v] == developed[v]) and the image never flips.
+        gl.uniform1f(this.uMaskFlipV, 0)
+        for (const mask of masks) {
+          const entry = this.maskTargets.get(mask.id)
+          if (entry === undefined) continue
+          gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer)
+          gl.viewport(0, 0, dst.width, dst.height)
+          gl.uniform1f(this.uMaskInvert, mask.invert ? 1 : 0)
+          // Tone keys only: `texture` is a mask adjustment too, but this shader
+          // cannot apply it (it needs a blur). It rides to the composite instead,
+          // through the amount map built below.
+          for (const key of MASK_TONE_KEYS) {
+            gl.uniform1f(this.maskAdjLoc[key], mask.adjustments[key] ?? 0)
+          }
+          gl.activeTexture(gl.TEXTURE0)
+          gl.bindTexture(gl.TEXTURE_2D, src.texture)
+          gl.uniform1i(this.uMaskImage, 0)
+          gl.activeTexture(gl.TEXTURE1)
+          gl.bindTexture(gl.TEXTURE_2D, entry.target.texture)
+          gl.uniform1i(this.uMaskTex, 1)
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+          // The result becomes the source for the next mask (ping-pong).
+          const tmp = src
+          src = dst
+          dst = tmp
+        }
+        finalDev = src
+      }
+      this.finalDeveloped = finalDev
+
+      // ── Passes 2-5: two separable Gaussian blurs of the developed image. ──
+      // Large (clarity/dehaze) → blurB; small (texture) → blurC. blurA is the
+      // shared H-pass scratch, reused once the large blur has consumed it.
+      // Skipped when no local-contrast slider is active: the composite is then the
+      // identity regardless of the (unused) blur textures, so 4 passes are saved.
+      if (needsBlur) {
+        const texelX = 1 / this.imageWidth
+        const texelY = 1 / this.imageHeight
+        const largeRadius = 40 // mid-sized structures (clarity/dehaze)
+        const smallRadius = 8 // fine detail (texture)
+        this.blur1D(this.finalDeveloped.texture, blurA, texelX, 0, largeRadius)
+        this.blur1D(blurA.texture, blurB, 0, texelY, largeRadius)
+        this.blur1D(this.finalDeveloped.texture, blurA, texelX, 0, smallRadius)
+        this.blur1D(blurA.texture, blurC, 0, texelY, smallRadius)
+      }
+
+      // ── Amount map: only when a mask carries a Texture of its own. With none,
+      // the composite keeps reading the plain `uTexture` uniform and this whole
+      // branch — a target and one draw per contribution — never happens. ──
+      if (hasMaskTexture) {
+        this.buildAmountMap(masks, adjustments.texture, amountMap)
+      }
+
+      this.developedKey = newKey
     }
 
     // ── Pass 4: clarity composite (developed + blur) → canvas, letterboxed. ──
@@ -2068,7 +2099,7 @@ export class WebGLRenderer {
     gl.uniform1f(this.uGrainSize, adjustments.grainSize)
     gl.uniform1f(this.uGrainRoughness, adjustments.grainRoughness)
     gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, finalDeveloped.texture)
+    gl.bindTexture(gl.TEXTURE_2D, this.finalDeveloped!.texture)
     gl.uniform1i(this.uClarityDeveloped, 0)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, blurB.texture)
