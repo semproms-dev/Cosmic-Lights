@@ -1,6 +1,6 @@
 import piexif from 'piexifjs'
 import type { Metadata } from 'libraw-wasm'
-import { formatShutterSpeedRational } from '../utils'
+import { APP_NAME, formatShutterSpeedRational } from '../utils'
 
 export interface ExifOptions {
     includeMetadata: boolean
@@ -38,7 +38,10 @@ export const buildExifDict = (metadata: Metadata, opts: ExifOptions): piexif.Exi
         dict['0th'][piexif.ImageIFD.Make] = metadata.camera_make
         dict['0th'][piexif.ImageIFD.Model] = metadata.camera_model
         dict['0th'][piexif.ImageIFD.Orientation] = 1          // ← NUNCA metadata.flip (§7)
-        dict['0th'][piexif.ImageIFD.Software] = metadata.software ?? 'CosmicLights'
+        // The exported file is the output of this app, so the Software tag should
+        // identify the editor that created it, not whichever camera payload it was
+        // derived from.
+        dict['0th'][piexif.ImageIFD.Software] = APP_NAME;
         if (metadata.artist) dict['0th'][piexif.ImageIFD.Artist] = metadata.artist
     }
 

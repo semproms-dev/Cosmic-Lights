@@ -58,10 +58,10 @@ describe('buildExifDict — camera identity (0th)', () => {
     expect(dict['0th']?.[piexif.ImageIFD.Software]).toBe('CosmicLights')
   })
 
-  it('keeps the original software when present', () => {
+  it('writes the export app name in the software tag even when the source metadata contains another value', () => {
     const dict = buildExifDict(makeMetadata({ software: 'Magic Lantern' }), withMetadata)
 
-    expect(dict['0th']?.[piexif.ImageIFD.Software]).toBe('Magic Lantern')
+    expect(dict['0th']?.[piexif.ImageIFD.Software]).toBe('CosmicLights')
   })
 })
 
