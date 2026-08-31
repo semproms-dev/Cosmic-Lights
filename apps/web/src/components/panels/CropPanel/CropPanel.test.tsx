@@ -21,9 +21,9 @@ describe('CropPanel', () => {
   it('renders the orientation, rotation and geometry tool sections', () => {
     render(<CropPanel />);
 
-    expect(screen.getByText('Orientation')).toBeInTheDocument();
-    expect(screen.getByText('Rotation')).toBeInTheDocument();
-    expect(screen.getByText('Geometry')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Orientation' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Rotation' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Geometry' })).toBeInTheDocument();
     expect(screen.getByText('Distortion')).toBeInTheDocument();
     expect(screen.getByText('Perspective')).toBeInTheDocument();
     expect(screen.getByText('Transform')).toBeInTheDocument();

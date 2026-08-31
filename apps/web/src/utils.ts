@@ -2,7 +2,11 @@
  * Functions to use through the project
  */
 
+import type { CropOverlayType } from "./editor/editorContext";
+
 export const APP_NAME = 'CosmicLights';
+
+export const CropValues: CropOverlayType[] = ['thirds', 'diagonal', 'square', 'spiral'];
 
 export const groupBy = <T, K extends PropertyKey>(arr: T[], key: (i: T) => K): Record<K, T[]> =>
   arr.reduce((groups, item) => {

@@ -254,6 +254,65 @@ export const pointerToImagePoint = (
   return { x: uv.x * imageWidth, y: uv.y * imageHeight }
 }
 
+/**
+ * Maps a crop region (image pixels) to the on-screen rectangle in container/CSS
+ * pixels, honouring everything the renderer does to place the image: the zoom/pan,
+ * the letterbox fitted to the orientation's displayed frame, the quarter turns,
+ * the flips and the free straighten angle.
+ *
+ * A crop is axis-aligned in image space. Quarter turns and mirrors map it to an
+ * axis-aligned rectangle on the screen, and the free angle only grows the
+ * letterboxed frame (its {@link rotatedBoundingBox}); the screen rectangle is
+ * therefore just the bounding box of the four mapped corners. Using
+ * {@link imagePointToPointer} here keeps this a mirror of
+ * {@link pointerToImagePoint}, so the frame cannot peel away from the canvas the
+ * moment a turn, flip or straighten is applied — the same class of bug the crop
+ * tool already paid for once with the plain letterbox mapping.
+ *
+ * `crop` is always `null` here: the crop tool opens on the full frame, exactly
+ * what the Canvas is showing while `cropping` is true.
+ *
+ * @param region - The crop region in image pixels.
+ * @param containerWidth - Container width in CSS pixels.
+ * @param containerHeight - Container height in CSS pixels.
+ * @param imageWidth - Full image width in pixels.
+ * @param imageHeight - Full image height in pixels.
+ * @param view - The active zoom/pan.
+ * @param orientation - The turns and mirroring the canvas is displaying.
+ * @param geometry - The lens/perspective/scale/offset the canvas is displaying.
+ * @returns The region's on-screen rectangle in container/CSS pixels.
+ */
+export const cropRegionToViewRect = (
+  region: CropRegion,
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+  view: CanvasView,
+  orientation: Orientation,
+  geometry: Geometry = IDENTITY_GEOMETRY,
+): DisplayRect => {
+  const corners = [
+    { x: region.x, y: region.y },
+    { x: region.x + region.width, y: region.y },
+    { x: region.x, y: region.y + region.height },
+    { x: region.x + region.width, y: region.y + region.height },
+  ]
+  const points = corners.map((p) =>
+    imagePointToPointer(p, containerWidth, containerHeight, imageWidth, imageHeight, null, view, orientation, geometry),
+  )
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const x = Math.min(...xs)
+  const y = Math.min(...ys)
+  return {
+    x,
+    y,
+    width: Math.max(...xs) - x,
+    height: Math.max(...ys) - y,
+  }
+}
+
 export const effectiveAspect = (
   ratio: string,
   orientation: CropOrientation,

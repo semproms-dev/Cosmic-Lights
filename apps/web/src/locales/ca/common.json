@@ -160,7 +160,17 @@
     "portrait": "Vertical"
   },
   "cropPanel": {
-    "cropOrientation": "Canvia a {{orientation}}"
+    "cropOrientation": "Canvia a {{orientation}}",
+    "overlay": "Capa: {{overlay}}",
+    "overlayLabel": "Capa",
+    "orientationLabel": "Orientació"
+  },
+  "cropOverlay": {
+    "thirds": "Terços",
+    "diagonal": "Diagonal",
+    "spiral": "Espiral",
+    "square": "Quadrat",
+    "circle": "Cercle"
   },
   "masks": {
     "title": "Màscares",

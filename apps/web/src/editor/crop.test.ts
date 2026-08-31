@@ -17,6 +17,7 @@ import {
   imageToCanvasCoords,
   parseAspectRatio,
   refitCrop,
+  cropRegionToViewRect,
 } from './crop'
 import {MIN_CROP_SIZE} from '../utils'
 import { cropToUvTransform, IDENTITY_ORIENTATION, type Orientation, type QuarterTurns } from './rotation'
@@ -558,5 +559,69 @@ describe('refitCrop', () => {
 
     expect(result.width * result.height).toBeCloseTo(draft.width * draft.height)
     expect(result.width).toBeCloseTo(result.height)
+  })
+})
+
+describe('cropRegionToViewRect', () => {
+  // 4000×3000 ≙ 4:3 in a 1000×750 (4:3) container: no letterbox bars.
+  const image = { width: 4000, height: 3000 }
+  const container = { w: 1000, h: 750 }
+  const region: CropRegion = { x: 1000, y: 750, width: 2000, height: 1500 }
+  const oriented = (o: Partial<Orientation>): Orientation => ({ ...IDENTITY_ORIENTATION, ...o })
+
+  it('matches the plain letterbox when upright', () => {
+    expect(
+      cropRegionToViewRect(region, container.w, container.h, image.width, image.height, IDENTITY_VIEW, oriented({})),
+    ).toEqual({ x: 250, y: 187.5, width: 500, height: 375 })
+  })
+
+  it('stands the frame on its end on an odd quarter turn', () => {
+    // A 2000×1500 region turned once maps to the mirror of the right half onto
+    // the top: the 1000×750 box the full turn sweeps out, halved, so 281.25×375.
+    const rect = cropRegionToViewRect(region, container.w, container.h, image.width, image.height, IDENTITY_VIEW, oriented({ quarterTurns: 1 }))
+    expect(rect.x).toBeCloseTo(359.375)
+    expect(rect.y).toBeCloseTo(187.5)
+    expect(rect.width).toBeCloseTo(281.25)
+    expect(rect.height).toBeCloseTo(375)
+  })
+
+  it('mirrors the frame on an H flip', () => {
+    // Flipping left↔right mirrors the region about the container centre. This
+    // region is centred, so its on-screen box keeps the same bounds either way.
+    const rect = cropRegionToViewRect(region, container.w, container.h, image.width, image.height, IDENTITY_VIEW, oriented({ flipH: true }))
+    expect(rect.x).toBeCloseTo(250)
+    expect(rect.width).toBeCloseTo(500)
+  })
+
+  it('keeps the frame glued to the image centre through a free straighten angle', () => {
+    // The straighten rotates the whole displayed frame about the image centre and
+    // the letterbox zooms to fit its bounding box; the crop rotates with it, so
+    // the axis-aligned frame the overlay draws stays centred and keeps its bounds.
+    const upright = cropRegionToViewRect(region, container.w, container.h, image.width, image.height, IDENTITY_VIEW, oriented({}))
+    const rect = cropRegionToViewRect(region, container.w, container.h, image.width, image.height, IDENTITY_VIEW, oriented({ angleDeg: 30 }))
+    expect(rect.x + rect.width / 2).toBeCloseTo(container.w / 2)
+    expect(rect.y + rect.height / 2).toBeCloseTo(container.h / 2)
+    expect(rect.x).toBeCloseTo(upright.x)
+    expect(rect.y).toBeCloseTo(upright.y)
+    expect(rect.width).toBeCloseTo(upright.width)
+    expect(rect.height).toBeCloseTo(upright.height)
+  })
+
+  it('keeps every corner on the screen rectangle through the canvas zoom', () => {
+    const view = { scale: 2, offsetX: 0.1, offsetY: -0.2 }
+    const rect = cropRegionToViewRect(region, container.w, container.h, image.width, image.height, view, oriented({ quarterTurns: 1 }))
+    const corners = [
+      { x: region.x, y: region.y },
+      { x: region.x + region.width, y: region.y },
+      { x: region.x, y: region.y + region.height },
+      { x: region.x + region.width, y: region.y + region.height },
+    ]
+    for (const c of corners) {
+      const p = imagePointToPointer(c, container.w, container.h, image.width, image.height, null, view, oriented({ quarterTurns: 1 }))
+      expect(p.x).toBeGreaterThanOrEqual(rect.x - 1e-6)
+      expect(p.x).toBeLessThanOrEqual(rect.x + rect.width + 1e-6)
+      expect(p.y).toBeGreaterThanOrEqual(rect.y - 1e-6)
+      expect(p.y).toBeLessThanOrEqual(rect.y + rect.height + 1e-6)
+    }
   })
 })

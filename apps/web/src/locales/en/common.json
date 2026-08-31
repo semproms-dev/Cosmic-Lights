@@ -160,7 +160,17 @@
     "portrait": "Portrait"
   },
   "cropPanel": {
-    "cropOrientation": "Change to {{orientation}}"
+    "cropOrientation": "Change to {{orientation}}",
+    "overlay": "Overlay: {{overlay}}",
+    "overlayLabel": "Overlay",
+    "orientationLabel": "Orientation"
+  },
+  "cropOverlay": {
+    "thirds": "Thirds",
+    "diagonal": "Diagonal",
+    "spiral": "Spiral",
+    "square": "Square",
+    "circle": "Circle"
   },
   "masks": {
     "title": "Masks",

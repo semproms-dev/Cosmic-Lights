@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import type { CropRegion } from './image'
+import { IDENTITY_GEOMETRY } from './geometry'
+import { IDENTITY_ORIENTATION } from './rotation'
 
 // Controlled editor store: the test drives `image`/`cropRegion`/`cropRatio` and
 // spies on `setCrop`/`commit` to observe when the overlay applies and checkpoints
@@ -25,6 +27,10 @@ vi.mock('./editorContext', () => ({
     cropRatio: state.cropRatio,
     cropOrientation: state.cropOrientation,
     view: state.view,
+    orientation: IDENTITY_ORIENTATION,
+    geometry: IDENTITY_GEOMETRY,
+    cropOverlay: null,
+    setCropOverlay: vi.fn(),
     setCrop,
     commit,
     setView,

@@ -1,12 +1,11 @@
-import { ActionIcon, Group, SegmentedControl, Stack, Text, Title, Tooltip } from '@mantine/core';
-import { useEditor } from '../../../editor/editorContext';
-import { IoMdPhonePortrait } from "react-icons/io";
+import { Group, SegmentedControl, Select, Stack, Text, Title } from '@mantine/core';
+import { useEditor, type CropOverlayType } from '../../../editor/editorContext';
+import type { CropOrientation } from '../../../editor/editorReducer';
 import { useTranslation } from 'react-i18next';
 import { DistortionComponent } from './DistortionComponent';
 import { OrientationComponent } from './OrientationComponent';
 import { RotationComponent } from './RotationComponent';
-import { IoPhoneLandscapeSharp } from 'react-icons/io5';
-import { MdOutlineGridGoldenratio } from 'react-icons/md';
+import { CropValues } from '../../../utils';
 
 const aspectRatios = (t: (key: string) => string) => [
   { value: 'Original', label: t('crop.original') },
@@ -18,17 +17,35 @@ const aspectRatios = (t: (key: string) => string) => [
   { value: 'Free', label: t('crop.free') },
 ];
 
+const orientationOptions = (t: (key: string) => string) => [
+  { value: 'landscape', label: t('crop.landscape') },
+  { value: 'portrait', label: t('crop.portrait') },
+];
+
+const overlayOptions = (t: (key: string) => string) =>
+  CropValues.map((value) => ({ value, label: t(`cropOverlay.${value}`) }));
+
 /**
  * Crop tool panel. Exposes the aspect-ratio selector, wired to the shared editor
  * store so the crop overlay can constrain the draft to the chosen ratio.
  */
 export function CropPanel() {
-  const { cropRatio, setCropRatio, commit, setCropOrientation, image, cropOrientation } = useEditor();
+  const { cropRatio, setCropRatio, commit, setCropOrientation, image, cropOrientation, cropOverlay, setCropOverlay } = useEditor();
   const {t} = useTranslation(['common']);
 
   // Picking a ratio is a discrete edit: apply it, then checkpoint it as one undo step.
   const handleRatioChange = (value: string) => {
     setCropRatio(value);
+    commit();
+  };
+
+  const handleOverlayChange = (value: string | null) => {
+    setCropOverlay((value ?? 'thirds') as CropOverlayType);
+    commit();
+  };
+
+  const handleOrientationChange = (value: string | null) => {
+    setCropOrientation((value === 'portrait' ? 'portrait' : 'landscape') as CropOrientation);
     commit();
   };
 
@@ -54,16 +71,24 @@ export function CropPanel() {
       />
         <Stack gap="xl">
           <Group>
-            <Tooltip label={t('cropPanel.cropOrientation', { orientation: cropOrientation === 'portrait' ? t('crop.landscape') : t('crop.portrait') })}>
-              <ActionIcon size='lg' variant='subtle' onClick={() => {setCropOrientation(cropOrientation === 'portrait' ? 'landscape' : 'portrait'); commit()}} disabled={image === null}>
-                {cropOrientation === 'portrait' ? <IoMdPhonePortrait size="1.5rem" /> : <IoPhoneLandscapeSharp size="1.5rem" />}
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label={undefined}>
-              <ActionIcon size='lg' variant='subtle' onClick={() => {}} disabled={image === null}>
-                <MdOutlineGridGoldenratio size="1.5rem" />
-              </ActionIcon>
-            </Tooltip>
+            <Select
+              label={t('cropPanel.orientationLabel')}
+              data={orientationOptions(t)}
+              value={cropOrientation}
+              onChange={handleOrientationChange}
+              allowDeselect={false}
+              disabled={image === null}
+              w={150}
+            />
+            <Select
+              label={t('cropPanel.overlayLabel')}
+              data={overlayOptions(t)}
+              value={cropOverlay ?? 'thirds'}
+              onChange={handleOverlayChange}
+              allowDeselect={false}
+              disabled={image === null}
+              w={150}
+            />
           </Group>
           <OrientationComponent/>
           <RotationComponent/>

@@ -30,6 +30,9 @@ export interface RotationSpin {
   id: number
 }
 
+export type CropOverlayType = 'thirds' | 'diagonal' | 'spiral' | 'square';
+
+
 /**
  * Shared editor state. For now it holds the live adjustment values; the canvas
  * and other panels will read from the same store as the app grows.
@@ -239,6 +242,8 @@ export interface EditorState {
   setGeometry: (key: keyof Geometry, value: number) => void
   /** Devuelve los siete controles de geometría a cero. */
   resetGeometry: () => void
+  cropOverlay: CropOverlayType | null
+  setCropOverlay: (overlay: CropOverlayType | null) => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

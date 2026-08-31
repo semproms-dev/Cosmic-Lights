@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react"
 import { useEditor } from "./editorContext"
+import type { CropOverlayType } from "./editorContext"
 import type { CropRegion } from "./image"
 import {
   anchorForHandle,
-  canvasToImageCoords,
   clampCropRegion,
   constrainAspectRatio,
+  cropRegionToViewRect,
   effectiveAspect,
-  imageToCanvasCoords,
-  baseToViewRect,
-  viewToBasePoint,
+  pointerToImagePoint,
   refitCrop,
   IDENTITY_VIEW,
 } from "./crop"
@@ -34,6 +33,144 @@ const handleCursor = (fx: number, fy: number): string => {
   if (fy === 0.5) return 'ew-resize'
   return fx === fy ? 'nwse-resize' : 'nesw-resize'
 }
+const guidesFor = (overlay: CropOverlayType, rx: number, ry: number, rw: number, rh: number) => {
+  switch (overlay) {
+    case 'thirds':
+      return [
+        <line key="tv1" x1={rx + rw / 3} y1={ry} x2={rx + rw / 3} y2={ry + rh} stroke="white" strokeWidth={1} opacity={1} />,
+        <line key="tv2" x1={rx + 2 * rw / 3} y1={ry} x2={rx + 2 * rw / 3} y2={ry + rh} stroke="white" strokeWidth={1} opacity={1} />,
+        <line key="th1" x1={rx} y1={ry + rh / 3} x2={rx + rw} y2={ry + rh / 3} stroke="white" strokeWidth={1} opacity={1} />,
+        <line key="th2" x1={rx} y1={ry + 2 * rh / 3} x2={rx + rw} y2={ry + 2 * rh / 3} stroke="white" strokeWidth={1} opacity={1} />,
+      ]
+    case 'diagonal': {
+      const x = rx, y = ry, w = rw, h = rh;
+
+      // Puntos de división por tercios (Rejilla de fondo)
+      const x13 = x + w / 3;
+      const x23 = x + (2 * w) / 3;
+      const y13 = y + h / 3;
+      const y23 = y + (2 * h) / 3;
+
+      return (
+        <g key="harmonic-armature-grid">
+          {/* 1. Recuadro contenedor exterior */}
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            fill="none"
+            stroke="white"
+            strokeWidth={1}
+            opacity={0.4}
+          />
+
+          {/* 2. Rejilla de tercios discontinua (Dashed Lines) */}
+          <line x1={x13} y1={y} x2={x13} y2={y + h} stroke="white" strokeWidth={1} strokeDasharray="4 4" opacity={0.4} />
+          <line x1={x23} y1={y} x2={x23} y2={y + h} stroke="white" strokeWidth={1} strokeDasharray="4 4" opacity={0.4} />
+          <line x1={x} y1={y13} x2={x + w} y2={y13} stroke="white" strokeWidth={1} strokeDasharray="4 4" opacity={0.4} />
+          <line x1={x} y1={y23} x2={x + w} y2={y23} stroke="white" strokeWidth={1} strokeDasharray="4 4" opacity={0.4} />
+
+          {/* 3. Diagonales principales de esquina a esquina */}
+          <line x1={x} y1={y} x2={x + w} y2={y + h} stroke="white" strokeWidth={1.5} />
+          <line x1={x} y1={y + h} x2={x + w} y2={y} stroke="white" strokeWidth={1.5} />
+
+          {/* 4. Diagonales armónicas desde esquinas a tercios opuestos */}
+          <line x1={x} y1={y + h} x2={x13} y2={y} stroke="white" strokeWidth={1.5} />
+          <line x1={x} y1={y} x2={x23} y2={y + h} stroke="white" strokeWidth={1.5} />
+          <line x1={x + w} y1={y} x2={x13} y2={y + h} stroke="white" strokeWidth={1.5} />
+          <line x1={x + w} y1={y + h} x2={x23} y2={y} stroke="white" strokeWidth={1.5} />
+
+          {/* 5. Diagonales cruzadas centrales entre tercios */}
+          <line x1={x13} y1={y} x2={x23} y2={y + h} stroke="white" strokeWidth={1.5} />
+          <line x1={x23} y1={y} x2={x13} y2={y + h} stroke="white" strokeWidth={1.5} />
+        </g>
+      );
+    }
+    
+    case 'spiral': {
+      const phi = (1 + Math.sqrt(5)) / 2;
+      const b = Math.log(phi) / (Math.PI / 2);
+
+      // Centro focal de la espiral
+      const cx = rx + rw * 0.7236;
+      const cy = ry + rh * 0.618;
+
+      const startX = rx;
+      const startY = ry + rh;
+
+      const r0 = Math.hypot(startX - cx, startY - cy);
+      const angle0 = Math.atan2(startY - cy, startX - cx);
+
+      const totalTurns = 4;
+      const steps = 400;
+
+      // 1. Generar puntos base y detectar los extremos que la curva alcanza.
+      const rawPoints: { x: number; y: number }[] = [];
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const theta = t * (totalTurns * 2 * Math.PI);
+        const r = r0 * Math.exp(-b * theta);
+        const angle = angle0 + theta;
+
+        const px = cx + r * Math.cos(angle);
+        const py = cy + r * Math.sin(angle);
+
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+        rawPoints.push({ x: px, y: py });
+      }
+
+      // 2. Scale and centre the spiral's natural bounding box so it fills the
+      //    crop rectangle as much as the golden shape allows. A uniform contain
+      //    fit (which may grow when the curve is naturally smaller) always uses
+      //    the limiting dimension and centres the other — the golden spiral's
+      //    aspect (~φ) never matches a 16:9 or 3:2 frame exactly, so a shrink-only
+      //    fit about the focal centre would leave a small, off-centre curve.
+      const bboxW = maxX - minX;
+      const bboxH = maxY - minY;
+      const scale = Math.min(rw / bboxW, rh / bboxH);
+
+      // Centre the scaled bounding box on the crop frame.
+      const offsetX = rx + (rw - bboxW * scale) / 2 - minX * scale;
+      const offsetY = ry + (rh - bboxH * scale) / 2 - minY * scale;
+
+      const points = rawPoints.map((pt, i) => {
+        const px = pt.x * scale + offsetX;
+        const py = pt.y * scale + offsetY;
+        return `${i === 0 ? 'M' : 'L'} ${px.toFixed(2)} ${py.toFixed(2)}`;
+      });
+
+      return (
+        <g key="golden-spiral-bounded">
+          <rect
+            x={rx}
+            y={ry}
+            width={rw}
+            height={rh}
+            fill="none"
+            stroke="white"
+            strokeWidth={1}
+            opacity={0.3}
+          />
+          <path
+            d={points.join(' ')}
+            fill="none"
+            stroke="white"
+            strokeWidth={2}
+          />
+        </g>
+      );
+    }
+    default: // 'square' — not implemented, draw nothing
+      return null
+  }
+}
 
 interface CropOverlayProps {
   /** Called after `Enter` commits the crop, so the host can leave the Crop tool. */
@@ -48,7 +185,9 @@ interface CropOverlayProps {
  * store and calls `onDone`, `Escape` discards it.
  */
 export function CropOverlay({ onDone }: CropOverlayProps) {
-  const { image, cropRegion, setCrop, cropRatio, cropOrientation, commit, view, setView } = useEditor()
+  const { image, cropRegion, setCrop, cropRatio, cropOrientation, commit, view, setView, cropOverlay, setCropOverlay, orientation, geometry } = useEditor();
+  const overlay = cropOverlay || 'thirds';
+  setCropOverlay(overlay);
   const ref = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -143,16 +282,15 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
   // The draft, defaulting to the full frame when no crop is set yet.
   const region: CropRegion = draft ?? { x: 0, y: 0, width: image.width, height: image.height }
 
-  /** Current pointer position in image px. */
+  /** Current pointer position in image px, honouring the crop letterbox and orientation. */
   const toImage = (e: React.PointerEvent) => {
     const box = ref.current!.getBoundingClientRect()
-    // Undo the canvas' zoom/pan first: everything below assumes the fitted
-    // layout, so without this the mapping is off by exactly the zoom factor.
-    const base = viewToBasePoint(
+    // The canvas shows the full frame while the crop tool is open (crop = null),
+    // exactly what `pointerToImagePoint` needs to mirror the renderer.
+    return pointerToImagePoint(
       { x: e.clientX - box.left, y: e.clientY - box.top },
-      size.w, size.h, view,
+      size.w, size.h, image.width, image.height, null, view, orientation, geometry,
     )
-    return canvasToImageCoords(base, image.width, image.height, size.w, size.h)
   }
 
   const startMove = (e: React.PointerEvent) => {
@@ -227,11 +365,10 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
     if (e.key === 'Escape') setDraft(cropRegion)
   }
 
-  // Where the crop sits in the fitted layout, then where that actually lands on
-  // screen once the canvas' zoom/pan is applied — the frame must track the image.
-  const rect = baseToViewRect(
-    imageToCanvasCoords(region, image.width, image.height, size.w, size.h),
-    size.w, size.h, view,
+  // Where the crop frame sits on screen once the canvas' zoom/pan, letterbox,
+  // turns, flips and straighten are applied — the frame must track the image.
+  const rect = cropRegionToViewRect(
+    region, size.w, size.h, image.width, image.height, view, orientation, geometry,
   )
   const { x: rx, y: ry, width: rw, height: rh } = rect
   const ready = size.w > 0 && size.h > 0
@@ -264,12 +401,7 @@ export function CropOverlay({ onDone }: CropOverlayProps) {
             onPointerDown={startMove}
           />
 
-          {/* Rule-of-thirds guides — two verticals and two horizontals dividing
-              the frame into a 3×3 grid, like Lightroom's third-overlay. */}
-          <line x1={rx + rw / 3} y1={ry}          x2={rx + rw / 3} y2={ry + rh}          stroke="white" strokeWidth={1} opacity={0.5} />
-          <line x1={rx + 2 * rw / 3} y1={ry}       x2={rx + 2 * rw / 3} y2={ry + rh}      stroke="white" strokeWidth={1} opacity={0.5} />
-          <line x1={rx}            y1={ry + rh / 3} x2={rx + rw}        y2={ry + rh / 3}   stroke="white" strokeWidth={1} opacity={0.5} />
-          <line x1={rx}            y1={ry + 2 * rh / 3} x2={rx + rw}   y2={ry + 2 * rh / 3} stroke="white" strokeWidth={1} opacity={0.5} />
+          {guidesFor(overlay, rx, ry, rw, rh)}
 
           {/* Handles. With a locked ratio, only corners are shown: edge handles
               feel wrong under fit-inside (shrink-only) constraining. */}

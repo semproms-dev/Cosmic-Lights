@@ -160,7 +160,17 @@
     "portrait": "Bertikal"
   },
   "cropPanel": {
-    "cropOrientation": "Aldatu hona: {{orientation}}"
+    "cropOrientation": "Aldatu hona: {{orientation}}",
+    "overlay": "Gainjartzea: {{overlay}}",
+    "overlayLabel": "Gainjartzea",
+    "orientationLabel": "Orientazioa"
+  },
+  "cropOverlay": {
+    "thirds": "Hirurenak",
+    "diagonal": "Diagonala",
+    "spiral": "Espirala",
+    "square": "Karratua",
+    "circle": "Zirkulua"
   },
   "masks": {
     "title": "Maskarak",

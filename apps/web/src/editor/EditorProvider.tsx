@@ -5,7 +5,7 @@ import type { ChannelId, CurvePoint } from './curves'
 import { type CropRegion } from './image'
 import { DEFAULT_CROP_ORIENTATION, IDENTITY_VIEW, type CanvasView } from './crop'
 import { decodeImage } from './decodeImage'
-import { EditorContext, type RotationSpin } from './editorContext'
+import { EditorContext, type CropOverlayType, type RotationSpin } from './editorContext'
 import { editorReducer, buildInitialAdjustments, type CropOrientation } from './editorReducer'
 import { IDENTITY_GEOMETRY, type Geometry } from './geometry'
 import { logger } from '../logger'
@@ -77,6 +77,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // Canvas zoom/pan. Transient (never undoable), but shared: the crop overlay
   // draws on top of the canvas and must undo the very same transform.
   const [view, setView] = useState<CanvasView>(IDENTITY_VIEW)
+
+  // Crop overlay guide choice ('thirds' | 'diagonal' | …). Transient like `view`:
+  // it only changes what gets drawn over the crop frame, never the undo history.
+  const [cropOverlay, setCropOverlay] = useState<CropOverlayType | null>(null)
 
   // One-shot spin signal for the canvas' rotation animation. Transient, like
   // `view`: it only cues a CSS transition, so it must not live in the history.
@@ -557,6 +561,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         retryMask,
         view,
         setView,
+        cropOverlay,
+        setCropOverlay,
         orientation: state.orientation,
         rotateCw,
         rotateCcw,
