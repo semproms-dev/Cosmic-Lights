@@ -56,6 +56,32 @@ const RENDER_DEFAULTS: RenderAdjustments = {
   // Plantilla clásica: 0 = ninguna, 1 = B&W, 2 = Sepia. Como las ruedas, no es
   // un slider del store: el shader la espera igual y su neutro es 0.
   template: 0,
+  // Color mixer: ocho canales × tres claves. Neutro en 0 para los tres — sin
+  // desplazamiento de tono, sin cambio de saturación, sin offset de luminancia.
+  mixRedHue: 0,
+  mixRedSat: 0,
+  mixRedLum: 0,
+  mixOrangeHue: 0,
+  mixOrangeSat: 0,
+  mixOrangeLum: 0,
+  mixYellowHue: 0,
+  mixYellowSat: 0,
+  mixYellowLum: 0,
+  mixGreenHue: 0,
+  mixGreenSat: 0,
+  mixGreenLum: 0,
+  mixCyanHue: 0,
+  mixCyanSat: 0,
+  mixCyanLum: 0,
+  mixBlueHue: 0,
+  mixBlueSat: 0,
+  mixBlueLum: 0,
+  mixPurpleHue: 0,
+  mixPurpleSat: 0,
+  mixPurpleLum: 0,
+  mixMagentaHue: 0,
+  mixMagentaSat: 0,
+  mixMagentaLum: 0,
 }
 
 /**

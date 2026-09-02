@@ -174,6 +174,71 @@ export const effectsAdjustement: EffectOption[] = [
 ]
 
 /**
+ * One colour-mixer channel: the three sliders that edit it and the hue centre
+ * its weights fall off from.
+ *
+ * Like {@link GradingOption}, the three sliders are **flat** keys in the store
+ * (`mixRedHue`, `mixRedSat`, …) rather than a nested object, so presets, undo,
+ * the export and the preset thumbnails walk them for free.
+ *
+ * `center` is the hue — in degrees — that "owns" this channel on the hue wheel,
+ * the point where its influence is 100% and from which it falls off toward the
+ * neighbouring channels (Lightroom spaces its mixer the same way: it has two
+ * extra stops, orange and purple, that the 6-colour wheel does not).
+ */
+export interface MixerOption {
+  /** Channel id. Also the translation key under `lateralNavBar.*`. */
+  key: string
+  label: string
+  /** Adjustment key holding the channel's hue shift, -100..100. */
+  hueKey: string
+  /** Adjustment key holding the channel's saturation shift, -100..100. */
+  satKey: string
+  /** Adjustment key holding the channel's luminance shift, -100..100. */
+  lumKey: string
+  /** Hue centre of the channel in degrees [0, 360). */
+  center: number
+  group: string
+}
+
+/**
+ * The colour mixer: eight wedges of the hue wheel, each with its own hue,
+ * saturation and luminance shift.
+ *
+ * Deliberately NOT part of {@link colorAdjustement}: the mixer is global, writes
+ * eight channels × three keys, and its per-channel values are consumed by the
+ * shader as a packed array, not scalar uniforms — three flat keys per channel
+ * would be barren without this structure giving them their wheel order.
+ */
+export const colorMixerAdjustment: MixerOption[] = [
+  { key: 'mixRed', label: 'Reds', hueKey: 'mixRedHue', satKey: 'mixRedSat', lumKey: 'mixRedLum', center: 0, group: 'mixer' },
+  { key: 'mixOrange', label: 'Oranges', hueKey: 'mixOrangeHue', satKey: 'mixOrangeSat', lumKey: 'mixOrangeLum', center: 30, group: 'mixer' },
+  { key: 'mixYellow', label: 'Yellows', hueKey: 'mixYellowHue', satKey: 'mixYellowSat', lumKey: 'mixYellowLum', center: 60, group: 'mixer' },
+  { key: 'mixGreen', label: 'Greens', hueKey: 'mixGreenHue', satKey: 'mixGreenSat', lumKey: 'mixGreenLum', center: 120, group: 'mixer' },
+  { key: 'mixCyan', label: 'Cyans', hueKey: 'mixCyanHue', satKey: 'mixCyanSat', lumKey: 'mixCyanLum', center: 180, group: 'mixer' },
+  { key: 'mixBlue', label: 'Blues', hueKey: 'mixBlueHue', satKey: 'mixBlueSat', lumKey: 'mixBlueLum', center: 240, group: 'mixer' },
+  { key: 'mixPurple', label: 'Purples', hueKey: 'mixPurpleHue', satKey: 'mixPurpleSat', lumKey: 'mixPurpleLum', center: 285, group: 'mixer' },
+  { key: 'mixMagenta', label: 'Magentas', hueKey: 'mixMagentaHue', satKey: 'mixMagentaSat', lumKey: 'mixMagentaLum', center: 315, group: 'mixer' },
+]
+
+/** Range of a mixer slider, symmetric around its neutral 0. */
+export const MIXER_RANGE = 100
+
+/** Neutral of every mixer slider: no hue shift, no saturation change, no luminance offset. */
+export const MIXER_DEFAULT = 0
+
+/** Builds the initial value map for the colour mixer: three keys per channel. */
+export function buildMixerDefaults(): Record<string, number> {
+  return Object.fromEntries(
+    colorMixerAdjustment.flatMap((option) => [
+      [option.hueKey, MIXER_DEFAULT],
+      [option.satKey, MIXER_DEFAULT],
+      [option.lumKey, MIXER_DEFAULT],
+    ]),
+  )
+}
+
+/**
  * Builds the initial value map (`key -> defaultValue`) for a set of sliders.
  */
 export function buildDefaults(options: SliderOption[]): Record<string, number> {

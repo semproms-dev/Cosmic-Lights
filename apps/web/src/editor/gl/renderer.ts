@@ -43,6 +43,7 @@ import { IDENTITY_GEOMETRY, type Geometry } from '../geometry'
 import { IDENTITY_ORIENTATION, uvTransform, type Orientation } from '../rotation'
 import { MASK_TONE_KEYS, type BrushMode, type BrushStroke, type GradientLine, type Mask, type MaskPoint, type RadialShape } from '../masks'
 import type { MaskAlpha, MaskAlphaCache } from '../segmentation/types'
+import { colorMixerAdjustment } from '../adjustments'
 
 /**
  * The per-frame adjustment values the shader needs, already defaulted (no
@@ -121,6 +122,34 @@ export interface RenderAdjustments {
   /** Grain roughness in [0, 100]; how clumped the grain is (0 = even). */
   grainRoughness: number
   template: number
+  // Colour mixer: one flat triple per hue-wedge channel, named like the wheel
+  // (`mixRedHue/Sat/Lum`, `mixOrangeHue/Sat/Lum`, …). Flattened so the map of
+  // `number`s the store hands over (and `toRenderAdjustments` completes) needs no
+  // special case; the renderer gathers them into the shader's vec3 array.
+  mixRedHue: number
+  mixRedSat: number
+  mixRedLum: number
+  mixOrangeHue: number
+  mixOrangeSat: number
+  mixOrangeLum: number
+  mixYellowHue: number
+  mixYellowSat: number
+  mixYellowLum: number
+  mixGreenHue: number
+  mixGreenSat: number
+  mixGreenLum: number
+  mixCyanHue: number
+  mixCyanSat: number
+  mixCyanLum: number
+  mixBlueHue: number
+  mixBlueSat: number
+  mixBlueLum: number
+  mixPurpleHue: number
+  mixPurpleSat: number
+  mixPurpleLum: number
+  mixMagentaHue: number
+  mixMagentaSat: number
+  mixMagentaLum: number
 }
 
 /**
@@ -199,6 +228,9 @@ export class WebGLRenderer {
   private readonly uGradeHigh: WebGLUniformLocation | null
   private readonly uGradeBlending: WebGLUniformLocation | null
   private readonly uGradeBalance: WebGLUniformLocation | null
+  // Colour mixer: one vec3 per channel. A single location — `getUniformLocation`
+  // for an array returns the first element, and `uniform3fv` writes the rest.
+  private readonly uMixer: WebGLUniformLocation | null
   private readonly uTexel: WebGLUniformLocation | null
   private readonly uSharpness: WebGLUniformLocation | null
   private readonly uThreshold: WebGLUniformLocation | null
@@ -532,6 +564,7 @@ export class WebGLRenderer {
     this.uGradeHigh = gl.getUniformLocation(this.program, 'uGradeHigh')
     this.uGradeBlending = gl.getUniformLocation(this.program, 'uGradeBlending')
     this.uGradeBalance = gl.getUniformLocation(this.program, 'uGradeBalance')
+    this.uMixer = gl.getUniformLocation(this.program, 'uMixer')
     this.uTexel = gl.getUniformLocation(this.program, 'uTexel')
     this.uSharpness = gl.getUniformLocation(this.program, 'uSharpness')
     this.uThreshold = gl.getUniformLocation(this.program, 'uThreshold')
@@ -785,6 +818,21 @@ export class WebGLRenderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 4, 0, gl.RED, gl.UNSIGNED_BYTE, data)
+  }
+
+  /**
+   * Packs the colour-mixer's flat per-channel keys into the shader's vec3 array,
+   * one (hue, sat, lum) triple per wedge channel, in `colorMixerAdjustment` order
+   * so the GPU cannot drift from the wheel the UI renders.
+   */
+  private mixerUniforms(adjustments: RenderAdjustments): Float32Array {
+    return new Float32Array(
+      colorMixerAdjustment.flatMap((option) => [
+        adjustments[option.hueKey],
+        adjustments[option.satKey],
+        adjustments[option.lumKey],
+      ]),
+    )
   }
 
   /**
@@ -1851,7 +1899,7 @@ export class WebGLRenderer {
     const maskTextureKey = hasMaskTexture
       ? masks.map((m) => `${m.id}:${m.adjustments.texture ?? 0}`).join('|')
       : ''
-    const newKey = `${adjustments.exposure}|${adjustments.contrast}|${adjustments.highlights}|${adjustments.shadows}|${adjustments.whites}|${adjustments.blacks}|${adjustments.temperature}|${adjustments.tint}|${adjustments.vibrance}|${adjustments.saturation}|${adjustments.template}|${adjustments.gradeShadowHue}|${adjustments.gradeShadowSat}|${adjustments.gradeShadowLum}|${adjustments.gradeMidHue}|${adjustments.gradeMidSat}|${adjustments.gradeMidLum}|${adjustments.gradeHighHue}|${adjustments.gradeHighSat}|${adjustments.gradeHighLum}|${adjustments.gradeBlending}|${adjustments.gradeBalance}|${adjustments.sharpness}|${adjustments.threshold}|${adjustments.colorNoise}|${adjustments.luminanceNoise}|${adjustments.luminanceDetail}|${adjustments.clarity}|${adjustments.dehaze}|${adjustments.texture}|${needsBlur ? 'b' : 'n'}|${maskTextureKey}|${masks.length}|${masks.map((m) => `${m.id}:${m.version}`).join(',')}`
+    const newKey = `${adjustments.exposure}|${adjustments.contrast}|${adjustments.highlights}|${adjustments.shadows}|${adjustments.whites}|${adjustments.blacks}|${adjustments.temperature}|${adjustments.tint}|${adjustments.vibrance}|${adjustments.saturation}|${adjustments.template}|${adjustments.gradeShadowHue}|${adjustments.gradeShadowSat}|${adjustments.gradeShadowLum}|${adjustments.gradeMidHue}|${adjustments.gradeMidSat}|${adjustments.gradeMidLum}|${adjustments.gradeHighHue}|${adjustments.gradeHighSat}|${adjustments.gradeHighLum}|${adjustments.gradeBlending}|${adjustments.gradeBalance}|${adjustments.sharpness}|${adjustments.threshold}|${adjustments.colorNoise}|${adjustments.luminanceNoise}|${adjustments.luminanceDetail}|${adjustments.clarity}|${adjustments.dehaze}|${adjustments.texture}|mx(${Array.from(this.mixerUniforms(adjustments)).join(',')})|${needsBlur ? 'b' : 'n'}|${maskTextureKey}|${masks.length}|${masks.map((m) => `${m.id}:${m.version}`).join(',')}`
 
     const cacheValid = viewOnly && this.developedKey === newKey
 
@@ -1946,6 +1994,9 @@ export class WebGLRenderer {
       )
       gl.uniform1f(this.uGradeBlending, adjustments.gradeBlending)
       gl.uniform1f(this.uGradeBalance, adjustments.gradeBalance)
+      // Colour mixer: gather the flat per-channel keys into the shader's vec3
+      // array, one (hue, sat, lum) triple per wedge channel in wheel order.
+      gl.uniform3fv(this.uMixer, this.mixerUniforms(adjustments))
       // Texel size in UV space so the sharpen can reach its neighbours.
       gl.uniform2f(this.uTexel, 1 / this.imageWidth, 1 / this.imageHeight)
       gl.uniform1f(this.uSharpness, adjustments.sharpness)

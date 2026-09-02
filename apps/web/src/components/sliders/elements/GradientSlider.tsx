@@ -1,6 +1,8 @@
 import { Group, Slider, Stack, Text } from '@mantine/core';
 import classes from '../styles/GradientSlider.module.css';
+import { useHover } from '@mantine/hooks';
 import { useEditor } from '../../../editor/editorContext';
+import { useTranslation } from 'react-i18next';
 
 interface GradientSliderProps {
   label: string;
@@ -11,6 +13,13 @@ interface GradientSliderProps {
   onChange: (value: number) => void;
   onChangeEnd: () => void;
   gradient: string;
+  /**
+   * Restores the slider to its default. Given by the owner, the only place that
+   * knows which value this row writes and what its default is. Omit it and the
+   * label is inert — a row that resets nothing is better than one that resets
+   * the wrong thing.
+   */
+  onReset?: () => void;
 }
 
 export function GradientSlider({
@@ -22,12 +31,28 @@ export function GradientSlider({
   onChange,
   gradient,
   onChangeEnd,
+  onReset,
 }: GradientSliderProps) {
-  const {image} = useEditor()
+  const { hovered, ref } = useHover();
+  const { image } = useEditor();
+  const { t } = useTranslation(['common']);
+  const showReset = hovered && onReset !== undefined;
   return (
     <Stack gap={4} className={classes.root} style={{ '--gradient': gradient } as React.CSSProperties}>
       <Group justify="space-between" gap="xs">
-        <Text size="sm">{label}</Text>
+        {/* Both texts stay in the DOM, stacked in one grid cell, and only their
+            visibility swaps, so the box never resizes out from under the
+            pointer while hovering. */}
+        <Text
+          size="sm"
+          className={classes.label}
+          onClick={onReset}
+          style={{ cursor: onReset === undefined ? 'default' : 'pointer' }}
+          ref={ref}
+        >
+          <span style={{ visibility: showReset ? 'hidden' : 'visible' }}>{label}</span>
+          <span style={{ visibility: showReset ? 'visible' : 'hidden' }}>{t('common.reset')}</span>
+        </Text>
         <Text size="sm" c="dimmed">
           {value}
         </Text>

@@ -5,6 +5,7 @@ import {
   effectsAdjustement,
   buildDefaults,
   buildGradingDefaults,
+  buildMixerDefaults,
 } from './adjustments'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint, Curves } from './curves'
@@ -118,6 +119,10 @@ export function buildInitialAdjustments(): Record<string, number> {
     // Las ruedas de grading no son `SliderOption`: cada una escribe dos claves
     // (tono y saturación), así que trae las suyas.
     ...buildGradingDefaults(),
+    // El color mixer tampoco: ocho canales × tres claves (tono, saturación y
+    // luminancia). Omitirlo dejaría `mix*` ausentes y el shader las leería como
+    // `NaN`.
+    ...buildMixerDefaults(),
     // Las plantillas clásicas no son `SliderOption` (ni slider ni radio con
     // rango): `0` = ninguna, `1` = B&W, `2` = Sepia. Sembrarla a mano evita que
     // una clave ausente llegue al shader como `NaN` y tiña el fotograma.

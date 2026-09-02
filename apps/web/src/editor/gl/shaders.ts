@@ -4,6 +4,7 @@ import {
   GRADE_BLEND_MIN,
   GRADE_LUM_RANGE,
 } from '../colorGrading'
+import { colorMixerAdjustment, MIXER_RANGE } from '../adjustments'
 import { NOISE_LUMA_BINS } from '../noiseEstimate'
 import { NLM_PATCH_PIXELS, NLM_PATCH_RADIUS } from '../nlm'
 
@@ -246,6 +247,140 @@ vec3 applyGrading(vec3 rgb, vec3 shadow, vec3 mid, vec3 high, float blending, fl
   graded = tintZone(graded, mid, wM);
   graded = tintZone(graded, high, wH);
   return graded;
+}
+`
+
+/**
+ * Colour mixer: eight wedges of the hue wheel, each with its own hue,
+ * saturation and luminance shift.
+ *
+ * Only in the pipeline pass, not the mask one — it is a global control like the
+ * grading wheels, and the mask shader would need eight more uniforms per mask.
+ * If it ever goes local it plugs in as this same chunk, never a copy.
+ *
+ * The hue centres are interpolated from `colorMixerAdjustment` so the GLSL and
+ * the TypeScript wheel the UI renders cannot drift — the same trick GRADING_GLSL
+ * uses for its constants.
+ *
+ * **How a pixel picks its channel.** Convert to HSV, find each channel's weight
+ * as the squared linear falloff of the pixel's hue from the channel centre
+ * (reaching 0 at 40°), then apply the three shifts weighted by those weights.
+ * Only the 2-3 nearest channels to any hue contribute, which is what keeps the
+ * edits smooth at channel boundaries instead of stepping.
+ */
+const MIXER_GLSL = `
+const float MIX_RANGE = ${MIXER_RANGE.toFixed(1)};
+const float MIX_HUE_RANGE = 40.0;
+// Relative luminance reach: targetLuma = originalLuma * (1 + dl/MIX_RANGE *
+// MIX_LUM_RANGE), so ±MIX_LUM_RANGE is the fraction the luma can rise or fall
+// at full travel. It fl oats the whole colour vector (RapidRAW's trick) rather
+// than clipping it, which is what keeps bright pixels from popping to white.
+const float MIX_LUM_RANGE = 0.35;
+const float MIXER_CENTERS[${colorMixerAdjustment.length}] = float[${colorMixerAdjustment.length}](${colorMixerAdjustment.map((m) => m.center.toFixed(1)).join(', ')});
+const int MIXER_COUNT = ${colorMixerAdjustment.length};
+
+/** Branchless-ish RGB→hue in [0, 360). Grey returns 0 (its hue is undefined but harmless). */
+float rgbHue(vec3 c) {
+  float mx = max(c.r, max(c.g, c.b));
+  float mn = min(c.r, min(c.g, c.b));
+  float d = mx - mn;
+  if (d < 0.0001) { return 0.0; }
+  float h;
+  if (mx == c.r)      { h = mod((c.g - c.b) / d, 6.0); }
+  else if (mx == c.g) { h = (c.b - c.r) / d + 2.0; }
+  else                { h = (c.r - c.g) / d + 4.0; }
+  return h * 60.0;
+}
+
+/** Angular distance in [0, 180] on the hue wheel. */
+float hueDist(float a, float b) {
+  float d = abs(mod(a - b, 360.0));
+  return d > 180.0 ? 360.0 - d : d;
+}
+
+/**
+ * Applies the colour-mixer shifts. \`channels[i]\` is what the panel stores:
+ * x = hue shift (-100..100), y = saturation shift (-100..100), z = luminance
+ * shift (-100..100).
+ */
+vec3 applyMixer(vec3 rgb, vec3 channels[${colorMixerAdjustment.length}]) {
+  // Exact identity — and an early out that skips a hue-convert + 8-weight loop
+  // on every frame where nothing has been touched, which is most of them.
+  float touched = 0.0;
+  for (int i = 0; i < ${colorMixerAdjustment.length}; i++) {
+    touched += abs(channels[i].x) + abs(channels[i].y) + abs(channels[i].z);
+  }
+  if (touched <= 0.0) { return rgb; }
+
+  float h = rgbHue(rgb);
+  float v = max(rgb.r, max(rgb.g, rgb.b));
+  // Relative saturation, the form hsvToRgb expects: (max-min)/max, in [0,1].
+  // Using the absolute excursion (max-min) instead over-saturates on the way
+  // back, so an untouched channel's pixel does not survive the round trip.
+  float s = v > 0.0 ? (v - min(rgb.r, min(rgb.g, rgb.b))) / v : 0.0;
+
+  // A truly grey pixel has no colour to mix: its hue is arbitrary (rgbHue
+  // returns 0, which lands on the red channel), so without this guard the red
+  // channel's luminance shift would brighten every grey pixel in the frame.
+  // Pastels (s just above the epsilon) still mix, by their true hue.
+  if (s < 0.001) { return rgb; }
+
+  // Luma of the untouched pixel, the anchor for the luminance shift below —
+  // taken from the original colour, not the hue/sat-shifted one (RapidRAW).
+  float originalLuma = dot(rgb, LUMA);
+
+  // How strongly the pixel belongs to each of the eight wheel channels, then
+  // normalised so what matters is a channel's share of the influence, not its
+  // raw falloff value. "reference" numbers it up so the loop can reuse it.
+  float rawRef[${colorMixerAdjustment.length}];
+  float totalRaw = 0.0;
+  for (int i = 0; i < ${colorMixerAdjustment.length}; i++) {
+    // Weight peaks at the channel centre and falls to 0 40° away. The squaring
+    // sharpens it so neighbours do not drag each other, while the wider
+    // orange↔yellow gaps still overlap slightly.
+    float w = max(1.0 - hueDist(h, MIXER_CENTERS[i]) / 40.0, 0.0);
+    rawRef[i] = w * w;
+    totalRaw += rawRef[i];
+  }
+  if (totalRaw <= 1e-5) { return rgb; }
+
+  // Hue and saturation get weighted by how saturated the pixel is, luminance by
+  // its saturation too but through a gentler ramp. That second weight is what
+  // keeps the noisy hue of near-grey pixels out of the luminance shift — the
+  // grain that a fixed-ratio luma rescale (or a raw v bump) would otherwise
+  // amplify off the recovered chroma.
+  float saturationMask = smoothstep(0.05, 0.20, s);
+  float luminanceWeight = smoothstep(0.0, 1.0, s);
+
+  float dh = 0.0;
+  float ds = 0.0;
+  float dl = 0.0;
+  for (int i = 0; i < ${colorMixerAdjustment.length}; i++) {
+    float normalizedInfluence = rawRef[i] / totalRaw;
+    float hueSatInfluence = normalizedInfluence * saturationMask;
+    float lumaInfluence = normalizedInfluence * luminanceWeight;
+    dh += channels[i].x * hueSatInfluence;
+    ds += channels[i].y * hueSatInfluence;
+    dl += channels[i].z * lumaInfluence;
+  }
+
+  // Hue and saturation play out in HSV, keeping the original value "v" so the
+  // chroma they produce stays honest. Hue is a signed wrap-around offset
+  // (MIX_HUE_RANGE at full travel); saturation scales around 1.
+  h = mod(h + dh / MIX_RANGE * MIX_HUE_RANGE, 360.0);
+  s = clamp(s * (1.0 + ds / MIX_RANGE), 0.0, 1.0);
+  vec3 shifted = hsvToRgb(h / 360.0, s, v);
+
+  // Luminance then rescales that shifted colour to a relative luma target —
+  // RapidRAW's approach, and the one that avoids both the white-dot clamp of an
+  // additive offset and the grain of an unweighted ratio: the target floats the
+  // whole vector by originalLuma * (1 + adjust) and every channel is scaled by
+  // targetLuma / newLuma, so the chroma survives undivided and bright pixels
+  // land on white gradually, never in a clipped pop.
+  float newLuma = dot(shifted, LUMA);
+  float targetLuma = max(originalLuma * (1.0 + dl / MIX_RANGE * MIX_LUM_RANGE), 0.0);
+  if (newLuma < 1e-4) { return vec3(max(0.0, targetLuma)); }
+  return shifted * (targetLuma / newLuma);
 }
 `
 
@@ -1234,6 +1369,9 @@ uniform vec3 uGradeMid;
 uniform vec3 uGradeHigh;
 uniform float uGradeBlending;
 uniform float uGradeBalance;
+// Colour mixer: one vec3 per hue-wedge channel, packed as (hue shift -100..100,
+// saturation shift -100..100, luminance shift -100..100).
+uniform vec3 uMixer[${colorMixerAdjustment.length}];
 // Details group: size of one texel in UV space (1/width, 1/height) so the
 // unsharp mask can reach its 8 neighbours, plus the two Details sliders.
 uniform vec2 uTexel;
@@ -1263,6 +1401,7 @@ float applyCurve(float v, float row) {
 ${EXPOSURE_GLSL}
 ${CONTRAST_GLSL}
 ${GRADING_GLSL}
+${MIXER_GLSL}
 
 void main() {
   vec4 texel = texture(uImage, vUv);
@@ -1317,6 +1456,10 @@ void main() {
   // down; before, because the curve is the last global shaper of tone and moving
   // a point would otherwise redistribute which pixels each zone owns.
   rgb = applyGrading(rgb, uGradeShadow, uGradeMid, uGradeHigh, uGradeBlending, uGradeBalance);
+  // Colour mixer, straight after the grading wheels and before the curves — the
+  // same reasoning: it moves hue/saturation/luminance per channel, and the curve
+  // stays the last global shaper of tone.
+  rgb = applyMixer(rgb, uMixer);
   // Tone curves. Per-channel red/green/blue first, then the master rgb curve on
   // every channel (Photoshop's order). Identity LUTs leave rgb untouched.
   rgb.r = applyCurve(rgb.r, 1.0);

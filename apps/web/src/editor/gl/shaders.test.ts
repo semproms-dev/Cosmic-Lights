@@ -206,6 +206,74 @@ describe('shader sources', () => {
     expect(FRAGMENT_SHADER).toMatch(/const float GRADE_BLEND_MIN = \d+\.\d+;/)
   })
 
+  it('applies the mixer between grading and the curves', () => {
+    // Same reasoning as grading: after the wheels (so it moves the graded
+    // colour), before the curves (so the curve stays the last global shaper).
+    const grading = FRAGMENT_SHADER.indexOf('rgb = applyGrading(')
+    const mixer = FRAGMENT_SHADER.indexOf('rgb = applyMixer(rgb, uMixer);')
+    const curves = FRAGMENT_SHADER.indexOf('rgb.r = applyCurve(rgb.r, 1.0);')
+
+    expect(mixer).toBeGreaterThan(-1)
+    expect(mixer).toBeGreaterThan(grading)
+    expect(curves).toBeGreaterThan(mixer)
+    expect(FRAGMENT_SHADER).toContain('uniform vec3 uMixer[')
+  })
+
+  it('keeps the colour mixer out of the mask pass', () => {
+    // Global on purpose, like grading: in the mask pass it would be eight more
+    // uniforms per mask per pixel, and keys a mask could save while its shader
+    // painted nothing with them.
+    expect(MASK_FRAGMENT_SHADER).not.toContain('applyMixer(')
+    expect(MASK_FRAGMENT_SHADER).not.toContain('uMixer')
+  })
+
+  it('is an exact identity while every mixer channel is at rest', () => {
+    // All 24 controls at 0 must return the pixel untouched — not merely close.
+    // Anything else restyles every photo edited before the mixer existed.
+    expect(FRAGMENT_SHADER).toContain('if (touched <= 0.0) { return rgb; }')
+  })
+
+  it('writes the mixer centres as GLSL float literals', () => {
+    // Interpolated from the same array the UI wheel renders, so GLSL and
+    // TypeScript cannot drift — and as floats, because `const float x = 5;`
+    // does not compile in GLSL ES 3.00.
+    expect(FRAGMENT_SHADER).toMatch(/const float MIXER_CENTERS\[8\] = float\[8\]\(/)
+  })
+
+  it('leaves grey pixels untouched by the mixer', () => {
+    // A grey pixel's hue is arbitrary (rgbHue returns 0, the red channel), so
+    // without this guard the red channel's luminance shift would brighten every
+    // grey pixel in the frame.
+    expect(FRAGMENT_SHADER).toContain('if (s < 0.001) { return rgb; }')
+  })
+
+  it('uses the relative saturation the round trip expects', () => {
+    // hsvToRgb expects (max-min)/max, not the absolute excursion (max-min).
+    // Reconstructing from the absolute value over-saturates on the way back, so
+    // an untouched channel's pixel does not survive the convert→remap→convert
+    // journey and every move paints white dots over the photo.
+    expect(FRAGMENT_SHADER).toContain(
+      'float s = v > 0.0 ? (v - min(rgb.r, min(rgb.g, rgb.b))) / v : 0.0;',
+    )
+  })
+
+  it('lifts luminance by rescaling to a relative luma target', () => {
+    // RapidRAW's approach: hue/sat play out in HSV keeping the original v, then
+    // luminance fl oats the whole colour to originalLuma * (1 + adjust) and
+    // every channel is scaled by targetLuma / newLuma. A relative target with
+    // chroma surviving undivided is what avoids both the white-dot clamp of an
+    // additive offset and the grain of a bump against the rebuilt chroma (both
+    // seen at full travel during the fix).
+    expect(FRAGMENT_SHADER).toContain(
+      'float targetLuma = max(originalLuma * (1.0 + dl / MIX_RANGE * MIX_LUM_RANGE), 0.0);',
+    )
+    expect(FRAGMENT_SHADER).toContain('return shifted * (targetLuma / newLuma);')
+    expect(FRAGMENT_SHADER).toContain('float newLuma = dot(shifted, LUMA);')
+    // The luminance, unlike hue/sat, is gated by a gentle saturation ramp so
+    // the noisy hue of near-grey pixels cannot be amplified into grain.
+    expect(FRAGMENT_SHADER).toContain('float luminanceWeight = smoothstep(0.0, 1.0, s);')
+  })
+
   it('clamps the luma before the zone powers', () => {
     // `pow` of a negative base is NaN, and one NaN pixel paints the whole frame
     // black with no GL error to point at it.

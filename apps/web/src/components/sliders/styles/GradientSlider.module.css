@@ -9,3 +9,19 @@
 .root :global(.m_38aeed47) {
   background-color: transparent;
 }
+
+.labelGroup {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The label and its "Reset" share one grid cell, so the box is always as wide as
+ * the wider of the two and never resizes under the pointer mid-hover. */
+.label {
+  display: grid;
+  min-width: 0;
+}
+
+.label > span {
+  grid-area: 1 / 1;
+}

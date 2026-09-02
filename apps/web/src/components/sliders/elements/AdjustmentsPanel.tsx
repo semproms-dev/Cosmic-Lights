@@ -14,6 +14,7 @@ import { CurvesPanel } from '../../panels/CurvesPanel/CurvesPanel';
 import { groupBy, roundAccurate } from '../../../utils';
 import { useTranslation } from 'react-i18next';
 import { GradingWheels } from './GradingWheels';
+import ColorMixer from '../../../editor/ColorMixer';
 
 
 const TEMPERATURE_GRADIENT = 'linear-gradient(to right, #2690f0, #ffffff, #f5c542)';
@@ -147,6 +148,7 @@ export function AdjustmentsPanel() {
         <Accordion.Control><Text fw={700}>{t('groups.color')}</Text></Accordion.Control>
         <Accordion.Panel>
           <Stack gap="md">
+            <ColorMixer/>
             <Radio.Group
               label={t('templates.title')}
               disabled={image === null}
