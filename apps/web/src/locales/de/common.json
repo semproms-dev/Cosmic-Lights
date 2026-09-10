@@ -22,7 +22,9 @@
     "grain": "Filmkorn über das Bild legen, am stärksten in den Mitteltönen",
     "grainSize": "Wie groß ein Korn ist, im Verhältnis zum Bildausschnitt",
     "grainRoughness": "Wie klumpig und unregelmäßig das Korn ist statt gleichmäßig",
-    "gradeLum": "Hellt nur diesen Tonbereich auf oder ab, ohne seine Färbung zu ändern"
+    "gradeLum": "Hellt nur diesen Tonbereich auf oder ab, ohne seine Färbung zu ändern",
+    "hue": "Ermöglicht es, eine Farbe von einer anderen zu unterscheiden",
+    "luminosity": "Die Menge an Licht, die eine Farbe hat, wie weit sie von Schwarz oder Weiß entfernt ist"
   },
   "groups": {
     "basic": "Grundlegend",
@@ -90,7 +92,8 @@
     "gradeShadow": "Schatten",
     "gradeMid": "Mitteltöne",
     "gradeHigh": "Lichter",
-    "gradeLum": "Helligkeit"
+    "gradeLum": "Helligkeit",
+    "colorMixer": "Farbmischer"
   },
   "settings": {
     "general": "Allgemein",

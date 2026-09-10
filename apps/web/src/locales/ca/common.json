@@ -22,7 +22,9 @@
     "grain": "Afegeix gra de pel·lícula sobre el marc, més fort als tons mitjans",
     "grainSize": "Com de gran és cada partícula de gra, com a fracció del marc",
     "grainRoughness": "Com d'agrumat i irregular és el gra, en lloc de ser uniforme",
-    "gradeLum": "Aclareix o enfosqueix només aquesta zona tonal, sense tocar el seu to"
+    "gradeLum": "Aclareix o enfosqueix només aquesta zona tonal, sense tocar el seu to",
+    "hue": "Ens permet diferenciar un color d'un altre",
+    "luminosity": "La quantitat de llum que té el color, com de lluny o a prop que està del negre o del blanc"
   },
   "groups": {
     "basic": "Bàsic",
@@ -90,7 +92,8 @@
     "gradeShadow": "Ombres",
     "gradeMid": "Tons mitjans",
     "gradeHigh": "Llums",
-    "gradeLum": "Luminància"
+    "gradeLum": "Luminància",
+    "colorMixer": "Mesclador de color"
   },
   "settings": {
     "general": "General",

@@ -1,5 +1,6 @@
 import { Box, Group, Stack, Text, UnstyledButton } from "@mantine/core";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { COLORS } from '../utils';
 import { GradientSlider } from "../components/sliders/elements/GradientSlider";
 import { useEditor } from "./editorContext";
@@ -7,6 +8,7 @@ import { colorMixerAdjustment } from "./adjustments";
 
 
 export default function ColorMixer() {
+    const { t } = useTranslation(['common']);
     const { adjustments, setAdjustment, commit } = useEditor();
     const [activeId, setActiveId] = useState('mixYellow');
 
@@ -32,7 +34,7 @@ export default function ColorMixer() {
 
     return (
         <Stack gap={'lg'}>
-            <Text fw={500} size="sm">Color Mixer</Text>
+            <Text fw={500} size="sm">{t('lateralNavBar.colorMixer')}</Text>
             <Group justify="space-between" wrap="nowrap" w="100%">
                 {COLORS.map((c) => {
                     const isActive = activeId === c.id;
@@ -60,9 +62,9 @@ export default function ColorMixer() {
             })}                
             </Group>
             <Stack gap="xs">
-                {renderSlider("Hue", activeOption.hueKey, active.hueGradient, adjustments[activeOption.hueKey])}
-                {renderSlider("Luminance", activeOption.lumKey, active.lumGradient, adjustments[activeOption.lumKey])}
-                {renderSlider("Saturation", activeOption.satKey, active.satGradient, adjustments[activeOption.satKey])}
+                {renderSlider(t('labels.hue'), activeOption.hueKey, active.hueGradient, adjustments[activeOption.hueKey])}
+                {renderSlider(t('labels.luminosity'), activeOption.lumKey, active.lumGradient, adjustments[activeOption.lumKey])}
+                {renderSlider(t('labels.saturation'), activeOption.satKey, active.satGradient, adjustments[activeOption.satKey])}
             </Stack>
         </Stack>
     )

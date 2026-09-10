@@ -22,7 +22,9 @@
     "grain": "Engade gran de película sobre o cadro, máis forte nos tons medios",
     "grainSize": "Canto grande é cada partícula de gran, como fracción do cadro",
     "grainRoughness": "Canto aglomerado e irregular é o gran, en vez de uniforme",
-    "gradeLum": "Aclara ou escurece só esta zona tonal, deixando intacto o seu matiz"
+    "gradeLum": "Aclara ou escurece só esta zona tonal, deixando intacto o seu matiz",
+    "hue": "Permítenos diferenciar un cor doutro",
+    "luminosity": "A cantidade de luz que ten o cor, como de lonxe ou preto está do negro ou do branco"
   },
   "groups": {
     "basic": "Básico",
@@ -90,7 +92,8 @@
     "gradeShadow": "Sombras",
     "gradeMid": "Tons medios",
     "gradeHigh": "Luces",
-    "gradeLum": "Luminancia"
+    "gradeLum": "Luminancia",
+    "colorMixer": "Mesturador de cor"
   },
   "settings": {
     "general": "Xeral",

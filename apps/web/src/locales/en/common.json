@@ -22,7 +22,9 @@
     "grain": "Add film grain over the frame, strongest in the midtones",
     "grainSize": "How big each grain particle is, as a fraction of the frame",
     "grainRoughness": "How clumped and irregular the grain is, instead of even",
-    "gradeLum": "Brightens or darkens only this tonal zone, leaving its tint alone"
+    "gradeLum": "Brightens or darkens only this tonal zone, leaving its tint alone",
+    "hue": "Allows us to differentiate one color from another",
+    "luminosity": "The amount of light a color has, how far or close it is from black or white"
   },
   "groups": {
     "basic": "Basic",
@@ -90,7 +92,8 @@
     "gradeShadow": "Shadows",
     "gradeMid": "Midtones",
     "gradeHigh": "Highlights",
-    "gradeLum": "Luminance"
+    "gradeLum": "Luminance",
+    "colorMixer": "Color Mixer"
   },
   "settings": {
     "general": "General",

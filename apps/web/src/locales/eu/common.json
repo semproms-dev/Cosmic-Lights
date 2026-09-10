@@ -22,7 +22,9 @@
     "grain": "Film-granoa gehitu markoaren gainean, indartsuena erdi-tonuetan",
     "grainSize": "Partikula bakoitza zein handia den, markoaren zati gisa",
     "grainRoughness": "Granoa zein bildua eta irregularra den, uniformea izan beharrean",
-    "gradeLum": "Tonalitate-eremu hori bakarrik argitu edo ilundu, bere tintari eragin gabe"
+    "gradeLum": "Tonalitate-eremu hori bakarrik argitu edo ilundu, bere tintari eragin gabe",
+    "hue": "Kolore bat besteatik bereizten laguntzen du",
+    "luminosity": "Koloreak duen argi kantitatea, beltzatik edo zuritik zein urrun edo hurbil dagoen"
   },
   "groups": {
     "basic": "Oinarrizkoa",
@@ -90,7 +92,8 @@
     "gradeShadow": "Itzalak",
     "gradeMid": "Erdi-tonuak",
     "gradeHigh": "Nabarmenak",
-    "gradeLum": "Luminantzia"
+    "gradeLum": "Luminantzia",
+    "colorMixer": "Kolore-nahasgailua"
   },
   "settings": {
     "general": "Orokorra",

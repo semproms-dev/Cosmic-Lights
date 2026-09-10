@@ -22,7 +22,9 @@
     "grain": "Ajouter du grain argentique sur le cadre, surtout dans les tons moyens",
     "grainSize": "Taille de chaque particule de grain, en proportion du cadre",
     "grainRoughness": "À quel point le grain est aggloméré et irrégulier plutôt qu'uniforme",
-    "gradeLum": "Éclaircit ou assombrit uniquement cette zone de tons, sans toucher à sa teinte"
+    "gradeLum": "Éclaircit ou assombrit uniquement cette zone de tons, sans toucher à sa teinte",
+    "hue": "Permet de différencier une couleur d'une autre",
+    "luminosity": "La quantité de lumière qu'une couleur contient, à quel point elle est proche du noir ou du blanc"
   },
   "groups": {
     "basic": "Basique",
@@ -90,7 +92,8 @@
     "gradeShadow": "Ombres",
     "gradeMid": "Tons moyens",
     "gradeHigh": "Hautes lumières",
-    "gradeLum": "Luminosité"
+    "gradeLum": "Luminosité",
+    "colorMixer": "Mélangeur de couleurs"
   },
   "settings": {
     "general": "Général",

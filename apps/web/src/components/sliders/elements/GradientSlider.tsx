@@ -1,8 +1,10 @@
-import { Group, Slider, Stack, Text } from '@mantine/core';
+import { Group, Slider, Stack, Text, Tooltip } from '@mantine/core';
 import classes from '../styles/GradientSlider.module.css';
 import { useHover } from '@mantine/hooks';
 import { useEditor } from '../../../editor/editorContext';
 import { useTranslation } from 'react-i18next';
+import { usePreferences } from '../../../preferences/preferences';
+import { IconInfoCircle } from '@tabler/icons-react';
 
 interface GradientSliderProps {
   label: string;
@@ -37,12 +39,18 @@ export function GradientSlider({
   const { image } = useEditor();
   const { t } = useTranslation(['common']);
   const showReset = hovered && onReset !== undefined;
+  const {preferences} = usePreferences();
   return (
     <Stack gap={4} className={classes.root} style={{ '--gradient': gradient } as React.CSSProperties}>
       <Group justify="space-between" gap="xs">
         {/* Both texts stay in the DOM, stacked in one grid cell, and only their
             visibility swaps, so the box never resizes out from under the
             pointer while hovering. */}
+        {preferences.helper ? 
+          <Tooltip label={label}>
+              <IconInfoCircle size="1rem" stroke={2} color="var(--mantine-color-dimmed)"  />
+          </Tooltip>: null
+        }
         <Text
           size="sm"
           className={classes.label}

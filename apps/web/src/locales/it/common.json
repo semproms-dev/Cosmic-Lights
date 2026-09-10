@@ -22,7 +22,9 @@
     "grain": "Aggiunge grana della pellicola sull'inquadratura, più forte nei mezzitoni",
     "grainSize": "Quanto è grande ogni particella di grana, in proporzione all'inquadratura",
     "grainRoughness": "Quanto la grana è aggregata e irregolare invece che uniforme",
-    "gradeLum": "Schiarisce o scurisce solo questa zona tonale, senza toccarne la tinta"
+    "gradeLum": "Schiarisce o scurisce solo questa zona tonale, senza toccarne la tinta",
+    "hue": "Permette di differenziare un colore da un altro",
+    "luminosity": "La quantità di luce che ha un colore, quanto è vicino o lontano dal nero o dal bianco"
   },
   "groups": {
     "basic": "Base",
@@ -90,7 +92,8 @@
     "gradeShadow": "Ombre",
     "gradeMid": "Mezzitoni",
     "gradeHigh": "Luci",
-    "gradeLum": "Luminosità"
+    "gradeLum": "Luminosità",
+    "colorMixer": "Mixer colori"
   },
   "settings": {
     "general": "Generale",
