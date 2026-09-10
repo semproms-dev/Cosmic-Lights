@@ -73,6 +73,7 @@
     "tint": "To",
     "vibrance": "Vivacitat",
     "saturation": "Saturació",
+    "hue": "To",
     "clarity": "Claredat",
     "dehaze": "Desboirina",
     "texture": "Textura",
@@ -93,6 +94,7 @@
     "gradeMid": "Tons mitjans",
     "gradeHigh": "Llums",
     "gradeLum": "Luminància",
+    "luminance": "Luminància",
     "colorMixer": "Mesclador de color"
   },
   "settings": {

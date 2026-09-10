@@ -64,6 +64,7 @@
   },
   "lateralNavBar": {
     "exposure": "Exposición",
+    "hue": "Matiz",
     "contrast": "Contraste",
     "highlights": "Luces altas",
     "shadows": "Sombras",
@@ -93,6 +94,7 @@
     "gradeMid": "Medios",
     "gradeHigh": "Luces altas",
     "gradeLum": "Luminosidad",
+    "luminance": "Luminancia",
     "colorMixer": "Mezclador de color"
   },
   "settings": {

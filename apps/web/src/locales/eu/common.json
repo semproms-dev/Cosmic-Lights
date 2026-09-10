@@ -73,6 +73,7 @@
     "tint": "Tinta",
     "vibrance": "Bizitasuna",
     "saturation": "Saturazioa",
+    "hue": "Tonna",
     "clarity": "Argitasuna",
     "dehaze": "Lainoa kendu",
     "texture": "Testura",
@@ -93,6 +94,7 @@
     "gradeMid": "Erdi-tonuak",
     "gradeHigh": "Nabarmenak",
     "gradeLum": "Luminantzia",
+    "luminance": "Luminantzia",
     "colorMixer": "Kolore-nahasgailua"
   },
   "settings": {

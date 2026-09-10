@@ -73,6 +73,7 @@
     "tint": "Matiz",
     "vibrance": "Vivacidade",
     "saturation": "Saturación",
+    "hue": "Matiz",
     "clarity": "Claridade",
     "dehaze": "Brétema",
     "texture": "Textura",
@@ -93,6 +94,7 @@
     "gradeMid": "Tons medios",
     "gradeHigh": "Luces",
     "gradeLum": "Luminancia",
+    "luminance": "Luminancia",
     "colorMixer": "Mesturador de cor"
   },
   "settings": {

@@ -73,6 +73,7 @@
     "tint": "Farbton",
     "vibrance": "Dynamik",
     "saturation": "Sättigung",
+    "hue": "Farbton",
     "clarity": "Klarheit",
     "dehaze": "Schlieren entfernen",
     "texture": "Struktur",
@@ -93,6 +94,7 @@
     "gradeMid": "Mitteltöne",
     "gradeHigh": "Lichter",
     "gradeLum": "Helligkeit",
+    "luminance": "Luminanz",
     "colorMixer": "Farbmischer"
   },
   "settings": {

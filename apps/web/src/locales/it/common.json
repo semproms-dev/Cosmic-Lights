@@ -73,6 +73,7 @@
     "tint": "Tinta",
     "vibrance": "Vibranza",
     "saturation": "Saturazione",
+    "hue": "Tonalità",
     "clarity": "Nitidezza",
     "dehaze": "Rimozione foschia",
     "texture": "Texture",
@@ -93,6 +94,7 @@
     "gradeMid": "Mezzitoni",
     "gradeHigh": "Luci",
     "gradeLum": "Luminosità",
+    "luminance": "Luminanza",
     "colorMixer": "Mixer colori"
   },
   "settings": {

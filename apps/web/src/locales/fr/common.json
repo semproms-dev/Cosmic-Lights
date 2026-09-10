@@ -73,6 +73,7 @@
     "tint": "Teinte",
     "vibrance": "Vibrance",
     "saturation": "Saturation",
+    "hue": "Teinte",
     "clarity": "Clarté",
     "dehaze": "Correction du voile",
     "texture": "Texture",
@@ -93,6 +94,7 @@
     "gradeMid": "Tons moyens",
     "gradeHigh": "Hautes lumières",
     "gradeLum": "Luminosité",
+    "luminance": "Luminance",
     "colorMixer": "Mélangeur de couleurs"
   },
   "settings": {

@@ -12,6 +12,7 @@ interface GradientSliderProps {
   min: number;
   max: number;
   step: number;
+  gradientName: string;
   onChange: (value: number) => void;
   onChangeEnd: () => void;
   gradient: string;
@@ -30,6 +31,7 @@ export function GradientSlider({
   min,
   max,
   step,
+  gradientName,
   onChange,
   gradient,
   onChangeEnd,
@@ -58,7 +60,7 @@ export function GradientSlider({
           style={{ cursor: onReset === undefined ? 'default' : 'pointer' }}
           ref={ref}
         >
-          <span style={{ visibility: showReset ? 'hidden' : 'visible' }}>{label}</span>
+          <span style={{ visibility: showReset ? 'hidden' : 'visible' }}>{gradientName}</span>
           <span style={{ visibility: showReset ? 'visible' : 'hidden' }}>{t('common.reset')}</span>
         </Text>
         <Text size="sm" c="dimmed">

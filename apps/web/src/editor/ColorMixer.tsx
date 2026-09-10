@@ -15,12 +15,13 @@ export default function ColorMixer() {
     const active = COLORS.filter((c) => c.id === activeId)[0];
     const activeOption = colorMixerAdjustment.filter((o) => o.key === activeId)[0];
 
-    const renderSlider = (label: string, key: string, gradient: string, value: number) => (
+    const renderSlider = (label: string, gradientName: string, key: string, gradient: string, value: number) => (
         <GradientSlider
             onChange={(value) => setAdjustment(key, value)}
             min={-100}
             max={100}
             gradient={gradient}
+            gradientName={gradientName}
             label={label}
             value={value}
             step={1}
@@ -62,9 +63,9 @@ export default function ColorMixer() {
             })}                
             </Group>
             <Stack gap="xs">
-                {renderSlider(t('labels.hue'), activeOption.hueKey, active.hueGradient, adjustments[activeOption.hueKey])}
-                {renderSlider(t('labels.luminosity'), activeOption.lumKey, active.lumGradient, adjustments[activeOption.lumKey])}
-                {renderSlider(t('labels.saturation'), activeOption.satKey, active.satGradient, adjustments[activeOption.satKey])}
+                {renderSlider(t('labels.hue'), t('lateralNavBar.hue'), activeOption.hueKey, active.hueGradient, adjustments[activeOption.hueKey])}
+                {renderSlider(t('labels.luminosity'), t('lateralNavBar.luminance'), activeOption.lumKey, active.lumGradient, adjustments[activeOption.lumKey])}
+                {renderSlider(t('labels.saturation'), t('lateralNavBar.saturation'), activeOption.satKey, active.satGradient, adjustments[activeOption.satKey])}
             </Stack>
         </Stack>
     )
