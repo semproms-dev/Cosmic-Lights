@@ -290,6 +290,7 @@ export function MasksPanel() {
                       value: formatConfidence(birdSpecies.confidence),
                     })}
                   </Text>
+                  <Text size='sm'>{birdSpecies.description}</Text>
                 </>
               )}
               {/* An answer ("no bird in this photo"), worded as such… */}

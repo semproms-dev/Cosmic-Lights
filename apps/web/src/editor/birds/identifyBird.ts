@@ -76,6 +76,7 @@ export interface BirdIdentification {
    * deliberately not modelled as a failure — see {@link identifyBird}.
    */
   note: string | null
+  description: string | null
 }
 
 /**
@@ -88,6 +89,7 @@ const responseSchema = z.object({
   label: z.string().min(1).optional(),
   confidence: z.number().optional(),
   error: z.string().optional(),
+  description: z.string().nullable()
 })
 
 /**
@@ -167,6 +169,7 @@ export async function identifyBird(
         label: payload.label,
         confidence: payload.confidence ?? 0,
         note: payload.error ?? null,
+        description: payload.description
       }
     }
     // No label and a bad status: nothing usable, and the status is the only
