@@ -148,8 +148,14 @@
   "info": {
     "title": "Informazioa",
     "file": "Fitxategia: ",
+    "captureDate": "Argazki-data: ",
     "brand": "Marka: ",
     "model": "Modeloa: ",
+    "aperture": "Irekidura: ",
+    "focalLength": "Foku-distantzia: ",
+    "iso": "ISO: ",
+    "shutter": "Obturadore-abiadura: ",
+    "lens": "Objektiboa: ",
     "empty": "Ez da irudirik kargatu. Argazkiaren metadatuak (EXIF) hemen agertuko dira irudi bat irekitzen denean."
   },
   "shortcuts": {

@@ -53,18 +53,21 @@ const WHITE_TARGET = 0.98
 const BLACK_TARGET = 0.02
 /** p90 luma Auto sends towards: recovering brights, not clipping them. */
 const HIGHLIGHT_TARGET = 0.8
-/** p10 luma Auto sends towards: revealing darks, not flattening them. */
-const SHADOW_TARGET = 0.25
+/** p10 luma Auto sends towards: a restrained lift that keeps dark tones dark. */
+const SHADOW_TARGET = 0.18
 /** p10..p90 spread Auto aims for; a narrower spread calls for contrast. */
 const CONTRAST_TARGET_SPREAD = 0.45
 /** Contrast slider units gained per unit of spread below the target. */
 const CONTRAST_GAIN = 150
 /**
  * Encoded-luma delta → slider units for the four zone offsets. The shader's
- * `* 0.25` weight makes the full-weight inverse exactly 400; 300 is gentler,
- * so the brightest zone never lands *on* its target but a little short of it.
+ * `* 0.25` weight makes the full-weight inverse exactly 400. Auto uses 300 for
+ * highlights/whites and a lower gain for shadows, whose broad mask can wash a
+ * large part of the image grey when lifted too far.
  */
 const ZONE_GAIN = 300
+/** Shadows need a gentler gain to preserve black depth and avoid a grey cast. */
+const SHADOW_GAIN = 200
 
 /** Exposure slider bounds, from `basicAdjustments`. */
 const EXPOSURE_MIN = -1
@@ -138,7 +141,7 @@ export function autoAdjustSliders(histogram: LumaHistogram): AutoTone {
     exposure,
     contrast: clampZone((CONTRAST_TARGET_SPREAD - (bright - dark)) * CONTRAST_GAIN),
     highlights: clampZone((HIGHLIGHT_TARGET - bright) * ZONE_GAIN),
-    shadows: clampZone((SHADOW_TARGET - dark) * ZONE_GAIN),
+    shadows: clampZone((SHADOW_TARGET - dark) * SHADOW_GAIN),
     whites: clampZone((WHITE_TARGET - hiTail) * ZONE_GAIN),
     blacks: clampZone((BLACK_TARGET - loTail) * ZONE_GAIN),
   }

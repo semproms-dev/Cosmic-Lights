@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useFullscreenDocument } from '@mantine/hooks'
+import { LoadingOverlay, Modal } from '@mantine/core'
+import { useTranslation } from 'react-i18next'
 import { NavBar } from '../components/navigation/elements/TopNavBar'
 import { LateralNavBar } from '../components/navigation/elements/LateralNavBar'
 import { AdjustmentsPanel } from '../components/sliders/elements/AdjustmentsPanel'
@@ -14,7 +16,6 @@ import { Presets } from '../components/panels/Presets'
 import { OpenImageButton } from '../components/canvas/OpenImageButton'
 import { Canvas } from '../components/canvas/Canvas'
 import classes from './index.module.css'
-import { LoadingOverlay } from '@mantine/core'
 import { useEditor } from '../editor/editorContext'
 import { usePreferences } from '../preferences/preferences'
 import { useEditorShortcuts } from '../editor/useEditorShortcuts'
@@ -31,7 +32,6 @@ export const Route = createFileRoute('/')({
  * Tool panels keyed by their rail nav key. A tool without an entry opens no panel.
  */
 const PANELS: Record<string, ComponentType> = {
-  info: InfoPanel,
   adjustments: AdjustmentsPanel,
   masks: MasksPanel,
   crop: CropPanel,
@@ -45,6 +45,8 @@ const PANELS: Record<string, ComponentType> = {
  */
 function HomePage() {
   const [activeTool, setActiveTool] = useState('adjustments')
+  const [infoOpen, setInfoOpen] = useState(false)
+  const { t } = useTranslation(['common'])
   const {imageStatus, masks, activeMaskId, maskOverlayHidden} = useEditor();
   const { preferences } = usePreferences();
   const { fullscreen, toggle } = useFullscreenDocument();
@@ -75,6 +77,10 @@ function HomePage() {
    * the panel closed (empty string = nothing selected).
    */
   const handleToolChange = (label: string) => {
+    if (label === 'info') {
+      setInfoOpen((open) => !open)
+      return
+    }
     setActiveTool((current) => (current === label ? '' : label))
   }
 
@@ -118,12 +124,24 @@ function HomePage() {
           {objectMaskId !== null && <ObjectPromptOverlay maskId={objectMaskId} />}
         </div>
         {ActivePanel && (
-          <aside className={classes.panel} aria-label={`${activeTool} panel`}>
+          <aside
+            className={classes.panel}
+            aria-label={`${activeTool} panel`}
+          >
             <ActivePanel />
           </aside>
         )}
         <LateralNavBar active={activeTool} onChange={handleToolChange} />
       </div>
+      <Modal
+        opened={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        title={t('info.title')}
+        centered
+        size="lg"
+      >
+        <InfoPanel />
+      </Modal>
     </main>
   )
 }

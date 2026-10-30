@@ -148,8 +148,14 @@
   "info": {
     "title": "Información",
     "file": "Ficheiro: ",
+    "captureDate": "Data de captura: ",
     "brand": "Marca: ",
     "model": "Modelo: ",
+    "aperture": "Apertura: ",
+    "focalLength": "Distancia focal: ",
+    "iso": "ISO: ",
+    "shutter": "Velocidade de obturación: ",
+    "lens": "Obxectivo: ",
     "empty": "Non se cargou ningunha imaxe. Os metadatos (EXIF) da foto aparecerán aquí cando se abra unha imaxe."
   },
   "shortcuts": {

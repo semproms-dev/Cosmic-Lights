@@ -148,8 +148,14 @@
   "info": {
     "title": "Informació",
     "file": "Fitxer: ",
+    "captureDate": "Data de captura: ",
     "brand": "Marca: ",
     "model": "Model: ",
+    "aperture": "Obertura: ",
+    "focalLength": "Distància focal: ",
+    "iso": "ISO: ",
+    "shutter": "Velocitat d'obturació: ",
+    "lens": "Objectiu: ",
     "empty": "No s'ha carregat cap imatge. Les metadades (EXIF) de la foto apareixeran aquí quan s'obri una imatge."
   },
   "shortcuts": {

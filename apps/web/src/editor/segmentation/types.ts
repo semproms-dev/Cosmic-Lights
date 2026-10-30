@@ -10,13 +10,8 @@ export interface MaskAlpha {
  * The mask kinds a model generates, as opposed to the hand-painted `brush` or
  * the rasterised `linear` gradient. Both of those are excluded — only AI masks
  * run through the segmentation worker.
- *
- * `identify` is excluded too, for a different reason: it is answered by a remote
- * service that returns a species name and no pixels, so it never reaches this
- * worker. Leaving it in would let `provider.segment(bitmap, 'identify')` compile
- * and then fail at runtime with "not implemented".
  */
-export type SegmentationKind = Exclude<MaskType, 'brush' | 'linear' | 'radial' | 'object' | 'identify'>
+export type SegmentationKind = Exclude<MaskType, 'brush' | 'linear' | 'radial' | 'object'>
 
 /**
  * A generated alpha, tagged with the `Mask.version` it was produced for.

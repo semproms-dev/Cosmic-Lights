@@ -14,7 +14,7 @@ export const MASK_GRANULARITIES: readonly MaskGranularity[] = ['auto', 'whole', 
  * model, `linear` from a rasterised gradient ramp. The application pipeline
  * treats them identically.
  */
-export type MaskType = 'brush' | 'subject' | 'sky' | 'linear' | 'radial' | 'object' | 'identify'
+export type MaskType = 'brush' | 'subject' | 'sky' | 'linear' | 'radial' | 'object'
 
 /**
  * The user's prompt for a promptable object mask (SAM), in **normalised [0,1]
@@ -374,8 +374,7 @@ export const MASK_TYPE_LABEL: Record<MaskType, string> = {
   sky: 'Sky',
   linear: 'Linear Gradient',
   radial: 'Radial Gradient',
-  object: 'Select object',
-  identify: 'Detect subject'
+  object: 'Select object'
 }
 
 /**

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Button, SegmentedControl, Stack, Text, Title, Checkbox } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Button, SegmentedControl, Stack, Text, Title, Checkbox, Alert } from '@mantine/core';
+import { IconInfoCircle } from '@tabler/icons-react';
 import { ControlSlider } from '../sliders/elements/ControlSlider';
 import { useEditor } from '../../editor/editorContext';
 import { WebGLRenderer } from '../../editor/gl/renderer';
@@ -57,6 +58,10 @@ export function ExportPanel() {
   const [format, setFormat] = useState('JPEG');
   const [quality, setQuality] = useState(90);
   const [loading, setLoading] = useState(false);
+
+  const supported = typeof window !== 'undefined' && 
+                    window.isSecureContext && 
+                    typeof window.showSaveFilePicker === 'function';
 
   const currentFormat = nativeFormats.find((f) => f.format === format);
   const [values, handlers] = useListState(checkBoxValues);
@@ -238,6 +243,11 @@ export function ExportPanel() {
       />
       }
       <Button onClick={handleExport} disabled={!image} loading={loading}>Export image</Button>
+      {supported && (
+        <Alert icon={<IconInfoCircle />} title="Downloads folder" color="info">
+          Your browser does not support picking a save location. The image will be saved to your default downloads folder.
+        </Alert>
+      )}
     </Stack>
   );
 }

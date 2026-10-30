@@ -148,8 +148,14 @@
   "info": {
     "title": "Info",
     "file": "File: ",
+    "captureDate": "Capture date: ",
     "brand": "Brand: ",
     "model": "Model: ",
+    "aperture": "Aperture: ",
+    "focalLength": "Focal length: ",
+    "iso": "ISO: ",
+    "shutter": "Shutter speed: ",
+    "lens": "Lens: ",
     "empty": "No image loaded. Photo metadata (EXIF) will appear here once an image is opened."
   },
   "shortcuts": {
@@ -224,13 +230,7 @@
     "contextDuplicateInvert": "Duplicate and invert mask",
     "contextDuplicate": "Duplicate mask",
     "contextRemoveMask": "Remove mask",
-    "copySuffix": "(copy)",
-    "detectSubject": "Bird",
-    "speciesSearching": "Identifying species…",
-    "speciesConfidence": "{{value}}% confidence",
-    "speciesNone": "No bird identified in this photo",
-    "speciesError": "The identification service did not answer",
-    "speciesRetry": "Try again"
+    "copySuffix": "(copy)"
   },
   "presets": {
     "title": "Presets",

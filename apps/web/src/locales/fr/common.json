@@ -148,8 +148,14 @@
   "info": {
     "title": "Info",
     "file": "Fichier : ",
+    "captureDate": "Date de prise de vue : ",
     "brand": "Marque : ",
     "model": "Modèle : ",
+    "aperture": "Ouverture : ",
+    "focalLength": "Distance focale : ",
+    "iso": "ISO : ",
+    "shutter": "Vitesse d’obturation : ",
+    "lens": "Objectif : ",
     "empty": "Aucune image chargée. Les métadonnées de la photo (EXIF) apparaîtront ici une fois qu'une image sera ouverte."
   },
   "shortcuts": {
@@ -224,13 +230,7 @@
     "contextDuplicateInvert": "Dupliquer et inverser le masque",
     "contextDuplicate": "Dupliquer le masque",
     "contextRemoveMask": "Supprimer le masque",
-    "copySuffix": "(copie)",
-    "detectSubject": "Oiseau",
-    "speciesSearching": "Identification de l'espèce…",
-    "speciesConfidence": "{{value}} % de confiance",
-    "speciesNone": "Aucun oiseau identifié sur cette photo",
-    "speciesError": "Le service d'identification n'a pas répondu",
-    "speciesRetry": "Réessayer"
+    "copySuffix": "(copie)"
   },
   "presets": {
     "title": "Préréglages",

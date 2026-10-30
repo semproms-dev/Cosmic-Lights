@@ -65,10 +65,11 @@ describe('autoAdjustSliders — the zones after the exposure shift', () => {
 
   it('computes the zones on the *shifted* percentiles, after exposure', () => {
     // A dark frame is exposed +1 stop first (median 0.2); the zone offsets then
-    // place the quartertones of the picture as it will be, not as it was.
+    // place the quartertones of the picture as it will be, not as it was. The
+    // shadows mapping keeps this lift restrained so dark tones retain depth.
     const result = autoAdjustSliders(makeHist({ p50: 0.2, p10: 0.1 }))
     expect(result.exposure).toBe(1)
-    expect(result.shadows).toBe(34)
+    expect(result.shadows).toBe(9)
     expect(result.highlights).toBe(-68)
     expect(result.whites).toBe(-100)
     expect(result.contrast).toBe(-66)

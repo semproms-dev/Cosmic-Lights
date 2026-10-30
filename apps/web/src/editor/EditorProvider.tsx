@@ -16,13 +16,6 @@ import {
   TransformersSegmentationProvider,
   type SegmentationProvider,
 } from './segmentation/TransformersSegmentationProvider'
-import {
-  MIN_CONFIDENCE,
-  identifyBird,
-  type BirdIdentification,
-  type BirdStatus,
-} from './birds/identifyBird'
-import { frameToJpeg } from './birds/frameToJpeg'
 import type { MaskAlphaCache, MaskStatus, SegmentationKind } from './segmentation/types'
 import { isRawFile } from '../components/canvas/rawFormats'
 import type { Metadata } from 'libraw-wasm'
@@ -129,33 +122,11 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // async closure below, and it never affects rendering.
   const objectRequests = useRef<Map<string, number>>(new Map())
 
-  // In-flight bird-identification requests, one per mask. A ref for the same
-  // reason as `objectRequests`: the async closure below must reach it, and it
-  // never affects rendering. Aborting on unmount is what keeps a slow service
-  // from resolving into a dead tree.
-  const identifyRequests = useRef<Map<string, AbortController>>(new Map())
-
-  // The species identified in the open photo, or null while none is known.
-  //
-  // A property of the *photo*, not of the edit, which is why it sits here and
-  // not in the reducer: undoing a slider must not undo what the bird is. Cleared
-  // when a different image is loaded, or it would label the new one.
-  const [birdSpecies, setBirdSpecies] = useState<BirdIdentification | null>(null)
-
-  // How that identification is going, so a panel can tell "still asking" from
-  // "asked, no bird" from "the service is down". Transient, like the species.
-  const [birdStatus, setBirdStatus] = useState<BirdStatus>('idle')
-
   // Tear the worker (and its ONNX session) down with the app.
   useEffect(() => {
-    const pendingIdentifications = identifyRequests.current
     return () => {
       providerRef.current?.dispose()
       providerRef.current = null
-      for (const controller of pendingIdentifications.values()) {
-        controller.abort()
-      }
-      pendingIdentifications.clear()
     }
   }, [])
 
@@ -376,70 +347,6 @@ export function EditorProvider({ children }: EditorProviderProps) {
   }
 
   /**
-   * Asks the bird service which species is in the open image, logs the answer
-   * and publishes it as {@link EditorState.birdSpecies} when it is confident
-   * enough to show. Nothing is painted: this mask type is on trial.
-   *
-   * Everything the service says reaches the log, including the guesses rejected
-   * for low confidence — that log is the only evidence there is for calibrating
-   * {@link MIN_CONFIDENCE}, so filtering it would throw away the measurements.
-   *
-   * It is not a segmentation: the service returns a name and a confidence, no
-   * geometry, so there is no alpha to publish and `maskStatus` is left alone —
-   * that map means "is this mask's alpha ready", and an identification cannot
-   * answer that question.
-   *
-   * @param id - The mask that asked, used to tell concurrent answers apart.
-   */
-  const runIdentification = async (id: string): Promise<void> => {
-    const controller = new AbortController()
-    try {
-      const image = state.image
-      if (image === null) return
-      // A second request for the same mask replaces the first: only the latest
-      // answer can still be the one the user is waiting for.
-      identifyRequests.current.get(id)?.abort()
-      identifyRequests.current.set(id, controller)
-      setBirdStatus('loading')
-      const frame = await frameToJpeg(image.bitmap)
-      const identification = await identifyBird(frame, { signal: controller.signal })
-      if (identification === null) {
-        logger.info(`Bird identification for mask ${id}: no bird found in ${image.fileName}`)
-        setBirdSpecies(null)
-        setBirdStatus('ready')
-        return
-      }
-      const confident = identification.confidence >= MIN_CONFIDENCE
-      const confidence = (identification.confidence * 100).toFixed(2)
-      logger.info(
-        `Bird identification for mask ${id}: ${identification.label} (${confidence}% confidence` +
-          `${confident ? '' : ' — below the display threshold, not shown'})`,
-      )
-      // Below the floor the app says nothing at all: the service always answers
-      // with its best guess, so an unfiltered result would name a bird in a
-      // photo of a wall.
-      setBirdSpecies(confident ? identification : null)
-      setBirdStatus('ready')
-      // The service reports this *with* a valid label — the classification stood,
-      // its species lookup did not. Worth seeing, not worth alarming anyone.
-      if (identification.note !== null) {
-        logger.warn(`Bird service note for mask ${id}: ${identification.note}`)
-      }
-    } catch (error) {
-      // An abort is this code cancelling itself (a newer request, or unmount);
-      // reporting it as a failure would cry wolf.
-      if (controller.signal.aborted) return
-      logger.error(`Bird identification failed for mask ${id}`, error)
-      setBirdStatus('error')
-    } finally {
-      // Only clear the slot if it is still ours: a newer request may own it now.
-      if (identifyRequests.current.get(id) === controller) {
-        identifyRequests.current.delete(id)
-      }
-    }
-  }
-
-  /**
    * Creates a mask of `type` with a unique default name ("Brush 1", "Sky 1", …),
    * appends it and selects it. AI masks additionally kick off their
    * segmentation. Returns the new id, or `null` if the cap blocked it (checked
@@ -456,11 +363,6 @@ export function EditorProvider({ children }: EditorProviderProps) {
       // rasterise from geometry; `object` waits for the user to point at
       // something — see `setObjectPrompt`.)
       void runSegmentation(mask.id, type, mask.version + 1)
-    }
-    if (type === 'identify') {
-      // Not a segmentation: it asks a remote service for a species name and logs
-      // it. The mask stays empty for now, on purpose.
-      void runIdentification(mask.id)
     }
     return mask.id
   }
@@ -524,11 +426,6 @@ export function EditorProvider({ children }: EditorProviderProps) {
     if (mask.type === 'object' && mask.prompt !== null) {
       void runObjectSegmentation(id, mask.prompt, mask.version + 1)
     }
-    // The identification is the failure most worth retrying: a local service
-    // that was not running yet is one click away from working.
-    if (mask.type === 'identify') {
-      void runIdentification(id)
-    }
   }
 
   const removeMask = (id: string) => {
@@ -590,9 +487,6 @@ export function EditorProvider({ children }: EditorProviderProps) {
       // every failed open — and a file that no decoder accepts is a path that
       // really happens.
       state.image?.bitmap.close()
-      // Whatever was identified belonged to the photo being replaced.
-      setBirdSpecies(null)
-      setBirdStatus('idle')
       let bitmap: ImageBitmap
       let metadata: Metadata | null = null
       if (isRawFile(file)) {
@@ -696,8 +590,6 @@ export function EditorProvider({ children }: EditorProviderProps) {
         maskStatus,
         modelProgress,
         retryMask,
-        birdSpecies,
-        birdStatus,
         view,
         setView,
         cropOverlay,

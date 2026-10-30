@@ -15,7 +15,6 @@ import type {
 } from './masks'
 import type { Preset } from './presets'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
-import type { BirdIdentification, BirdStatus } from './birds/identifyBird'
 import type { Orientation, TurnDirection } from './rotation'
 import type { Geometry } from './geometry'
 
@@ -203,25 +202,6 @@ export interface EditorState {
   modelProgress: number | null
   /** Re-runs the segmentation of a failed AI mask. */
   retryMask: (id: string) => void
-  /**
-   * The bird identified in the open photo, or `null` when there is none to show.
-   *
-   * `null` covers every "say nothing" case at once — no identification has been
-   * run, the service found nothing, it failed, or it was not confident enough
-   * (see `MIN_CONFIDENCE`) — so a consumer never has to decide whether a result
-   * is worth displaying: having one *is* the decision.
-   *
-   * `label` is the raw scientific name (`Coracias_benghalensis`); pass it
-   * through `speciesDisplayName` before showing it.
-   */
-  birdSpecies: BirdIdentification | null
-  /**
-   * How that identification is going. `ready` with a null {@link birdSpecies} is
-   * "asked, no bird in this photo" — an answer — while `error` is "the service
-   * did not answer". A panel must word those two differently; a user who reads
-   * "no bird" when the service is down will not trust the feature again.
-   */
-  birdStatus: BirdStatus
   /**
    * The canvas' interactive zoom/pan. Transient view state, never undoable.
    *

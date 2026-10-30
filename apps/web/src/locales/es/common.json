@@ -148,8 +148,14 @@
   "info": {
     "title": "Info",
     "file": "Archivo: ",
+    "captureDate": "Fecha de toma: ",
     "brand": "Marca: ",
     "model": "Modelo: ",
+    "aperture": "Apertura: ",
+    "focalLength": "Distancia focal: ",
+    "iso": "ISO: ",
+    "shutter": "Velocidad de obturación: ",
+    "lens": "Objetivo: ",
     "empty": "No hay imagen cargada. Los metadatos de la foto (EXIF) aparecerán aquí una vez que se abra una imagen."
   },
   "shortcuts": {
@@ -224,13 +230,7 @@
     "contextDuplicateInvert": "Duplicar e invertir máscara",
     "contextDuplicate": "Duplicar máscara",
     "contextRemoveMask": "Eliminar máscara",
-    "copySuffix": "(copia)",
-    "detectSubject": "Aves",
-    "speciesSearching": "Identificando especie…",
-    "speciesConfidence": "{{value}}% de confianza",
-    "speciesNone": "No se ha identificado ningún ave en esta foto",
-    "speciesError": "El servicio de identificación no respondió",
-    "speciesRetry": "Reintentar"
+    "copySuffix": "(copia)"
   },
   "presets": {
     "title": "Presets",
