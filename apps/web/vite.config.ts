@@ -6,6 +6,8 @@ import babel from '@rolldown/plugin-babel'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages serves this project below /Cosmic-Lights/; local builds stay at /.
+  base: process.env.VITE_BASE_PATH ?? '/',
   plugins: [
     // The router plugin must come before the React plugin.
     tanstackRouter({
