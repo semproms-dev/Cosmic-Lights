@@ -1,6 +1,10 @@
 # CosmicLights
 
-A web application for processing RAW photos and exporting JPGs — aiming to offer features comparable to Lightroom, RapidRAW, and Darktable.
+A web application for processing RAW photos and exporting JPGs — aiming to offer features comparable to Lightroom, RapidRAW and Darktable.
+
+At the moment this is just a hobby. I wanted a free Lightroom-style app to run on my own browser so I can edit pictures in an easy and quick way. Probably later I will go with a full Desktop application, if life me allows me to.
+
+Feel free to try and clone the repo and modify it as you want!
 
 ## Architecture
 
