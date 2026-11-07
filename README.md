@@ -41,6 +41,17 @@ Feel free to try and clone the repo and modify it as you want!
 | SWC | (decorator transforms) |
 | Supertest | ^7.0.0 |
 
+## AI Masks
+
+AI-generated masks run in the web app through Transformers.js; inference happens in a browser worker, using WebGPU when available and falling back to WASM. Models load on demand when an AI mask is first used.
+
+| Mask | Model | Purpose |
+|------|-------|---------|
+| Subject | [`onnx-community/ormbg-ONNX`](https://huggingface.co/onnx-community/ormbg-ONNX) (IS-Net) | Separates the main subject from the background. |
+| Object | [`Xenova/slimsam-77-uniform`](https://huggingface.co/Xenova/slimsam-77-uniform) (SlimSAM) | Selects a prompted object from a click or bounding box. |
+
+Sky masks are not implemented yet and require a semantic segmentation model. Brush and linear/radial gradient masks are created with the app's own editing tools and do not use an AI model.
+
 ## Getting Started
 
 ```bash
