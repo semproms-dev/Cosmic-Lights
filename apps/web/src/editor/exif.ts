@@ -7,6 +7,24 @@ export interface ExifOptions {
     includeGPS: boolean
 }
 
+export interface TiffMetadata {
+    make?: string
+    model?: string
+    software?: string
+    artist?: string
+    exposureTime?: number
+    fNumber?: number
+    focalLength?: number
+    iso?: number
+    dateTimeOriginal?: string
+    gps?: {
+        latitudeRef: 'N' | 'S'
+        latitude: [number, number, number]
+        longitudeRef: 'E' | 'W'
+        longitude: [number, number, number]
+    }
+}
+
 /** Decimal → EXIF rational [numerator, denominator] (aperture, focal length…). */
 const toRational = (value: number, precision = 10): [number, number] =>
   [Math.round(value * precision), precision]
@@ -66,6 +84,54 @@ export const buildExifDict = (metadata: Metadata, opts: ExifOptions): piexif.Exi
 
 
     return dict;
+}
+
+/** Build the metadata payload consumed by the native TIFF encoder. */
+export const buildTiffMetadata = (metadata: Metadata, opts: ExifOptions): TiffMetadata => {
+    const result: TiffMetadata = {}
+
+    if (opts.includeMetadata) {
+        if (metadata.camera_make) result.make = metadata.camera_make
+        if (metadata.camera_model) result.model = metadata.camera_model
+        if (metadata.artist) result.artist = metadata.artist
+        result.software = APP_NAME
+
+        if (Number.isFinite(metadata.shutter) && metadata.shutter > 0) {
+            result.exposureTime = metadata.shutter
+        }
+        if (Number.isFinite(metadata.aperture) && metadata.aperture > 0) {
+            result.fNumber = metadata.aperture
+        }
+        if (Number.isFinite(metadata.focal_len) && metadata.focal_len > 0) {
+            result.focalLength = metadata.focal_len
+        }
+        if (Number.isInteger(metadata.iso_speed) && metadata.iso_speed > 0) {
+            result.iso = metadata.iso_speed
+        }
+        if (metadata.timestamp instanceof Date && !Number.isNaN(metadata.timestamp.getTime())) {
+            result.dateTimeOriginal = exifDate(metadata.timestamp)
+        }
+    }
+
+    const gps = metadata.gps_data
+    if (
+        opts.includeGPS &&
+        gps?.gpsparsed &&
+        (gps.latref === 'N' || gps.latref === 'S') &&
+        (gps.longref === 'E' || gps.longref === 'W') &&
+        gps.latitude.length === 3 &&
+        gps.longitude.length === 3 &&
+        [...gps.latitude, ...gps.longitude].every(Number.isFinite)
+    ) {
+        result.gps = {
+            latitudeRef: gps.latref,
+            latitude: [...gps.latitude] as [number, number, number],
+            longitudeRef: gps.longref,
+            longitude: [...gps.longitude] as [number, number, number],
+        }
+    }
+
+    return result
 }
 
 export const insertExif = (jpegDataUrl: string, dict: piexif.ExifDict): string =>

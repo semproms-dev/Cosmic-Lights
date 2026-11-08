@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Button, SegmentedControl, Stack, Text, Title, Checkbox, Alert } from '@mantine/core';
+import { useState } from 'react';
+import { Button, SegmentedControl, Stack, Text, Title, Checkbox, Alert, Select } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { ControlSlider } from '../sliders/elements/ControlSlider';
 import { useEditor } from '../../editor/editorContext';
@@ -14,11 +14,49 @@ import {
   exportFileName,
   normalizeQuality,
 } from '../../editor/export';
-import { buildExifDict, insertExif } from '../../editor/exif';
+import { buildExifDict, buildTiffMetadata, insertExif } from '../../editor/exif';
 import { randomId, useListState } from '@mantine/hooks';
+import { TIFF_BITS } from '../../utils';
 
-const nativeFormats = Object.values(FORMAT_CAPS).filter(
-  (f) => f.encoder === 'native'
+interface TiffRuntime {
+  FS: {
+    writeFile(path: string, data: Uint8Array): Promise<void>;
+    unlink(path: string): Promise<void>;
+    rmdir(path: string): Promise<void>;
+  };
+  getRandomPath(path: string): Promise<string>;
+  getFileBytes(path: string): Promise<Uint8Array>;
+  TiffEncoder: {
+    encodeTiff(
+      rgbaPath: string,
+      tiffPath: string,
+      width: number,
+      height: number,
+      bitDepth: 8 | 16,
+      metadataJson: string,
+    ): Promise<void>;
+  };
+}
+
+let tiffRuntimePromise: Promise<TiffRuntime> | null = null;
+
+/** Load the TIFF WebAssembly runtime only when the user exports a TIFF. */
+const loadTiffRuntime = (): Promise<TiffRuntime> => {
+  if (tiffRuntimePromise === null) {
+    tiffRuntimePromise = import('../../native/tiff_encoder.h')
+      .then(async ({ initNative }) => (await initNative()) as TiffRuntime)
+      .catch((error: unknown) => {
+        // Allow another attempt if initialization failed (for example, a
+        // transient failure fetching the WASM asset).
+        tiffRuntimePromise = null;
+        throw error;
+      });
+  }
+  return tiffRuntimePromise;
+};
+
+const availableFormats = Object.values(FORMAT_CAPS).filter(
+  (f) => (f.encoder === 'native' || f.encoder === 'wasm') && f.isAvailable === true
 );
 
 interface exportMetadata {
@@ -58,12 +96,14 @@ export function ExportPanel() {
   const [format, setFormat] = useState('JPEG');
   const [quality, setQuality] = useState(90);
   const [loading, setLoading] = useState(false);
+  const [bits, setBits] = useState<8 | 16>(8);
+  const disabled = image === null;
 
   const supported = typeof window !== 'undefined' && 
                     window.isSecureContext && 
                     typeof window.showSaveFilePicker === 'function';
 
-  const currentFormat = nativeFormats.find((f) => f.format === format);
+  const currentFormat = availableFormats.find((f) => f.format === format);
   const [values, handlers] = useListState(checkBoxValues);
   const allChecked = values.every((value) => value.checked);
   const indeterminate = values.some((value) => value.checked) && !allChecked;
@@ -72,11 +112,15 @@ export function ExportPanel() {
 
   const formatKey = format.toLowerCase() as ExportFormat;
 
-  const renderImage = (): Promise<Blob> | null => {
+  const renderImage = async (): Promise<Blob | null> => {
     if (!image) return null;
 
     const caps = FORMAT_CAPS[formatKey];
-    if (!caps || caps.encoder !== 'native') {
+    if (
+      !caps ||
+      !caps.isAvailable ||
+      (caps.encoder !== 'native' && formatKey !== 'tiff')
+    ) {
       logger.error(`Export: ${format} is not yet supported`);
       return null;
     }
@@ -126,32 +170,92 @@ export function ExportPanel() {
       outHeight,
     );
 
-    const qualityNorm = normalizeQuality(quality);
-    const blobPromise = new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        b => (b ? resolve(b) : reject(new Error('Canvas toBlob failed'))),
-        caps.mime,
-        caps.hasQuality ? qualityNorm : undefined,
-      );
-    });
+    try {
+      if (formatKey === 'tiff') {
+        // WebGL's default framebuffer is the rendered canvas. readPixels starts
+        // at its lower-left corner and returns four 8-bit channels per pixel.
+        const pixelBottomUp = new Uint8Array(outWidth * outHeight * 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.readBuffer(gl.BACK);
+        gl.readPixels(
+          0,
+          0,
+          outWidth,
+          outHeight,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          pixelBottomUp,
+        );
 
-    blobPromise.finally(() => renderer.dispose());
-    return blobPromise;
+        // TIFF scanlines are written top-to-bottom. Reverse WebGL's row order
+        // in place so the input file's first row is at the top, without
+        // allocating a second full-size pixel buffer.
+        const rowBytes = outWidth * 4;
+        const rowBuffer = new Uint8Array(rowBytes);
+        for (let y = 0; y < Math.floor(outHeight / 2); y++) {
+          const topStart = y * rowBytes;
+          const bottomStart = (outHeight - 1 - y) * rowBytes;
+          rowBuffer.set(pixelBottomUp.subarray(topStart, topStart + rowBytes));
+          pixelBottomUp.copyWithin(topStart, bottomStart, bottomStart + rowBytes);
+          pixelBottomUp.set(rowBuffer, bottomStart);
+        }
+
+        const native = await loadTiffRuntime();
+        const directory = await native.getRandomPath('/memfs');
+        const rgbaPath = `${directory}/pixels.rgba`;
+        const tiffPath = `${directory}/export.tiff`;
+        try {
+          await native.FS.writeFile(rgbaPath, pixelBottomUp);
+          const metadata = image.metadata
+            ? buildTiffMetadata(image.metadata, { includeMetadata, includeGPS })
+            : {};
+          await native.TiffEncoder.encodeTiff(
+            rgbaPath,
+            tiffPath,
+            outWidth,
+            outHeight,
+            bits,
+            JSON.stringify(metadata),
+          );
+          const encodedBytes = await native.getFileBytes(tiffPath);
+          return new Blob([encodedBytes.buffer as ArrayBuffer], {
+            type: caps.mime ?? 'image/tiff',
+          });
+        } finally {
+          await Promise.allSettled([
+            native.FS.unlink(rgbaPath),
+            native.FS.unlink(tiffPath),
+          ]);
+          await native.FS.rmdir(directory).catch(() => undefined);
+        }
+      }
+
+      const qualityNorm = normalizeQuality(quality);
+      return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error('Canvas toBlob failed'))),
+          caps.mime,
+          caps.hasQuality ? qualityNorm : undefined,
+        );
+      });
+    } finally {
+      renderer.dispose();
+    }
   };
 
   const handleExport = async () => {
     if (!image) return;
 
-    const blob = renderImage();
-    if (!blob) return;
-
     const caps = FORMAT_CAPS[formatKey];
+    if (!caps) return;
     const extension = exportExtension(formatKey);
     const fileName = exportFileName('export', formatKey);
 
     setLoading(true);
     try {
-      let out = await blob;
+      const blob = await renderImage();
+      if (!blob) return;
+      let out = blob;
       // JPEG is the only native format with an EXIF container; when the user
       // opted into metadata, rebuild it from the source RAW and embed it (the
       // canvas re-encode dropped all of it). Every other case saves as-is.
@@ -198,7 +302,8 @@ export function ExportPanel() {
           fullWidth
           value={format}
           onChange={setFormat}
-          data={nativeFormats.map((f) => ({ value: f.format, label: f.format }))}
+          orientation='vertical'
+          data={availableFormats.map((f) => ({ value: f.format, label: f.format }))}
         />
         {/* No camera block to offer when the source was a plain JPEG: the
             checkboxes would promise metadata the export cannot carry. */}
@@ -242,6 +347,21 @@ export function ExportPanel() {
         onChange={setQuality}
       />
       }
+      {formatKey === 'tiff' ? 
+        <Select
+          title='Bits'
+          label='Bits'
+          value={String(bits)}
+          data={TIFF_BITS}
+          disabled={disabled}
+          onChange={(value) => {
+            if(value === '8' || value === '16') {
+              setBits(Number(value) as 8 | 16)
+            }
+          }}
+        >
+        </Select> 
+      : null}
       <Button onClick={handleExport} disabled={!image} loading={loading}>Export image</Button>
       {supported && (
         <Alert icon={<IconInfoCircle />} title="Downloads folder" color="info">

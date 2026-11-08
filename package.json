@@ -9,6 +9,9 @@
     "lint": "pnpm -r lint"
   },
   "dependencies": {
+    "@crossbind/plugin-vite": "2.0.0-beta.68",
+    "@crossbind/port-tiff-wasm": "2.0.0-beta.67",
+    "crossbind": "2.0.0-beta.68",
     "icons-react": "^3.7.1",
     "mantine-contextmenu": "^9.3.1"
   }

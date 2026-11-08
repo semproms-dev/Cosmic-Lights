@@ -1,6 +1,6 @@
 # CosmicLights
 
-A web application for processing RAW photos and exporting JPGs — aiming to offer features comparable to Lightroom, RapidRAW and Darktable.
+A web application for processing RAW photos and exporting developed images such as JPEG and TIFF — aiming to offer features comparable to Lightroom, RapidRAW and Darktable.
 
 At the moment this is just a hobby. I wanted a free Lightroom-style app to run on my own browser so I can edit pictures in an easy and quick way. Probably later I will go with a full Desktop application, if life me allows me to.
 
@@ -51,6 +51,30 @@ AI-generated masks run in the web app through Transformers.js; inference happens
 | Object | [`Xenova/slimsam-77-uniform`](https://huggingface.co/Xenova/slimsam-77-uniform) (SlimSAM) | Selects a prompted object from a click or bounding box. |
 
 Sky masks are not implemented yet and require a semantic segmentation model. Brush and linear/radial gradient masks are created with the app's own editing tools and do not use an AI model.
+
+## TIFF Export
+
+The web app exports TIFF images in the browser. The TIFF encoder is C++ code in `apps/web/src/native/tiff_encoder.h`, compiled to WebAssembly and called from `apps/web/src/components/panels/ExportPanel.tsx`.
+
+### Libraries
+
+- [`@crossbind/port-tiff-wasm`](https://www.npmjs.com/package/@crossbind/port-tiff-wasm) supplies **libtiff** for the WebAssembly build. libtiff writes the TIFF image, LZW compression, and the TIFF/EXIF/GPS directories.
+- [`crossbind`](https://www.npmjs.com/package/crossbind) and [`@crossbind/plugin-vite`](https://www.npmjs.com/package/@crossbind/plugin-vite) expose the C++ encoder to TypeScript and integrate its WebAssembly build with Vite. The dependency setup is in `apps/web/crossbind.config.js`; Vite integration is in `apps/web/vite.config.ts`.
+- `libraw-wasm` supplies camera metadata when a RAW file is decoded. JPEG metadata is read by `apps/web/src/editor/jpegMetadata.ts`. `apps/web/src/editor/exif.ts` maps those values to the TIFF encoder's payload. The existing `piexifjs` path still embeds EXIF in JPEG exports; TIFF metadata is written by libtiff instead.
+
+Crossbind uses its WebAssembly toolchain through Docker, so Docker must be available when Vite needs to compile or relink the encoder.
+
+### Export flow
+
+1. `ExportPanel` renders the edited, cropped and oriented image with WebGL2, then reads its RGBA pixels with `readPixels`.
+2. WebGL returns rows from bottom to top. The panel reverses them and writes the pixel bytes to crossbind's in-memory filesystem (MEMFS), avoiding a large pixel buffer crossing the JavaScript/C++ boundary.
+3. The panel calls `TiffEncoder.encodeTiff` with the dimensions, selected bit depth and JSON metadata payload.
+4. The encoder converts each RGBA row to opaque RGB and writes a LZW-compressed TIFF. It writes camera make, model, software, artist and orientation in the main TIFF IFD. Exposure time, aperture, focal length, ISO and original date go in the EXIF IFD. GPS coordinates go in a separate GPS IFD only when the user enables the GPS option.
+5. The encoder returns the TIFF through MEMFS. The panel saves it with the browser's file picker when supported, or downloads it directly.
+
+The export panel offers **8-bit** and **16-bit** integer samples. The current WebGL readback is 8-bit, so the 16-bit option scales each 8-bit channel by 257 to fill the 16-bit range. This creates a 16-bit TIFF but does not recover additional tonal detail from the RAW sensor; a true high-precision export would require a higher-precision render/readback pipeline.
+
+Camera metadata is included when available and enabled in the export options. GPS is off by default. If the source has no readable metadata, the TIFF is still exported without invented metadata.
 
 ## Getting Started
 
