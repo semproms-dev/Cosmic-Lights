@@ -7,8 +7,6 @@ import classes from './styles/About.modal.module.css';
 import logoCosmicLights from '../../assets/CosmicLightsLogo.png';
 import { useTranslation } from 'react-i18next';
 
-const APP_VERSION = '1.0.0';
-
 /**
  * About dialog body. Displays app branding, feature highlights, useful links,
  * and copyright information. Rendered inside a Mantine modal by the NavBar.
@@ -30,28 +28,19 @@ export function AboutModal() {
           size="lg"
           className={classes.versionBadge}
         >
-          v{APP_VERSION}
+          v{__APP_VERSION__}
         </Badge>
       </div>
 
       <div className={classes.links}>
         <a
           className={classes.link}
-          href="https://github.com/semproms/CosmicLights"
+          href="https://github.com/semproms-dev/Cosmic-Lights"
           target="_blank"
           rel="noopener noreferrer"
         >
           <IconBrandGithub size="1rem" stroke={1.5} />
           {t('about.sourceCode')}
-        </a>
-        <a
-          className={classes.link}
-          href="https://cosmiclights.app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <IconWorld size="1rem" stroke={1.5} />
-          {t('about.website')}
         </a>
       </div>
 

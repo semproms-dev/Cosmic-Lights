@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
+import { readFileSync } from 'node:fs'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import babel from '@rolldown/plugin-babel'
@@ -12,6 +13,11 @@ const crossbindTargetParams = getTargetParams(
   { platform: ['wasm'], arch: ['wasm32'], runtime: ['st'], runtimeEnv: ['browser'] },
   true,
 )
+
+// The workspace root package is the single source of truth for the app version.
+const appVersion = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+).version as string
 
 /** Build the small native source library before HMR can relink a changed header. */
 const crossbindSourceWarmup = () => ({
@@ -30,6 +36,9 @@ const crossbindSourceWarmup = () => ({
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   // GitHub Pages serves this project below /Cosmic-Lights/; local builds stay at /.
   base: process.env.VITE_BASE_PATH ?? '/',
   plugins: [

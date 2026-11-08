@@ -95,6 +95,10 @@ pnpm --filter api start:dev  # backend only
 
 ## Scripts
 
+### Versioning
+
+The root `package.json` is the source of truth for the app's Semantic Versioning (SemVer) version. Update its `version` for each release (`MAJOR.MINOR.PATCH`): increase MAJOR for incompatible changes, MINOR for backward-compatible features, and PATCH for fixes. Create the matching Git tag as `v<version>` (for example, `v1.0.0`). The web build reads this value from the root manifest, and the About dialog displays it automatically.
+
 ### Root (applies to all workspaces)
 
 | Script | Description |
