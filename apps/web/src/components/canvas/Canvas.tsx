@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useEditor } from '../../editor/editorContext'
 import { buildDefaultCurves } from '../../editor/curves'
 import { compileCurveTexture } from '../../editor/curvesMath'
@@ -106,6 +107,7 @@ const DENOISE_SETTLE_MS = 400
  * frame. The image keeps its aspect ratio (letterboxed) inside the container.
  */
 export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = null, radialMaskId = null, overlayMaskId = null, objectMaskId = null }: CanvasProps) {
+  const { t } = useTranslation(['common'])
   const { 
     image, 
     adjustments, 
@@ -771,9 +773,10 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       opened={resetDialogOpen}
       onClose={closeResetDialog}
       onConfirm={() => resetSettings()}
-      title="Reset changes"
-      message="This will reset all adjustment sliders, the crop area and tone curves to their default values."
-      confirmLabel="Reset"
+      title={t('confirm.resetTitle')}
+      message={t('confirm.resetMessage')}
+      confirmLabel={t('confirm.reset')}
+      cancelLabel={t('confirm.cancel')}
       confirmColor="red"
     />
   </>
