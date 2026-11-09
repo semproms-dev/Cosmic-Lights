@@ -62,6 +62,27 @@
     "settings": "Configuració",
     "about": "Quant a"
   },
+  "directoryPreview": {
+    "open": "Explora una carpeta",
+    "noImagesTitle": "No s’han trobat imatges",
+    "noImagesMessage": "La carpeta seleccionada no conté imatges compatibles directament a dins.",
+    "unknownFolder": "Carpeta seleccionada",
+    "title": "Imatges a {{directory}}",
+    "count": "{{count}} imatges compatibles",
+    "choose": "Selecciona {{name}}",
+    "selectPrompt": "Selecciona una imatge per previsualitzar-la aquí",
+    "openSelected": "Obre la imatge seleccionada",
+    "metadataTitle": "Dades EXIF",
+    "metadataLoading": "Llegint les dades EXIF…",
+    "metadataEmpty": "No hi ha dades EXIF disponibles",
+    "camera": "Càmera",
+    "exposure": "Exposició",
+    "captureDate": "Data",
+    "dimensions": "Dimensions",
+    "fileSize": "Mida del fitxer",
+    "technicalDetails": "Més dades tècniques",
+    "fullJson": "Mostra el JSON complet"
+  },
   "lateralNavBar": {
     "exposure": "Exposició",
     "contrast": "Contrast",

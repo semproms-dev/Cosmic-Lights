@@ -62,6 +62,27 @@
     "settings": "Paramètres",
     "about": "À propos"
   },
+  "directoryPreview": {
+    "open": "Parcourir un dossier",
+    "noImagesTitle": "Aucune image trouvée",
+    "noImagesMessage": "Le dossier sélectionné ne contient aucune image compatible directement à l’intérieur.",
+    "unknownFolder": "Dossier sélectionné",
+    "title": "Images dans {{directory}}",
+    "count": "{{count}} images compatibles",
+    "choose": "Sélectionner {{name}}",
+    "selectPrompt": "Sélectionnez une image pour l’afficher ici",
+    "openSelected": "Ouvrir l’image sélectionnée",
+    "metadataTitle": "Données EXIF",
+    "metadataLoading": "Lecture des données EXIF…",
+    "metadataEmpty": "Aucune donnée EXIF disponible",
+    "camera": "Appareil photo",
+    "exposure": "Prise de vue",
+    "captureDate": "Date",
+    "dimensions": "Dimensions",
+    "fileSize": "Taille du fichier",
+    "technicalDetails": "Plus de détails techniques",
+    "fullJson": "Afficher le JSON complet"
+  },
   "lateralNavBar": {
     "exposure": "Exposition",
     "contrast": "Contraste",

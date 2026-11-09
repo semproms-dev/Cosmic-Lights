@@ -17,6 +17,7 @@ import { IconRestore } from '@tabler/icons-react';
 import { IconViewfinder } from '@tabler/icons-react';
 import { IconViewfinderOff } from '@tabler/icons-react';
 import { usePreferences } from '../../../preferences/preferences';
+import { DirectoryPreviewButton } from '../../canvas/DirectoryPreviewButton'
 
 /*interface MenuItem {
   label: string;
@@ -130,6 +131,7 @@ export function NavBar({ onOpenImage, fullScreen, onToggleFullScreen }: NavBarPr
             <IconFolderOpen size="1.5rem" />
           </ActionIcon>
         </Tooltip>
+        <DirectoryPreviewButton />
         <Tooltip label={fullScreen ? t('topNav.exitFullScreen') : t('topNav.fullScreen')} withArrow>
           <ActionIcon variant='subtle' size={'lg'} disabled={image === null} onClick={() => onToggleFullScreen?.()} aria-label={fullScreen ? t('topNav.exitFullScreen') : t('topNav.fullScreen')}>
             {!fullScreen ? <TfiFullscreen size="1.375rem"/> : <IconMaximizeOff size={"1.375rem"}/>}

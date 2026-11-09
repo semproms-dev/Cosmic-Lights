@@ -47,6 +47,7 @@ Thumbs.db
 AGENTS.MD
 CLAUDE.md
 *.md
+!CHANGELOG.md
 
 # Working docs (planning / pseudocode)
 /docs/

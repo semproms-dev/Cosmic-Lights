@@ -62,6 +62,27 @@
     "settings": "Ajustes",
     "about": "Acerca de"
   },
+  "directoryPreview": {
+    "open": "Explorar una carpeta",
+    "noImagesTitle": "No se encontraron imágenes",
+    "noImagesMessage": "La carpeta seleccionada no contiene imágenes compatibles directamente en ella.",
+    "unknownFolder": "Carpeta seleccionada",
+    "title": "Imágenes en {{directory}}",
+    "count": "{{count}} imágenes compatibles",
+    "choose": "Seleccionar {{name}}",
+    "selectPrompt": "Selecciona una imagen para previsualizarla aquí",
+    "openSelected": "Abrir imagen seleccionada",
+    "metadataTitle": "Datos EXIF",
+    "metadataLoading": "Leyendo datos EXIF…",
+    "metadataEmpty": "No hay datos EXIF disponibles",
+    "camera": "Cámara",
+    "exposure": "Toma",
+    "captureDate": "Fecha",
+    "dimensions": "Tamaño",
+    "fileSize": "Tamaño del archivo",
+    "technicalDetails": "Más datos técnicos",
+    "fullJson": "Ver JSON completo"
+  },
   "lateralNavBar": {
     "exposure": "Exposición",
     "hue": "Matiz",

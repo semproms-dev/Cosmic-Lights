@@ -62,6 +62,27 @@
     "settings": "Ezarpenak",
     "about": "Honi buruz"
   },
+  "directoryPreview": {
+    "open": "Arakatu karpeta",
+    "noImagesTitle": "Ez da irudirik aurkitu",
+    "noImagesMessage": "Hautatutako karpetak ez du irudi bateragarririk zuzenean barruan.",
+    "unknownFolder": "Hautatutako karpeta",
+    "title": "Irudiak {{directory}} karpetan",
+    "count": "{{count}} irudi bateragarri",
+    "choose": "Hautatu {{name}}",
+    "selectPrompt": "Hautatu irudi bat hemen aurrebista ikusteko",
+    "openSelected": "Ireki hautatutako irudia",
+    "metadataTitle": "EXIF datuak",
+    "metadataLoading": "EXIF datuak irakurtzen…",
+    "metadataEmpty": "Ez dago EXIF daturik",
+    "camera": "Kamera",
+    "exposure": "Esposizioa",
+    "captureDate": "Data",
+    "dimensions": "Neurriak",
+    "fileSize": "Fitxategiaren tamaina",
+    "technicalDetails": "Datu tekniko gehiago",
+    "fullJson": "Ikusi JSON osoa"
+  },
   "lateralNavBar": {
     "exposure": "Esposizioa",
     "contrast": "Kontrastea",

@@ -62,6 +62,27 @@
     "settings": "Axustes",
     "about": "Acerca de"
   },
+  "directoryPreview": {
+    "open": "Explorar un cartafol",
+    "noImagesTitle": "Non se atoparon imaxes",
+    "noImagesMessage": "O cartafol seleccionado non contén imaxes compatibles directamente nel.",
+    "unknownFolder": "Cartafol seleccionado",
+    "title": "Imaxes en {{directory}}",
+    "count": "{{count}} imaxes compatibles",
+    "choose": "Seleccionar {{name}}",
+    "selectPrompt": "Selecciona unha imaxe para vela aquí",
+    "openSelected": "Abrir a imaxe seleccionada",
+    "metadataTitle": "Datos EXIF",
+    "metadataLoading": "Lendo os datos EXIF…",
+    "metadataEmpty": "Non hai datos EXIF dispoñibles",
+    "camera": "Cámara",
+    "exposure": "Exposición",
+    "captureDate": "Data",
+    "dimensions": "Dimensións",
+    "fileSize": "Tamaño do ficheiro",
+    "technicalDetails": "Máis datos técnicos",
+    "fullJson": "Ver o JSON completo"
+  },
   "lateralNavBar": {
     "exposure": "Exposición",
     "contrast": "Contraste",
