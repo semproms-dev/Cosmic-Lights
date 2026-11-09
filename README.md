@@ -6,7 +6,7 @@ At the moment this is just a hobby. I wanted a free Lightroom-style app to run o
 
 ## Privacy and data handling
 
-CosmicLights processes selected photos and editing data in your browser. The web app does not upload photo files, masks, or editing settings to the CosmicLights API. Photo previews, edits, AI-mask inference, and exports are handled locally in the browser.
+CosmicLights processes selected photos and editing data in your browser. The web app does not send photo files, masks, or editing settings to a remote service. Photo previews, edits, AI-mask inference, and exports are handled locally in the browser.
 
 AI masks require model files from Hugging Face. The browser downloads them when an AI mask is first used, or if the files are not available locally. That request goes to Hugging Face and may expose ordinary connection information, such as your IP address and browser/device details, as described in [Hugging Face's privacy policy](https://huggingface.co/privacy). CosmicLights runs inference in a browser worker; it does not send the photo to Hugging Face for inference.
 
@@ -16,12 +16,7 @@ Feel free to try and clone the repo and modify it as you want!
 
 ## Architecture
 
-**pnpm workspace monorepo** (`apps/*`):
-
-| App | Stack | Role |
-|-----|-------|------|
-| `apps/web` | React 19 + Vite + TanStack Router + Mantine 9 | Frontend UI |
-| `apps/api` | NestJS 11 + Express | Backend API |
+The web app is built with React 19, Vite, TanStack Router, and Mantine 9.
 
 ## Tech Stack
 
@@ -37,17 +32,6 @@ Feel free to try and clone the repo and modify it as you want!
 | vitest | ^4.1.9 |
 | Testing Library | ^16.3.2 |
 | Zod | ^4.4.3 |
-
-### Backend (`apps/api`)
-
-| Tool | Version |
-|------|---------|
-| NestJS | ^11.0.1 |
-| Express | (platform-express) |
-| TypeScript | ^5.7.3 |
-| vitest | ^4.1.9 |
-| SWC | (decorator transforms) |
-| Supertest | ^7.0.0 |
 
 ## AI Masks
 
@@ -87,34 +71,17 @@ Camera metadata is included when available and enabled in the export options. GP
 ## Getting Started
 
 ```bash
-pnpm install     # install all workspace dependencies
-pnpm dev         # run both apps in parallel (web + api)
+pnpm install
+pnpm --filter web dev
 ```
 
 - **Web:** http://localhost:5173
-- **API:** http://localhost:3000
-
-### Per-app dev
-
-```bash
-pnpm --filter web dev        # frontend only
-pnpm --filter api start:dev  # backend only
-```
 
 ## Scripts
 
 ### Versioning
 
 The root `package.json` is the source of truth for the app's Semantic Versioning (SemVer) version. Update its `version` for each release (`MAJOR.MINOR.PATCH`): increase MAJOR for incompatible changes, MINOR for backward-compatible features, and PATCH for fixes. Create the matching Git tag as `v<version>` (for example, `v1.0.0`). The web build reads this value from the root manifest, and the About dialog displays it automatically.
-
-### Root (applies to all workspaces)
-
-| Script | Description |
-|--------|-------------|
-| `pnpm dev` | Both apps in parallel |
-| `pnpm build` | Build all workspaces |
-| `pnpm test` | Test all workspaces |
-| `pnpm lint` | Lint all workspaces |
 
 ### Web (`apps/web`)
 
@@ -127,35 +94,11 @@ The root `package.json` is the source of truth for the app's Semantic Versioning
 | `pnpm --filter web test:coverage` | With coverage |
 | `pnpm --filter web exec vitest run src/routes/index.test.tsx` | Single test file |
 
-### API (`apps/api`)
-
-| Script | Description |
-|--------|-------------|
-| `pnpm --filter api start:dev` | Watch mode |
-| `pnpm --filter api build` | NestJS build |
-| `pnpm --filter api start:prod` | Production start |
-| `pnpm --filter api test` | Unit tests |
-| `pnpm --filter api test:cov` | With coverage |
-| `pnpm --filter api test:e2e` | E2E tests |
-
 ## Project Structure
 
 ```
 apps/
-├── api/                          # NestJS backend
-│   ├── src/
-│   │   ├── main.ts               # Bootstrap (custom Logger, try/catch)
-│   │   ├── app.module.ts         # Root module
-│   │   ├── app.controller.ts     # Controller (GET /)
-│   │   ├── app.service.ts        # Business logic
-│   │   ├── app.controller.spec.ts
-│   │   └── logger.ts             # ConsoleLogger wrapper
-│   ├── test/
-│   │   └── app.e2e-spec.ts
-│   ├── vitest.config.ts
-│   └── vitest.config.e2e.ts
-│
-└── web/                          # React frontend
+└── web/                          # React web app
     └── src/
         ├── main.tsx              # Entry point
         ├── logger.ts             # Logger utility
@@ -169,7 +112,7 @@ apps/
         │           ├── TopNavBar.module.css
         │           └── LateralNavBar.module.css
         ├── routes/
-        │   ├── __root.tsx        # Root layout (Outlet + Devtools)
+        │   ├── __root.tsx        # Root layout (Outlet)
         │   ├── index.tsx         # Home page
         │   └── index.test.tsx
         └── test/
@@ -186,12 +129,11 @@ Test files (`*.test.tsx`, `*.spec.tsx`) in `src/routes/` are excluded from route
 
 ## Testing
 
-Both apps use **vitest** with `globals: true` and 80% coverage thresholds.
+The web app uses **vitest** with `globals: true` and an 80% coverage threshold.
 
 | App | Environment | Key Setup |
 |-----|-------------|-----------|
 | Web | jsdom | `setup.ts` mocks `scrollIntoView`, `matchMedia`, `ResizeObserver`; `render.tsx` wraps in `MantineProvider` |
-| API | node | `@nestjs/testing` for unit tests; supertest + full app boot for e2e |
 
 ## Conventions
 
@@ -204,10 +146,9 @@ Both apps use **vitest** with `globals: true` and 80% coverage thresholds.
 
 ## Logger
 
-Both apps provide a level-gated logger:
+The web app provides a level-gated logger:
 
 - **Web:** `src/logger.ts` — levels `debug` / `info` / `warn` / `error`. Silences `debug`/`info` in production. Level overridable via `VITE_LOG_LEVEL` env var.
-- **API:** `src/logger.ts` — extends NestJS `ConsoleLogger`. Silences `debug`/`verbose` in production.
 
 ## Environment Variables
 
@@ -216,8 +157,3 @@ Both apps provide a level-gated logger:
 |----------|---------|-------------|
 | `VITE_LOG_LEVEL` | `debug` (dev) / `warn` (prod) | Minimum log level |
 
-### API
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3000` | HTTP server port |
-| `NODE_ENV` | `development` | Controls log level verbosity |
