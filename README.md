@@ -14,6 +14,12 @@ When you access a hosted copy of CosmicLights, its hosting or CDN provider also 
 
 Feel free to try and clone the repo and modify it as you want!
 
+## License
+
+CosmicLights is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). Third-party dependencies retain their respective licenses.
+
+If you offer a modified version of CosmicLights for users to interact with over a network, AGPL-3.0 section 13 requires you to offer those users free access to the corresponding source code. Make that offer easy to find from the application or service.
+
 ## Architecture
 
 The web app is built with React 19, Vite, TanStack Router, and Mantine 9.
