@@ -4,7 +4,13 @@ Welcome to CosmicLights! This is a web application for processing RAW photos and
 
 At the moment this is just a hobby. I wanted a free Lightroom-style app to run on my own browser so I can edit pictures in an easy and quick way. Probably later I will go with a full Desktop application, if life me allows me to.
 
-The app allows the user to explore their own folders on their own machines, however all the file management that the application does is 100% local, there's no external server or service that registers anything, the pictures always stay on your local machines as well as the own application. In the masks section you will see that we are using some AI models to separate the subject from the background, on the AI Masks sections of this README you will find more details, but the principles remain the same; once the model is downloaded everything works on local and no personal data is shared with anyone.
+## Privacy and data handling
+
+CosmicLights processes selected photos and editing data in your browser. The web app does not upload photo files, masks, or editing settings to the CosmicLights API. Photo previews, edits, AI-mask inference, and exports are handled locally in the browser.
+
+AI masks require model files from Hugging Face. The browser downloads them when an AI mask is first used, or if the files are not available locally. That request goes to Hugging Face and may expose ordinary connection information, such as your IP address and browser/device details, as described in [Hugging Face's privacy policy](https://huggingface.co/privacy). CosmicLights runs inference in a browser worker; it does not send the photo to Hugging Face for inference.
+
+When you access a hosted copy of CosmicLights, its hosting or CDN provider also receives the normal requests needed to serve the app and may log connection metadata, depending on its configuration. Exported JPEG and TIFF files can include camera metadata when that option is enabled. GPS coordinates are optional and are off by default.
 
 Feel free to try and clone the repo and modify it as you want!
 
