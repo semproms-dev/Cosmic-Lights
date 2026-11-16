@@ -309,6 +309,7 @@
   "about": {
     "tagline": "RAW argazkien prozesaketa profesionala zure nabigatzailean",
     "sourceCode": "Iturburu-kodea",
+    "email": "Posta",
     "website": "Webgunea",
     "builtWith": "React, Mantine eta Vite-rekin eraikia",
     "copyright": "CosmicLights. Eskubide guztiak erreserbatuta."

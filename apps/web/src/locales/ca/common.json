@@ -309,6 +309,7 @@
   "about": {
     "tagline": "Processament professional de fotos RAW al teu navegador",
     "sourceCode": "Codi font",
+    "email": "Correu",
     "website": "Lloc web",
     "builtWith": "Creat amb React, Mantine i Vite",
     "copyright": "CosmicLights. Tots els drets reservats."

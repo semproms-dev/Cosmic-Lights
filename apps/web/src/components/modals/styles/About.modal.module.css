@@ -1,90 +1,84 @@
 .hero {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--mantine-spacing-sm);
-  padding-bottom: var(--mantine-spacing-lg);
-  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
-}
-
-.logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(
-    135deg,
-    var(--mantine-color-blue-6),
-    var(--mantine-color-violet-6)
-  );
-  color: var(--mantine-color-white);
-}
-
-.tagline {
-  color: light-dark(var(--mantine-color-gray-6), var(--mantine-color-dark-2));
-  font-size: var(--mantine-font-size-sm);
-}
-
-.versionBadge {
-  composes: tagline;
-  background: none;
-  padding: 0;
-  font-family: var(--mantine-font-family-monospace);
-}
-
-.features {
-  padding: var(--mantine-spacing-lg) 0;
-  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
-}
-
-.featureCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--mantine-spacing-xs);
-  padding: var(--mantine-spacing-md);
-  border-radius: var(--mantine-radius-md);
-  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-5));
+  padding: calc(var(--mantine-spacing-xl) * 0.75) var(--mantine-spacing-lg);
+  border: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
+  border-radius: var(--mantine-radius-lg);
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      light-dark(rgba(34, 139, 230, 0.16), rgba(76, 110, 245, 0.22)),
+      transparent 65%
+    ),
+    light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
   text-align: center;
 }
 
-.featureIcon {
-  color: light-dark(var(--mantine-color-blue-6), var(--mantine-color-blue-4));
+.logoHalo {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow: 0 18px 45px light-dark(rgba(34, 139, 230, 0.18), rgba(0, 0, 0, 0.45));
 }
 
-.featureLabel {
+.logo {
+  border-radius: var(--mantine-radius-xl);
+}
+
+.name {
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  max-width: 34ch;
+  color: light-dark(var(--mantine-color-gray-6), var(--mantine-color-dark-2));
   font-size: var(--mantine-font-size-sm);
-  font-weight: 500;
-  color: light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-0));
+  line-height: 1.45;
 }
 
-.featureDescription {
-  font-size: var(--mantine-font-size-xs);
-  color: light-dark(var(--mantine-color-gray-5), var(--mantine-color-dark-2));
+.versionBadge {
+  font-family: var(--mantine-font-family-monospace);
+  letter-spacing: 0.02em;
 }
 
-.links {
-  display: flex;
-  justify-content: center;
-  gap: var(--mantine-spacing-lg);
-  padding: var(--mantine-spacing-lg) 0;
-  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
-}
-
-.link {
+.linkCard {
   display: flex;
   align-items: center;
-  gap: var(--mantine-spacing-xs);
-  font-size: var(--mantine-font-size-sm);
-  color: light-dark(var(--mantine-color-blue-6), var(--mantine-color-blue-4));
+  gap: var(--mantine-spacing-sm);
+  min-width: 0;
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+  border: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
+  border-radius: var(--mantine-radius-md);
+  background-color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-6));
+  color: inherit;
   text-decoration: none;
-  transition: color 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 
   &:hover {
-    color: light-dark(var(--mantine-color-blue-7), var(--mantine-color-blue-3));
+    transform: translateY(-1px);
+    border-color: light-dark(var(--mantine-color-blue-3), var(--mantine-color-blue-5));
+    background-color: light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-5));
+    text-decoration: none;
   }
+}
+
+.linkText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.linkValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .footer {
@@ -92,7 +86,8 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding-top: var(--mantine-spacing-lg);
+  padding-bottom: var(--mantine-spacing-xs);
+  text-align: center;
 }
 
 .footerText {

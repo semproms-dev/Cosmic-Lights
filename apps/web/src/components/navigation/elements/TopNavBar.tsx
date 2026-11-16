@@ -62,7 +62,7 @@ export function NavBar({ onOpenImage, fullScreen, onToggleFullScreen }: NavBarPr
   const openAbout = () => {
     modals.openModal({
       title: t('topNav.about'),
-      size: 'md',
+      size: 'lg',
       children: <AboutModal />
     })
   }

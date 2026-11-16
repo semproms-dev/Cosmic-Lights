@@ -310,6 +310,7 @@
   "about": {
     "tagline": "Professional RAW photo processing in your browser",
     "sourceCode": "Source Code",
+    "email": "Email",
     "website": "Website",
     "builtWith": "Built with React, Mantine, and Vite",
     "copyright": "CosmicLights. All rights reserved."

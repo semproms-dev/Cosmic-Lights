@@ -309,6 +309,7 @@
   "about": {
     "tagline": "Procesamento profesional de fotos RAW no teu navegador",
     "sourceCode": "Código fonte",
+    "email": "Correo",
     "website": "Sitio web",
     "builtWith": "Construído con React, Mantine e Vite",
     "copyright": "CosmicLights. Todos os dereitos reservados."
