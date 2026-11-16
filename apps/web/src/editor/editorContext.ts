@@ -14,6 +14,7 @@ import type {
   RadialShape,
 } from './masks'
 import type { Preset } from './presets'
+import type { CopiedDevelop } from './developClipboard'
 import type { MaskAlphaCache, MaskStatus } from './segmentation/types'
 import type { Orientation, TurnDirection } from './rotation'
 import type { Geometry } from './geometry'
@@ -244,6 +245,27 @@ export interface EditorState {
   resetGeometry: () => void
   cropOverlay: CropOverlayType | null
   setCropOverlay: (overlay: CropOverlayType | null) => void
+  /**
+   * The last global develop copied, or `null` until the user copies one.
+   *
+   * It lives in the provider rather than in the photo, so it survives opening
+   * another picture. Only sliders, curves and the source identity travel — crop,
+   * orientation, geometry and masks are deliberately left out.
+   */
+  copiedDevelop: CopiedDevelop | null
+  /** Snapshots the current global develop for later pasting. Never touches history. */
+  copyAdjustments: () => void
+  /**
+   * Replaces the current global develop with the copied one as a single undo
+   * step. No-op when nothing has been copied or no image is open.
+   */
+  pasteAdjustments: () => void
+  /**
+   * Applies a develop snapshot (for example, one parsed from an imported file)
+   * as a single undo step and keeps it in the clipboard for later pastes.
+   * No-op when no image is open or the snapshot version is unsupported.
+   */
+  applyDevelop: (develop: CopiedDevelop) => void
 }
 
 export const EditorContext = createContext<EditorState | null>(null)

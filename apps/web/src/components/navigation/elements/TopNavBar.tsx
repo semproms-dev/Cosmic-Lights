@@ -18,6 +18,7 @@ import { IconViewfinder } from '@tabler/icons-react';
 import { IconViewfinderOff } from '@tabler/icons-react';
 import { usePreferences } from '../../../preferences/preferences';
 import { DirectoryPreviewButton } from '../../canvas/DirectoryPreviewButton'
+import { DevelopFileMenu } from './DevelopFileMenu'
 
 /*interface MenuItem {
   label: string;
@@ -137,6 +138,7 @@ export function NavBar({ onOpenImage, fullScreen, onToggleFullScreen }: NavBarPr
             {!fullScreen ? <TfiFullscreen size="1.375rem"/> : <IconMaximizeOff size={"1.375rem"}/>}
           </ActionIcon>
         </Tooltip>
+        <DevelopFileMenu />
         <Tooltip label={t(showOriginal ? 'topNav.showEdited' : 'topNav.showOriginal')} withArrow>
           <ActionIcon size="lg" variant='subtle' onClick={() => setShowOriginal(!showOriginal)} disabled={image === null || !imageDirty}>
             {showOriginal ? <IconViewfinderOff size="1.5rem" /> : <IconViewfinder size="1.5rem" />}

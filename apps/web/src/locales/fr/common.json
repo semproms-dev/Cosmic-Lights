@@ -52,6 +52,16 @@
     "open": "Ouvrir...",
     "openFile": "Ouvrir un fichier",
     "exportJpg": "Exporter en JPG...",
+    "exportSettings": "Paramètres",
+    "exportSettingsTitle": "Exporter les paramètres",
+    "importSettings": "Importer les paramètres",
+    "importSettingsTitle": "Importer les paramètres",
+    "importSettingsMessage": "Appliquer les paramètres de \"{{fileName}}\" ? Le développement actuel de cette photo sera remplacé. Vous pourrez annuler cette action.",
+    "importSettingsDirtyMessage": "Appliquer les paramètres de \"{{fileName}}\" ? Le développement actuel non enregistré de cette photo sera remplacé. Vous pourrez annuler cette action.",
+    "importSettingsConfirm": "Importer",
+    "importSettingsInvalid": "Ce fichier n'est pas un fichier de paramètres CosmicLights valide.",
+    "importSettingsTooLarge": "Ce fichier de paramètres est trop volumineux (1 Mo maximum).",
+    "importSettingsErrorTitle": "Impossible d'importer les paramètres",
     "fullScreen": "Plein écran",
     "exitFullScreen": "Quitter le plein écran",
     "showOriginal": "Afficher l'original",
@@ -286,6 +296,11 @@
     "resetMessage": "Cela réinitialisera tous les curseurs d'ajustement, la zone de recadrage et les courbes de tonalité à leurs valeurs par défaut.",
     "discardTitle": "Ignorer les modifications ?",
     "discardMessage": "Ouvrir une nouvelle image ignorera tous les ajustements non enregistrés. Continuer ?"
+  },
+  "contextMenu": {
+    "resetChanges": "Réinitialiser les modifications",
+    "copyAdjustments": "Copier les ajustements",
+    "pasteAdjustments": "Coller les ajustements"
   },
   "dropzone": {
     "title": "Glissez une photo ici ou cliquez pour ouvrir",

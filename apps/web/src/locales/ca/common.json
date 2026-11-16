@@ -52,6 +52,16 @@
     "open": "Obre...",
     "openFile": "Obre el fitxer",
     "exportJpg": "Exporta JPG...",
+    "exportSettings": "Ajustos",
+    "exportSettingsTitle": "Exporta els ajustos",
+    "importSettings": "Importa els ajustos",
+    "importSettingsTitle": "Importa els ajustos",
+    "importSettingsMessage": "Voleu aplicar els ajustos de \"{{fileName}}\"? Es reemplaçarà el revelatge actual d'aquesta foto. Podreu desfer-ho.",
+    "importSettingsDirtyMessage": "Voleu aplicar els ajustos de \"{{fileName}}\"? Es reemplaçarà el revelatge actual sense desar d'aquesta foto. Podreu desfer-ho.",
+    "importSettingsConfirm": "Importa",
+    "importSettingsInvalid": "Aquest fitxer no és un fitxer d'ajustos de CosmicLights vàlid.",
+    "importSettingsTooLarge": "Aquest fitxer d'ajustos és massa gran (màxim 1 MB).",
+    "importSettingsErrorTitle": "No s'han pogut importar els ajustos",
     "fullScreen": "Pantalla completa",
     "exitFullScreen": "Sortir de la pantalla completa",
     "showOriginal": "Mostra l'original",
@@ -286,6 +296,11 @@
     "resetMessage": "Això restablirà tots els controls lliscants d'ajust, l'àrea de retall i les corbes de to als seus valors per defecte.",
     "discardTitle": "Vols descartar els canvis?",
     "discardMessage": "Obrir una imatge nova descartarà tots els ajustos sense desar. Continues?"
+  },
+  "contextMenu": {
+    "resetChanges": "Restableix els canvis",
+    "copyAdjustments": "Copia els ajustos",
+    "pasteAdjustments": "Enganxa els ajustos"
   },
   "dropzone": {
     "title": "Arrossega una foto aquí o fes clic per obrir",

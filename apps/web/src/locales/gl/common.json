@@ -52,6 +52,16 @@
     "open": "Abrir...",
     "openFile": "Abrir ficheiro",
     "exportJpg": "Exportar JPG...",
+    "exportSettings": "Axustes",
+    "exportSettingsTitle": "Exportar os axustes",
+    "importSettings": "Importar os axustes",
+    "importSettingsTitle": "Importar os axustes",
+    "importSettingsMessage": "Aplicar os axustes de \"{{fileName}}\"? O revelado actual desta foto substituirase. Poderás desfacer.",
+    "importSettingsDirtyMessage": "Aplicar os axustes de \"{{fileName}}\"? O revelado actual sen gardar desta foto substituirase. Poderás desfacer.",
+    "importSettingsConfirm": "Importar",
+    "importSettingsInvalid": "Este ficheiro non é un ficheiro de axustes de CosmicLights válido.",
+    "importSettingsTooLarge": "Este ficheiro de axustes é demasiado grande (máximo 1 MB).",
+    "importSettingsErrorTitle": "Non se puideron importar os axustes",
     "fullScreen": "Pantalla completa",
     "exitFullScreen": "Saír da pantalla completa",
     "showOriginal": "Mostrar o orixinal",
@@ -286,6 +296,11 @@
     "resetMessage": "Isto restablecerá todos os controles deslizantes de axuste, a área de recorte e as curvas de ton aos seus valores predeterminados.",
     "discardTitle": "Queres descartar os cambios?",
     "discardMessage": "Abrir unha imaxe nova descartará todos os axustes sen gardar. Continuar?"
+  },
+  "contextMenu": {
+    "resetChanges": "Restablecer os cambios",
+    "copyAdjustments": "Copiar os axustes",
+    "pasteAdjustments": "Pegar os axustes"
   },
   "dropzone": {
     "title": "Arrastra unha foto aquí ou fai clic para abrir",

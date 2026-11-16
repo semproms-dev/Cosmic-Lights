@@ -52,6 +52,16 @@
     "open": "Apri...",
     "openFile": "Apri file",
     "exportJpg": "Esporta JPG...",
+    "exportSettings": "Impostazioni",
+    "exportSettingsTitle": "Esporta impostazioni",
+    "importSettings": "Importa impostazioni",
+    "importSettingsTitle": "Importa impostazioni",
+    "importSettingsMessage": "Applicare le impostazioni da \"{{fileName}}\"? Lo sviluppo attuale di questa foto verrà sostituito. Potrai annullare l'operazione.",
+    "importSettingsDirtyMessage": "Applicare le impostazioni da \"{{fileName}}\"? Lo sviluppo attuale non salvato di questa foto verrà sostituito. Potrai annullare l'operazione.",
+    "importSettingsConfirm": "Importa",
+    "importSettingsInvalid": "Questo file non è un file di impostazioni CosmicLights valido.",
+    "importSettingsTooLarge": "Questo file di impostazioni è troppo grande (massimo 1 MB).",
+    "importSettingsErrorTitle": "Impossibile importare le impostazioni",
     "fullScreen": "Schermo intero",
     "exitFullScreen": "Esci dallo schermo intero",
     "showOriginal": "Mostra originale",
@@ -286,6 +296,11 @@
     "resetMessage": "Questo reimposterà tutti i cursori di regolazione, l'area di ritaglio e le curve di tono ai loro valori predefiniti.",
     "discardTitle": "Scartare le modifiche?",
     "discardMessage": "Aprendo una nuova immagine verranno scartate tutte le regolazioni non salvate. Continuare?"
+  },
+  "contextMenu": {
+    "resetChanges": "Reimposta modifiche",
+    "copyAdjustments": "Copia le regolazioni",
+    "pasteAdjustments": "Incolla le regolazioni"
   },
   "dropzone": {
     "title": "Trascina qui una foto o fai clic per aprire",

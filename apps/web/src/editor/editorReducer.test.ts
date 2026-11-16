@@ -9,6 +9,7 @@ import {
 } from './editorReducer'
 import { createMask, MAX_MASKS, type BrushStroke, type Mask } from './masks'
 import type { Preset } from './presets'
+import { createCopiedDevelop } from './developClipboard'
 import { IDENTITY_ORIENTATION } from './rotation'
 import { IDENTITY_GEOMETRY } from './geometry'
 
@@ -41,6 +42,9 @@ const fakeImage = {
 
 /** A sample crop region in image pixels. */
 const fakeRegion: CropRegion = { x: 10, y: 20, width: 40, height: 30 }
+
+/** Basic identity of the photo a copied develop came from. */
+const SOURCE = { fileName: 'test.arw', width: 6000, height: 4000 }
 
 describe('editorReducer — image slice', () => {
   it('SET_IMAGE_STATUS updates the status and leaves the image untouched', () => {
@@ -213,6 +217,56 @@ describe('editorReducer — presets', () => {
     })
 
     const next = editorReducer(state, { type: 'APPLY_PRESET', preset })
+
+    expect(next.cropRegion).toEqual(fakeRegion)
+    expect(next.masks).toEqual([mask])
+    expect(next.activeMaskId).toBe(mask.id)
+    expect(next.orientation).toEqual(IDENTITY_ORIENTATION)
+  })
+})
+
+describe('editorReducer — copied develop', () => {
+  const copiedDevelop = createCopiedDevelop(
+    { ...buildInitialAdjustments(), exposure: 0.6, contrast: 20 },
+    {
+      ...buildDefaultCurves(),
+      rgb: [
+        { x: 0, y: 0 },
+        { x: 128, y: 160 },
+        { x: 255, y: 255 },
+      ],
+    },
+    SOURCE,
+  )
+
+  it('PASTE_DEVELOP replaces sliders and curves and marks the image dirty', () => {
+    const next = editorReducer(createState(), { type: 'PASTE_DEVELOP', develop: copiedDevelop })
+
+    expect(next.adjustments.exposure).toBe(0.6)
+    expect(next.adjustments.contrast).toBe(20)
+    expect(next.curves.rgb).toEqual(copiedDevelop.curves.rgb)
+    expect(next.imageDirty).toBe(true)
+  })
+
+  it('PASTE_DEVELOP resets keys the copied snapshot does not name', () => {
+    const state = createState({
+      adjustments: { ...buildInitialAdjustments(), saturation: 35 },
+    })
+
+    const next = editorReducer(state, { type: 'PASTE_DEVELOP', develop: copiedDevelop })
+
+    expect(next.adjustments.saturation).toBe(0)
+  })
+
+  it('PASTE_DEVELOP leaves crop, orientation and masks alone', () => {
+    const mask = createMask('brush', 'Brush 1')
+    const state = createState({
+      cropRegion: fakeRegion,
+      masks: [mask],
+      activeMaskId: mask.id,
+    })
+
+    const next = editorReducer(state, { type: 'PASTE_DEVELOP', develop: copiedDevelop })
 
     expect(next.cropRegion).toEqual(fakeRegion)
     expect(next.masks).toEqual([mask])

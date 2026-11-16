@@ -52,6 +52,16 @@
     "open": "Öffnen...",
     "openFile": "Datei öffnen",
     "exportJpg": "Als JPG exportieren...",
+    "exportSettings": "Einstellungen",
+    "exportSettingsTitle": "Einstellungen exportieren",
+    "importSettings": "Einstellungen importieren",
+    "importSettingsTitle": "Einstellungen importieren",
+    "importSettingsMessage": "Einstellungen aus \"{{fileName}}\" anwenden? Die aktuelle Entwicklung dieses Fotos wird ersetzt. Du kannst sie rückgängig machen.",
+    "importSettingsDirtyMessage": "Einstellungen aus \"{{fileName}}\" anwenden? Die aktuelle ungespeicherte Entwicklung dieses Fotos wird ersetzt. Du kannst sie rückgängig machen.",
+    "importSettingsConfirm": "Importieren",
+    "importSettingsInvalid": "Diese Datei ist keine gültige CosmicLights-Einstellungsdatei.",
+    "importSettingsTooLarge": "Diese Einstellungsdatei ist zu groß (maximal 1 MB).",
+    "importSettingsErrorTitle": "Einstellungen konnten nicht importiert werden",
     "fullScreen": "Vollbild",
     "exitFullScreen": "Vollbild beenden",
     "showOriginal": "Original anzeigen",
@@ -286,6 +296,11 @@
     "resetMessage": "Dadurch werden alle Anpassungsschieber, der Zuschneidebereich und die Tonkurven auf ihre Standardwerte zurückgesetzt.",
     "discardTitle": "Änderungen verwerfen?",
     "discardMessage": "Das Öffnen eines neuen Bildes verwirft alle nicht gespeicherten Anpassungen. Fortfahren?"
+  },
+  "contextMenu": {
+    "resetChanges": "Änderungen zurücksetzen",
+    "copyAdjustments": "Anpassungen kopieren",
+    "pasteAdjustments": "Anpassungen einfügen"
   },
   "dropzone": {
     "title": "Ziehe ein Foto hierher oder klicke zum Öffnen",

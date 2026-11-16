@@ -52,6 +52,16 @@
     "open": "Open...",
     "openFile": "Open file",
     "exportJpg": "Export JPG...",
+    "exportSettings": "Settings",
+    "exportSettingsTitle": "Export settings",
+    "importSettings": "Import settings",
+    "importSettingsTitle": "Import settings",
+    "importSettingsMessage": "Apply the settings from \"{{fileName}}\"? This will replace the current develop for this photo. You can undo it.",
+    "importSettingsDirtyMessage": "Apply the settings from \"{{fileName}}\"? This will replace the current unsaved develop for this photo. You can undo it.",
+    "importSettingsConfirm": "Import",
+    "importSettingsInvalid": "This file is not a valid CosmicLights settings file.",
+    "importSettingsTooLarge": "This settings file is too large (maximum 1 MB).",
+    "importSettingsErrorTitle": "Could not import settings",
     "fullScreen": "Full screen",
     "exitFullScreen": "Exit full screen",
     "showOriginal": "Show original",
@@ -287,6 +297,11 @@
     "resetMessage": "This will reset all adjustment sliders, the crop area and tone curves to their default values.",
     "discardTitle": "Discard changes?",
     "discardMessage": "Opening a new picture will discard all unsaved adjustments. Continue?"
+  },
+  "contextMenu": {
+    "resetChanges": "Reset changes",
+    "copyAdjustments": "Copy adjustments",
+    "pasteAdjustments": "Paste adjustments"
   },
   "dropzone": {
     "title": "Drag a photo here or click to open",

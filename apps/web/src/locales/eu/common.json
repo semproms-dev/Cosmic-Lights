@@ -52,6 +52,16 @@
     "open": "Ireki...",
     "openFile": "Ireki fitxategia",
     "exportJpg": "Esportatu JPG...",
+    "exportSettings": "Ezarpenak",
+    "exportSettingsTitle": "Esportatu ezarpenak",
+    "importSettings": "Importatu ezarpenak",
+    "importSettingsTitle": "Importatu ezarpenak",
+    "importSettingsMessage": "Aplikatu \"{{fileName}}\" fitxategiko ezarpenak? Argazki honen uneko agerketa ordezkatuko da. Desegin dezakezu.",
+    "importSettingsDirtyMessage": "Aplikatu \"{{fileName}}\" fitxategiko ezarpenak? Argazki honen uneko gorde gabeko agerketa ordezkatuko da. Desegin dezakezu.",
+    "importSettingsConfirm": "Importatu",
+    "importSettingsInvalid": "Fitxategi hau ez da CosmicLights ezarpen fitxategi baliozko bat.",
+    "importSettingsTooLarge": "Ezarpen fitxategi hau handiegia da (gehienez 1 MB).",
+    "importSettingsErrorTitle": "Ezin izan dira ezarpenak inportatu",
     "fullScreen": "Pantaila osoa",
     "exitFullScreen": "Irten pantaila osotik",
     "showOriginal": "Erakutsi originala",
@@ -286,6 +296,11 @@
     "resetMessage": "Honek doikuntza-erregulagailu guztiak, mozketa-eremua eta tonu-kurbak berrezarriko ditu lehenetsitako balioetara.",
     "discardTitle": "Aldaketak baztertu?",
     "discardMessage": "Argazki berri bat irekitzeak gordeta ez dauden doikuntza guztiak baztertuko ditu. Jarraitu?"
+  },
+  "contextMenu": {
+    "resetChanges": "Berrezarri aldaketak",
+    "copyAdjustments": "Kopiatu doikuntzak",
+    "pasteAdjustments": "Itsatsi doikuntzak"
   },
   "dropzone": {
     "title": "Arrrastatu argazki bat hona edo egin klik irekitzeko",

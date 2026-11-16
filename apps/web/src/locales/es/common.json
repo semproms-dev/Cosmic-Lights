@@ -52,6 +52,16 @@
     "open": "Abrir...",
     "openFile": "Abrir archivo",
     "exportJpg": "Exportar JPG...",
+    "exportSettings": "Ajustes",
+    "exportSettingsTitle": "Exportar ajustes",
+    "importSettings": "Importar ajustes",
+    "importSettingsTitle": "Importar ajustes",
+    "importSettingsMessage": "¿Aplicar los ajustes de \"{{fileName}}\"? Se reemplazará el revelado actual de esta foto. Podrás deshacerlo.",
+    "importSettingsDirtyMessage": "¿Aplicar los ajustes de \"{{fileName}}\"? Se reemplazará el revelado actual sin guardar de esta foto. Podrás deshacerlo.",
+    "importSettingsConfirm": "Importar",
+    "importSettingsInvalid": "Este archivo no es un archivo de ajustes de CosmicLights válido.",
+    "importSettingsTooLarge": "Este archivo de ajustes es demasiado grande (máximo 1 MB).",
+    "importSettingsErrorTitle": "No se pudieron importar los ajustes",
     "fullScreen": "Pantalla completa",
     "exitFullScreen": "Salir de pantalla completa",
     "showOriginal": "Mostrar original",
@@ -286,6 +296,11 @@
     "resetMessage": "Esto restablecerá todos los controles de ajuste, el área de recorte y las curvas de tono a sus valores predeterminados.",
     "discardTitle": "¿Descartar cambios?",
     "discardMessage": "Abrir una nueva imagen descartará todos los ajustes no guardados. ¿Continuar?"
+  },
+  "contextMenu": {
+    "resetChanges": "Restablecer cambios",
+    "copyAdjustments": "Copiar ajustes",
+    "pasteAdjustments": "Pegar ajustes"
   },
   "dropzone": {
     "title": "Arrastra una foto aquí o haz clic para abrir",

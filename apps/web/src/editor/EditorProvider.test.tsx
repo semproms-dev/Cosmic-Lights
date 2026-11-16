@@ -1,9 +1,24 @@
 import { act, renderHook, type RenderHookResult } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { EditorProvider } from './EditorProvider'
 import { useEditor, type EditorState } from './editorContext'
 import { MAX_MASKS } from './masks'
+import { buildDefaultCurves } from './curves'
+import { createCopiedDevelop } from './developClipboard'
+import { buildInitialAdjustments } from './editorReducer'
 import type { CachedMaskAlpha } from './segmentation/types'
+
+// Decoding a real file needs a worker and LibRaw; the clipboard tests only need
+// `loadImage` to put a bitmap-shaped object in the store.
+vi.mock('./decodeImage', () => ({
+  decodeImage: vi.fn(async () => ({
+    bitmap: { width: 300, height: 200, close: () => undefined },
+    metadata: null,
+    source: 'developed' as const,
+    noise: null,
+    histogram: null,
+  })),
+}))
 
 /**
  * A generated alpha, as the segmentation worker would hand one over. Tiny on
@@ -16,6 +31,16 @@ function fakeAlpha(version = 0): CachedMaskAlpha {
 
 function renderEditor(): RenderHookResult<EditorState, unknown> {
   return renderHook(() => useEditor(), { wrapper: EditorProvider })
+}
+
+/** Opens a photo so the copy/paste guards see an image in the store. */
+async function openImage(
+  result: RenderHookResult<EditorState, unknown>['result'],
+  fileName: string,
+): Promise<void> {
+  await act(async () => {
+    await result.current.loadImage(new File([], fileName))
+  })
 }
 
 describe('EditorProvider · duplicateMask', () => {
@@ -123,6 +148,114 @@ describe('EditorProvider · duplicateMask', () => {
 
     expect(duplicate(result, first, 'copy')).toBeNull()
     expect(result.current.masks).toHaveLength(MAX_MASKS)
+  })
+})
+
+describe('EditorProvider · copied develop', () => {
+  it('copies without dirtying the photo or moving the history', async () => {
+    const { result } = renderEditor()
+    await openImage(result, 'a.jpg')
+    act(() => {
+      result.current.setAdjustment('exposure', 0.5)
+      result.current.commit()
+    })
+    const token = result.current.commitToken
+
+    act(() => result.current.copyAdjustments())
+
+    expect(result.current.copiedDevelop?.adjustments.exposure).toBe(0.5)
+    expect(result.current.commitToken).toBe(token)
+    expect(result.current.adjustments.exposure).toBe(0.5)
+    expect(result.current.canUndo).toBe(true)
+  })
+
+  it('keeps the clipboard when another photo is opened', async () => {
+    const { result } = renderEditor()
+    await openImage(result, 'a.jpg')
+    act(() => result.current.setAdjustment('exposure', 0.5))
+    act(() => result.current.copyAdjustments())
+
+    await openImage(result, 'b.jpg')
+
+    expect(result.current.adjustments.exposure).toBe(0)
+    expect(result.current.copiedDevelop?.adjustments.exposure).toBe(0.5)
+    expect(result.current.copiedDevelop?.source?.fileName).toBe('a.jpg')
+  })
+
+  it('pastes the copied develop as a single undo step', async () => {
+    const { result } = renderEditor()
+    await openImage(result, 'a.jpg')
+    const curve = [
+      { x: 0, y: 0 },
+      { x: 128, y: 170 },
+      { x: 255, y: 255 },
+    ]
+    act(() => {
+      result.current.setAdjustment('exposure', 0.5)
+      result.current.setCurve('rgb', curve)
+      result.current.commit()
+    })
+    act(() => result.current.copyAdjustments())
+
+    await openImage(result, 'b.jpg')
+    expect(result.current.adjustments.exposure).toBe(0)
+    expect(result.current.canUndo).toBe(false)
+
+    act(() => result.current.pasteAdjustments())
+
+    expect(result.current.adjustments.exposure).toBe(0.5)
+    expect(result.current.curves.rgb).toEqual(curve)
+    expect(result.current.imageDirty).toBe(true)
+    expect(result.current.canUndo).toBe(true)
+
+    act(() => result.current.undo())
+
+    expect(result.current.adjustments.exposure).toBe(0)
+    expect(result.current.curves.rgb).toEqual([
+      { x: 0, y: 0 },
+      { x: 255, y: 255 },
+    ])
+    expect(result.current.canUndo).toBe(false)
+  })
+
+  it('does nothing without a copied develop', async () => {
+    const { result } = renderEditor()
+    await openImage(result, 'a.jpg')
+
+    act(() => result.current.pasteAdjustments())
+
+    expect(result.current.adjustments.exposure).toBe(0)
+    expect(result.current.canUndo).toBe(false)
+  })
+
+  it('applies an imported develop as a single undo step and remembers it', async () => {
+    const { result } = renderEditor()
+    await openImage(result, 'a.jpg')
+    const imported = createCopiedDevelop(
+      { ...buildInitialAdjustments(), exposure: 0.6 },
+      buildDefaultCurves(),
+      { fileName: 'imported.raw', width: 4000, height: 3000 },
+    )
+
+    act(() => result.current.applyDevelop(imported))
+
+    expect(result.current.adjustments.exposure).toBe(0.6)
+    expect(result.current.imageDirty).toBe(true)
+    expect(result.current.canUndo).toBe(true)
+    expect(result.current.copiedDevelop).toBe(imported)
+
+    act(() => result.current.undo())
+
+    expect(result.current.adjustments.exposure).toBe(0)
+    expect(result.current.canUndo).toBe(false)
+  })
+
+  it('does not copy when no image is open', () => {
+    const { result } = renderEditor()
+
+    act(() => result.current.copyAdjustments())
+
+    expect(result.current.copiedDevelop).toBeNull()
   })
 })
 

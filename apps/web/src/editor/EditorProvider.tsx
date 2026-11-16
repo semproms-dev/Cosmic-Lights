@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { buildDefaultCurves } from './curves'
 import type { ChannelId, CurvePoint } from './curves'
-import { rgbToRgba, type CropRegion } from './image'
+import type { CropRegion } from './image'
 import { DEFAULT_CROP_ORIENTATION, IDENTITY_VIEW, type CanvasView } from './crop'
 import { decodeImage } from './decodeImage'
 import { EditorContext, type CropOverlayType, type RotationSpin } from './editorContext'
@@ -17,10 +17,11 @@ import {
   type SegmentationProvider,
 } from './segmentation/TransformersSegmentationProvider'
 import type { MaskAlphaCache, MaskStatus, SegmentationKind } from './segmentation/types'
-import { isRawFile } from '../components/canvas/rawFormats'
-import type { Metadata } from 'libraw-wasm'
-import { decodeRaw } from './decodeRaw'
-import { readJpegMetadata } from './jpegMetadata'
+import {
+  createCopiedDevelop,
+  DEVELOP_CLIPBOARD_VERSION,
+  type CopiedDevelop,
+} from './developClipboard'
 
 /**
  * Undo/redo wrapper around the editor reducer. Built once at module scope:
@@ -72,6 +73,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // own radius/hardness/mode, so undo replays the mask exactly as painted no
   // matter where the tool sits now.
   const [brush, setBrushState] = useState<BrushSettings>(DEFAULT_BRUSH)
+
+  // The last copied global develop. Deliberately outside the history: copying
+  // is not an edit, and it has to survive opening another photo.
+  const [copiedDevelop, setCopiedDevelop] = useState<CopiedDevelop | null>(null)
 
   /** Patches the brush settings, leaving the untouched fields alone. */
   const setBrush = (patch: Partial<BrushSettings>) => {
@@ -216,6 +221,39 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const commit = () => {
     dispatch({type: 'COMMIT'})
+  }
+
+  /** Snapshots the present global develop; copying itself changes nothing. */
+  const copyAdjustments = () => {
+    if (state.image === null) return
+    setCopiedDevelop(createCopiedDevelop(state.adjustments, state.curves, state.image))
+  }
+
+  /**
+   * Applies a develop snapshot as one atomic action, then commits it so the
+   * whole change is a single undo step. Also keeps it in the clipboard so it
+   * can be pasted onto another photo later.
+   */
+  const applyDevelop = (develop: CopiedDevelop) => {
+    if (state.image === null) return
+    if (develop.schemaVersion !== DEVELOP_CLIPBOARD_VERSION) {
+      logger.warn(
+        `Cannot apply develop: version ${develop.schemaVersion}, expected ${DEVELOP_CLIPBOARD_VERSION}`,
+      )
+      return
+    }
+    dispatch({ type: 'PASTE_DEVELOP', develop })
+    commit()
+    setCopiedDevelop(develop)
+  }
+
+  /**
+   * Applies the copied develop as one atomic action, then commits it so the
+   * whole paste is a single undo step.
+   */
+  const pasteAdjustments = () => {
+    if (copiedDevelop === null || state.image === null) return
+    applyDevelop(copiedDevelop)
   }
 
   /**
@@ -487,33 +525,6 @@ export function EditorProvider({ children }: EditorProviderProps) {
       // every failed open — and a file that no decoder accepts is a path that
       // really happens.
       state.image?.bitmap.close()
-      let bitmap: ImageBitmap
-      let metadata: Metadata | null = null
-      if (isRawFile(file)) {
-        const buffer = await file.arrayBuffer()
-        const decoded = await decodeRaw(buffer)
-        const imageData = new ImageData(
-          rgbToRgba(decoded.data, decoded.width, decoded.height),
-          decoded.width,
-          decoded.height,
-        )
-        bitmap = await createImageBitmap(imageData)
-        metadata = decoded.metadata
-      } else {
-        // `from-image` applies the file's EXIF orientation here, at decode time,
-        // so a portrait shot does not come in lying on its side. It must be
-        // consumed here and never reach `orientation`: that one is the user's
-        // own rotation, and folding both in would turn the photo twice.
-        //
-        // Decode and EXIF run together: neither needs the other's answer, and
-        // the metadata read is pure parsing on a slice of the same file.
-        const [decoded, exif] = await Promise.all([
-          createImageBitmap(file, { imageOrientation: 'from-image' }),
-          readJpegMetadata(file),
-        ])
-        bitmap = decoded
-        metadata = exif
-      }
       // A different image invalidates the object model's cached encoding: reuse
       // it and every prompt would be decoded against the previous photo.
       imageId.current += 1
@@ -549,6 +560,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
         resetCurves,
         resetAdjustements,
         applyPreset,
+        copiedDevelop,
+        copyAdjustments,
+        pasteAdjustments,
+        applyDevelop,
         loadImage,
         cropRegion: state.cropRegion,
         setCrop,

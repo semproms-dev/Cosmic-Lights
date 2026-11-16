@@ -9,7 +9,7 @@ import { toRenderAdjustments } from '../../editor/renderAdjustments'
 import { logger } from '../../logger'
 import { useComputedColorScheme } from '@mantine/core'
 import { useContextMenu } from 'mantine-contextmenu'
-import { IconZoomReset } from '@tabler/icons-react'
+import { IconFileExport, IconZoomReset } from '@tabler/icons-react'
 import { ConfirmDialog } from '../window/ConfirmDialog'
 import { clampZoom } from '../../utils'
 import { displayScale, IDENTITY_VIEW, pointerToImagePoint } from '../../editor/crop'
@@ -23,6 +23,7 @@ import {
 import type { BrushMode, Mask, MaskPoint, NormalizedPoint, ObjectPrompt } from '../../editor/masks'
 import { DropOverlay } from './DropOverlay'
 import { isSupportedFile } from './rawFormats'
+import { FaPaste } from 'react-icons/fa'
 
 /** Per wheel notch, the fitted image grows/shrinks by this factor. */
 const ZOOM_STEP = 1.1
@@ -138,6 +139,10 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     commitToken,
     geometry,
     resetGeometry,
+    copiedDevelop,
+    copyAdjustments,
+    pasteAdjustments,
+    imageDirty
   } = useEditor()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -708,9 +713,23 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       {
         key: 'reset',
         icon: <IconZoomReset size="1.5rem" />,
-        title: 'Reset changes',
+        title: t('contextMenu.resetChanges'),
         onClick: () => openResetDialog()
       },
+      {
+        key: 'copy',
+        icon: <IconFileExport size="1.5rem" />,
+        disabled: image === null || !imageDirty,
+        title: t('contextMenu.copyAdjustments'),
+        onClick: () => copyAdjustments()
+      },
+      {
+        key: 'paste',
+        disabled: copiedDevelop === null || image === null,
+        icon: <FaPaste size="1.5rem"/>,
+        title: t('contextMenu.pasteAdjustments'),
+        onClick: () => pasteAdjustments()
+      }
     ])}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

@@ -13,6 +13,11 @@ import type { CropRegion, ImageState, ImageStatus, LoadedImage } from './image'
 import { DEFAULT_CROP_ORIENTATION } from './crop'
 import { MAX_MASKS, type BrushStroke, type GradientLine, type Mask, type ObjectPrompt, type RadialShape } from './masks'
 import { presetAdjustments, presetCurves, type Preset } from './presets'
+import {
+  sanitizeDevelopAdjustments,
+  sanitizeDevelopCurves,
+  type CopiedDevelop,
+} from './developClipboard'
 import { IDENTITY_ORIENTATION, turn, type Orientation } from './rotation'
 import { IDENTITY_GEOMETRY, type Geometry } from './geometry'
 
@@ -103,6 +108,7 @@ export type EditorAction =
   | { type: 'SET_ROTATION_ANGLE', angleDeg: number }
   | { type: 'SET_GEOMETRY'; key: keyof Geometry; value: number }
   | { type: 'RESET_GEOMETRY' }
+  | { type: 'PASTE_DEVELOP'; develop: CopiedDevelop }
 
 /**
  * Construye el mapa inicial de sliders a partir de los cuatro grupos (Basic,
@@ -260,6 +266,19 @@ export function editorReducer(
         curves: presetCurves(action.preset),
         imageDirty: true,
       }
+    // Reemplaza el revelado global en un solo paso, como APPLY_PRESET, pero
+    // desde un snapshot completo: lo copiado se reproduce tal cual sobre los
+    // valores por defecto. Recorte, orientación y máscaras no viajan.
+    case 'PASTE_DEVELOP':
+      return {
+        ...state,
+        adjustments: sanitizeDevelopAdjustments(
+          action.develop.adjustments,
+          buildInitialAdjustments(),
+        ),
+        curves: sanitizeDevelopCurves(action.develop.curves),
+        imageDirty: true,
+      }
     case 'SET_CROP':
       return { ...state, cropRegion: action.cropRegion, imageDirty: true}
     case 'CLEAR_CROP':
@@ -359,8 +378,6 @@ export function editorReducer(
         })),
         imageDirty: true,
       }
-    case 'SET_CROP_ORIENTATION':
-      return { ...state, cropOrientation: action.orientation }
     default:
       return state
   }
