@@ -155,6 +155,8 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
   const colorScheme = useComputedColorScheme('dark')
   // Holds the last pointer position while panning; null when not dragging.
   const panRef = useRef<{ x: number; y: number } | null>(null)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+  const [panning, setPanning] = useState(false)
   // Set to true by the pan/zoom handlers to signal that the next draw only
   // changes the view transform (pan/zoom) and can skip the full GPU pipeline
   // (denoise, develop, mask stacking, blurs) — only the composite pass needs
@@ -194,6 +196,36 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     if (!isSupportedFile(file)) return
     void loadImage(file)
   }
+
+  useEffect(() => {
+    const isTextEntry = (target: EventTarget | null): boolean => {
+      if (target instanceof HTMLInputElement) {
+        return !['button', 'checkbox', 'file', 'image', 'radio', 'reset', 'submit'].includes(target.type)
+      }
+      if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true
+      return target instanceof HTMLElement && (target.isContentEditable || target.closest('[role="textbox"]') !== null)
+    }
+
+    const isSpace = (e: KeyboardEvent): boolean => e.code === 'Space' || e.key === ' '
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (!isSpace(e) || isTextEntry(e.target)) return
+      e.preventDefault()
+      setSpaceHeld(true)
+    }
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (isSpace(e)) setSpaceHeld(false)
+    }
+    const onBlur = (): void => setSpaceHeld(false)
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [])
 
   // Create the renderer once, bound to the canvas's WebGL2 context.
   useEffect(() => {
@@ -513,6 +545,13 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
 
   // Drag paints the active brush mask, defines the active gradient, or pans.
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (spaceHeld || e.button === 1) {
+      e.preventDefault()
+      panRef.current = { x: e.clientX, y: e.clientY }
+      setPanning(true)
+      e.currentTarget.setPointerCapture(e.pointerId)
+      return
+    }
     if (brushMaskId !== null && image !== null) {
       const p = toImagePoint(e)
       if (p === null) return
@@ -561,7 +600,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     // Keep the brush cursor ring under the pointer whenever painting is armed.
-    if (brushMaskId !== null) updateBrushCursor(e)
+    if (brushMaskId !== null && !spaceHeld && !panning) updateBrushCursor(e)
     const stroke = strokeRef.current
     if (stroke !== null && brushMaskId !== null) {
       const p = toImagePoint(e)
@@ -682,7 +721,19 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       return
     }
     panRef.current = null
+    setPanning(false)
     e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  const handlePointerCancel = (): void => {
+    strokeRef.current = null
+    gradientAnchorRef.current = null
+    radialAnchorRef.current = null
+    objectDragRef.current = null
+    setObjectBand(null)
+    setBrushCursor(null)
+    panRef.current = null
+    setPanning(false)
   }
 
   // Back to how the photo opened: sliders, curves, crop, orientation, geometry
@@ -734,9 +785,11 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onPointerLeave={() => setBrushCursor(null)}
+      onAuxClick={(e) => e.preventDefault()}
       onDoubleClick={() => setView(IDENTITY_VIEW)}
-      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: brushMaskId !== null ? 'none' : gradientMaskId !== null || radialMaskId !== null || objectMaskId !== null ? 'crosshair' : 'default' }} />
+      ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', cursor: panning ? 'grabbing' : spaceHeld ? 'grab' : brushMaskId !== null ? 'none' : gradientMaskId !== null || radialMaskId !== null || objectMaskId !== null ? 'crosshair' : 'default' }} />
 
     </div>
   </div>
@@ -744,7 +797,7 @@ export function Canvas({ cropping = false, brushMaskId = null, gradientMaskId = 
     <DropOverlay imageLoaded={image !== null} onDropFile={handleDropFile} />
 
 
-    {brushMaskId !== null && brushCursor !== null && (
+    {brushMaskId !== null && brushCursor !== null && !spaceHeld && !panning && (
       <div
         aria-hidden
         style={{

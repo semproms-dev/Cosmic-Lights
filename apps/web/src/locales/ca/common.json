@@ -191,7 +191,30 @@
   },
   "shortcuts": {
     "title": "Dreceres",
-    "soon": " (aviat)"
+    "soon": " (aviat)",
+    "categories": {
+      "file": "Fitxer",
+      "edit": "Edita",
+      "view": "Veu",
+      "masks": "Màscares"
+    },
+    "actions": {
+      "openImage": "Obrir imatge",
+      "resetAll": "Restablir canvis",
+      "undo": "Desfer",
+      "redo": "Refer",
+      "showShortcuts": "Mostrar dreceres",
+      "brushSmaller": "Pinzell més petit",
+      "brushLarger": "Pinzell més gran",
+      "move": "Desplaçar amb el pinzell actiu"
+    },
+    "keys": {
+      "space": "Espai",
+      "leftClick": "clic esquerre",
+      "shift": "Majús",
+      "ctrl": "Ctrl",
+      "alt": "Alt"
+    }
   },
   "crop": {
     "title": "Retall",

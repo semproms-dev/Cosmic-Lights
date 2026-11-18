@@ -11,7 +11,7 @@ import { IDENTITY_GEOMETRY, type Geometry } from './geometry'
 import { logger } from '../logger'
 import { canRedo, canUndo, initHistory, undoable } from './editorHistory'
 import type { Preset } from './presets'
-import { createMask, duplicateMask as cloneMask, DEFAULT_BRUSH, MASK_TYPE_LABEL, MAX_MASKS, type BrushSettings, type BrushStroke, type DuplicateMaskOptions, type GradientLine, type MaskType, type ObjectPrompt, type RadialShape } from './masks'
+import { createMask, duplicateMask as cloneMask, DEFAULT_BRUSH, MASK_TYPE_LABEL, MAX_MASKS, type BrushSettings, type BrushStroke, type DuplicateMaskOptions, type GradientLine, type Mask, type MaskType, type ObjectPrompt, type RadialShape } from './masks'
 import {
   TransformersSegmentationProvider,
   type SegmentationProvider,
@@ -74,6 +74,10 @@ export function EditorProvider({ children }: EditorProviderProps) {
   // matter where the tool sits now.
   const [brush, setBrushState] = useState<BrushSettings>(DEFAULT_BRUSH)
 
+  // Which mask receives brush strokes right now. `brush.mode` only says add vs
+  // erase; this is the missing "tool armed" bit. Transient, like `brush`.
+  const [brushArmedMaskId, setBrushArmedMaskId] = useState<string | null>(null)
+
   // The last copied global develop. Deliberately outside the history: copying
   // is not an edit, and it has to survive opening another photo.
   const [copiedDevelop, setCopiedDevelop] = useState<CopiedDevelop | null>(null)
@@ -81,6 +85,34 @@ export function EditorProvider({ children }: EditorProviderProps) {
   /** Patches the brush settings, leaving the untouched fields alone. */
   const setBrush = (patch: Partial<BrushSettings>) => {
     setBrushState((current) => ({ ...current, ...patch }))
+  }
+
+  /**
+   * Points the brush at `mask` and, when requested, restores Add as the starting
+   * mode for a Select Subject refinement.
+   *
+   * @param mask - Mask being loaded; `null` disarms the brush.
+   * @param resetSubjectMode - Whether a subject mask should start in Add mode.
+   */
+  const prepareBrushForMask = (mask: Mask | null, resetSubjectMode: boolean): void => {
+    if (mask === null || (mask.type !== 'brush' && mask.type !== 'subject')) {
+      setBrushArmedMaskId(null)
+      return
+    }
+    if (mask.type === 'subject' && resetSubjectMode) {
+      setBrushState((current) => ({ ...current, mode: 'add' }))
+    }
+    setBrushArmedMaskId(mask.id)
+  }
+
+  /** Arms brush painting on `id`; unknown or non-paintable masks disarm it. */
+  const setBrushArmedMask = (id: string | null): void => {
+    if (id === null) {
+      setBrushArmedMaskId(null)
+      return
+    }
+    const mask = state.masks.find((candidate) => candidate.id === id)
+    prepareBrushForMask(mask ?? null, false)
   }
 
   // Canvas zoom/pan. Transient (never undoable), but shared: the crop overlay
@@ -394,6 +426,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
     if (state.masks.length >= MAX_MASKS) return null
     const sameType = state.masks.filter((mask) => mask.type === type).length
     const mask = createMask(type, `${MASK_TYPE_LABEL[type]} ${sameType + 1}`)
+    prepareBrushForMask(mask, true)
     dispatch({ type: 'ADD_MASK', mask })
     if (type === 'subject' || type === 'sky') {
       // Automatic AI masks only. `mask` is brand new, so its version is known
@@ -441,6 +474,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
     // never ran. No segmentation is started: its alpha is already in the cache.
     const status = maskStatus.get(id)
     if (status !== undefined) setMaskStatus((current) => new Map(current).set(copy.id, status))
+    prepareBrushForMask(copy, true)
     dispatch({ type: 'ADD_MASK', mask: copy })
     return copy.id
   }
@@ -467,10 +501,13 @@ export function EditorProvider({ children }: EditorProviderProps) {
   }
 
   const removeMask = (id: string) => {
+    if (brushArmedMaskId === id) setBrushArmedMaskId(null)
     dispatch({ type: 'REMOVE_MASK', id })
   }
 
   const setActiveMask = (id: string | null) => {
+    const mask = id === null ? null : (state.masks.find((candidate) => candidate.id === id) ?? null)
+    prepareBrushForMask(mask, mask?.type === 'subject' && id !== state.activeMaskId)
     dispatch({ type: 'SET_ACTIVE_MASK', id })
   }
 
@@ -528,6 +565,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
       // A different image invalidates the object model's cached encoding: reuse
       // it and every prompt would be decoded against the previous photo.
       imageId.current += 1
+      setBrushArmedMaskId(null)
       dispatch({
         type: 'SET_IMAGE',
         image: {
@@ -595,6 +633,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
         addBrushStroke,
         brush,
         setBrush,
+        brushArmedMaskId,
+        setBrushArmedMask,
         setMaskGradient,
         setObjectPrompt,
         maskOverlayHidden,
@@ -621,7 +661,7 @@ export function EditorProvider({ children }: EditorProviderProps) {
         angle: state.orientation.angleDeg,
         geometry: state.geometry,
         setGeometry,
-        resetGeometry
+        resetGeometry,
       }}
     >
       {children}

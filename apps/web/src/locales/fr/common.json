@@ -191,7 +191,30 @@
   },
   "shortcuts": {
     "title": "Raccourcis",
-    "soon": " (bientôt)"
+    "soon": " (bientôt)",
+    "categories": {
+      "file": "Fichier",
+      "edit": "Modifier",
+      "view": "Affichage",
+      "masks": "Masques"
+    },
+    "actions": {
+      "openImage": "Ouvrir l’image",
+      "resetAll": "Réinitialiser les modifications",
+      "undo": "Annuler",
+      "redo": "Rétablir",
+      "showShortcuts": "Afficher les raccourcis",
+      "brushSmaller": "Pinceau plus petit",
+      "brushLarger": "Pinceau plus grand",
+      "move": "Déplacer quand le pinceau est actif"
+    },
+    "keys": {
+      "space": "Espace",
+      "leftClick": "clic gauche",
+      "shift": "Maj",
+      "ctrl": "Ctrl",
+      "alt": "Alt"
+    }
   },
   "crop": {
     "title": "Recadrer",

@@ -38,10 +38,11 @@ export function useEditorShortcuts(handlers: EditorShortcutHandlers): void {
     // move a tool setting, which nothing else reads.
     brushSmaller: () => setBrush({ size: stepBrushSize(brush.size, -1) }),
     brushLarger: () => setBrush({ size: stepBrushSize(brush.size, 1) }),
+    move: () => undefined,
   }
 
   useHotkeys(
-    SHORTCUTS.filter((s) => s.enabled !== false).map((s) => [
+    SHORTCUTS.filter((s) => s.enabled !== false && s.id !== 'move').map((s) => [
       s.combo,
       () => {
         // Without an image, only opening one or showing the help does anything.

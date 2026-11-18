@@ -192,7 +192,30 @@
   },
   "shortcuts": {
     "title": "Shortcuts",
-    "soon": " (soon)"
+    "soon": " (soon)",
+    "categories": {
+      "file": "File",
+      "edit": "Edit",
+      "view": "View",
+      "masks": "Masks"
+    },
+    "actions": {
+      "openImage": "Open image",
+      "resetAll": "Reset changes",
+      "undo": "Undo",
+      "redo": "Redo",
+      "showShortcuts": "Show shortcuts",
+      "brushSmaller": "Smaller brush",
+      "brushLarger": "Larger brush",
+      "move": "Move when brush is active"
+    },
+    "keys": {
+      "space": "Space",
+      "leftClick": "left click",
+      "shift": "Shift",
+      "ctrl": "Ctrl",
+      "alt": "Alt"
+    }
   },
   "crop": {
     "title": "Crop",

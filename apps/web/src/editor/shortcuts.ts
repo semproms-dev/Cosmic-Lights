@@ -17,6 +17,7 @@ export type ShortcutActionId =
   | 'showShortcuts'
   | 'brushSmaller'
   | 'brushLarger'
+  | 'move'
 
 /** Grouping used to lay out the reference panel. */
 export type ShortcutCategory = 'File' | 'Edit'  | 'View' | 'Masks'
@@ -54,6 +55,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: 'showShortcuts', combo: '?', label: 'Show shortcuts', category: 'View', icon: IconKeyboard },
   { id: 'brushSmaller', combo: '[', label: 'Smaller brush', category: 'Masks', icon: IconBrush, enabled: true },
   { id: 'brushLarger', combo: ']', label: 'Larger brush', category: 'Masks', icon: IconBrush, enabled: true },
+  { id: 'move', combo: 'space + left click', label: 'Move when brush is active', category: 'Masks', icon: IconBrush, enabled: true },
 ]
 
 // `mod` is Cmd on macOS and Ctrl elsewhere; resolve which for display only.
@@ -72,4 +74,7 @@ const KEY_LABEL: Record<string, string> = IS_MAC
  * @returns The ordered list of key labels to render as `<Kbd>`.
  */
 export const formatCombo = (combo: string): string[] =>
-  combo.split('+').map((k) => KEY_LABEL[k] ?? k.toUpperCase())
+  combo.split('+').map((raw) => {
+    const key = raw.trim()
+    return KEY_LABEL[key] ?? key.toUpperCase()
+  })

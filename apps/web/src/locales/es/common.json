@@ -191,7 +191,30 @@
   },
   "shortcuts": {
     "title": "Atajos",
-    "soon": " (pronto)"
+    "soon": " (pronto)",
+    "categories": {
+      "file": "Archivo",
+      "edit": "Editar",
+      "view": "Ver",
+      "masks": "Máscaras"
+    },
+    "actions": {
+      "openImage": "Abrir imagen",
+      "resetAll": "Restablecer cambios",
+      "undo": "Deshacer",
+      "redo": "Rehacer",
+      "showShortcuts": "Mostrar atajos",
+      "brushSmaller": "Pincel más pequeño",
+      "brushLarger": "Pincel más grande",
+      "move": "Desplazar con el pincel activo"
+    },
+    "keys": {
+      "space": "Espacio",
+      "leftClick": "clic izquierdo",
+      "shift": "Mayús",
+      "ctrl": "Ctrl",
+      "alt": "Alt"
+    }
   },
   "crop": {
     "title": "Recortar",

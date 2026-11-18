@@ -47,16 +47,20 @@ function HomePage() {
   const [activeTool, setActiveTool] = useState('adjustments')
   const [infoOpen, setInfoOpen] = useState(false)
   const { t } = useTranslation(['common'])
-  const {imageStatus, masks, activeMaskId, maskOverlayHidden} = useEditor();
+  const { imageStatus, masks, activeMaskId, maskOverlayHidden, brushArmedMaskId } = useEditor();
   const { preferences } = usePreferences();
   const { fullscreen, toggle } = useFullscreenDocument();
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // When the Masks tool is open and a brush mask is selected, the canvas paints
-  // that mask on drag instead of panning. Any other case → no painting (null).
+  // When Masks is open, a brush mask stays paintable as before; a subject mask
+  // becomes paintable once its Add/Erase control arms the brush.
   const activeMask = masks.find((m) => m.id === activeMaskId) ?? null
   const brushMaskId =
-    activeTool === 'masks' && activeMask?.type === 'brush' ? activeMask.id : null
+    activeTool === 'masks' &&
+    activeMask !== null &&
+    (activeMask.type === 'brush' || brushArmedMaskId === activeMask.id)
+      ? activeMask.id
+      : null
   // Same idea for a linear-gradient mask: a drag defines its ramp instead of panning.
   const gradientMaskId =
     activeTool === 'masks' && activeMask?.type === 'linear' ? activeMask.id : null

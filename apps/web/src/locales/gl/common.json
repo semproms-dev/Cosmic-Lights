@@ -191,7 +191,30 @@
   },
   "shortcuts": {
     "title": "Atallos",
-    "soon": " (pronto)"
+    "soon": " (pronto)",
+    "categories": {
+      "file": "Ficheiro",
+      "edit": "Editar",
+      "view": "Ver",
+      "masks": "Máscaras"
+    },
+    "actions": {
+      "openImage": "Abrir imaxe",
+      "resetAll": "Restablecer cambios",
+      "undo": "Desfacer",
+      "redo": "Refacer",
+      "showShortcuts": "Amosar atallos",
+      "brushSmaller": "Pincel máis pequeno",
+      "brushLarger": "Pincel máis grande",
+      "move": "Desprazar co pincel activo"
+    },
+    "keys": {
+      "space": "Espazo",
+      "leftClick": "clic esquerdo",
+      "shift": "Maiús",
+      "ctrl": "Ctrl",
+      "alt": "Alt"
+    }
   },
   "crop": {
     "title": "Recorte",

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   BRUSH_SIZE_MAX,
   BRUSH_SIZE_MIN,
+  BRUSH_SIZE_SLIDER_STEP,
   brushRadiusPx,
   buildMaskAdjustments,
   createMask,
@@ -199,6 +200,13 @@ describe('brush tool settings', () => {
     expect(small).toBeCloseTo(large)
     expect(stepBrushSize(0.04, 1)).toBeGreaterThan(0.04)
     expect(stepBrushSize(0.04, -1)).toBeLessThan(0.04)
+  })
+
+  it('uses fine steps and stops short of a full-frame brush', () => {
+    expect(stepBrushSize(0.04, 1) / 0.04).toBeCloseTo(1.1)
+    expect(BRUSH_SIZE_SLIDER_STEP).toBe(0.005)
+    expect(BRUSH_SIZE_MAX).toBe(0.25)
+    expect(brushRadiusPx(BRUSH_SIZE_MAX, 4000, 3000)).toBe(750)
   })
 
   it('is reversible: a step out and back returns to the same size', () => {

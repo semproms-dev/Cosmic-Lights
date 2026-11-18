@@ -36,4 +36,8 @@ describe('formatCombo', () => {
     expect(formatCombo('1')).toEqual(['1'])
     expect(formatCombo('?')).toEqual(['?'])
   })
+
+  it('trims spaced combos such as space + left click', () => {
+    expect(formatCombo('space + left click')).toEqual(['SPACE', 'LEFT CLICK'])
+  })
 })

@@ -528,6 +528,17 @@ describe('editorReducer — masks', () => {
     expect(next.imageDirty).toBe(true)
   })
 
+  it('ADD_BRUSH_STROKE can refine an AI mask too', () => {
+    const mask = createMask('subject', 'Subject 1')
+    const state = createState({ masks: [mask] })
+
+    const next = editorReducer(state, { type: 'ADD_BRUSH_STROKE', id: mask.id, stroke })
+
+    expect(next.masks[0].strokes).toEqual([stroke])
+    expect(next.masks[0].version).toBe(1)
+    expect(next.imageDirty).toBe(true)
+  })
+
   it('SET_MASK_GRADIENT sets the ramp and bumps the version', () => {
     const mask = createMask('linear', 'Linear Gradient 1')
     const state = createState({ masks: [mask] })

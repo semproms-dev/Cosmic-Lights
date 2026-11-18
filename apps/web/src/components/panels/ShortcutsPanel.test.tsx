@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '../../test/render';
+import { afterEach, describe, expect, it } from 'vitest';
+import { act, render, screen } from '../../test/render';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { SHORTCUTS } from '../../editor/shortcuts';
+import i18n from '../../i18n';
 
 describe('ShortcutsPanel', () => {
+  afterEach(async () => {
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+  });
+
   it('renders every shortcut label from the registry', () => {
     render(<ShortcutsPanel />);
 
@@ -27,5 +34,20 @@ describe('ShortcutsPanel', () => {
     // Open image = mod+O; reset = mod+shift+R. Their distinctive keys render as <kbd>.
     expect(screen.getByText('O')).toBeInTheDocument();
     expect(screen.getByText('R')).toBeInTheDocument();
+  });
+
+  it('translates the title, categories, actions and combo keys', async () => {
+    render(<ShortcutsPanel />);
+    await act(async () => {
+      await i18n.changeLanguage('es');
+    });
+
+    expect(screen.getByText('Atajos')).toBeInTheDocument();
+    expect(screen.getByText('Archivo')).toBeInTheDocument();
+    expect(screen.getByText('Abrir imagen')).toBeInTheDocument();
+    expect(screen.getByText('Desplazar con el pincel activo')).toBeInTheDocument();
+    expect(screen.getByText('Espacio')).toBeInTheDocument();
+    expect(screen.getByText('clic izquierdo')).toBeInTheDocument();
+    expect(screen.getAllByText('Mayús')).toHaveLength(2);
   });
 });

@@ -191,7 +191,30 @@
   },
   "shortcuts": {
     "title": "Scorciatoie",
-    "soon": " (presto)"
+    "soon": " (presto)",
+    "categories": {
+      "file": "File",
+      "edit": "Modifica",
+      "view": "Visualizza",
+      "masks": "Maschere"
+    },
+    "actions": {
+      "openImage": "Apri immagine",
+      "resetAll": "Reimposta modifiche",
+      "undo": "Annulla",
+      "redo": "Ripeti",
+      "showShortcuts": "Mostra scorciatoie",
+      "brushSmaller": "Pennello più piccolo",
+      "brushLarger": "Pennello più grande",
+      "move": "Sposta quando il pennello è attivo"
+    },
+    "keys": {
+      "space": "Spazio",
+      "leftClick": "clic sinistro",
+      "shift": "Maiusc",
+      "ctrl": "Ctrl",
+      "alt": "Alt"
+    }
   },
   "crop": {
     "title": "Ritaglia",

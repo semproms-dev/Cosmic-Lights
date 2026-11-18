@@ -146,7 +146,7 @@ export interface EditorState {
   setMaskInvert: (id: string, invert: boolean) => void
   /** Renames a mask. */
   renameMask: (id: string, name: string) => void
-  /** Appends a freehand brush stroke to a brush mask. */
+  /** Appends a freehand stroke to a brush mask, or refines an AI mask. */
   addBrushStroke: (id: string, stroke: BrushStroke) => void
   /**
    * Live brush-tool settings (size/hardness/add-erase). Transient UI state, like
@@ -156,6 +156,14 @@ export interface EditorState {
   brush: BrushSettings
   /** Patches the brush settings; unlisted fields keep their current value. */
   setBrush: (patch: Partial<BrushSettings>) => void
+  /**
+   * Id of the mask whose alpha target is armed for freehand painting.
+   * `brush.mode` only chooses add vs erase; this field says *whether* a drag
+   * paints at all. Transient UI state, never undoable.
+   */
+  brushArmedMaskId: string | null
+  /** Arms brush painting on a mask, or disarms it with `null`. */
+  setBrushArmedMask: (id: string | null) => void
   /** Sets (or replaces) the gradient ramp of a `linear` mask. */
   setMaskGradient: (id: string, gradient: GradientLine) => void
   /**

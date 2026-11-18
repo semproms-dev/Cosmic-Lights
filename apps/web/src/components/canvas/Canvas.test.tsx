@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '../../test/render'
+import { fireEvent, render, screen, waitFor } from '../../test/render'
 import userEvent from '@testing-library/user-event'
 import { Canvas } from './Canvas'
 import { useEditor } from '../../editor/editorContext'
@@ -187,5 +187,133 @@ describe('Canvas — reset', () => {
     // the straighten — the reset itself would be unundoable.
     await user.click(screen.getByRole('button', { name: 'undo' }))
     expect(screen.getByTestId('angle')).toHaveTextContent('12')
+  })
+})
+
+describe('Canvas — pan override', () => {
+  const getCanvas = (): HTMLCanvasElement => {
+    const canvas = document.querySelector('canvas')
+    if (canvas === null) throw new Error('canvas not found')
+    return canvas
+  }
+
+  beforeEach(() => {
+    gpu.views = []
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({})) as unknown as typeof HTMLCanvasElement.prototype.getContext
+    HTMLCanvasElement.prototype.setPointerCapture = vi.fn()
+    HTMLCanvasElement.prototype.releasePointerCapture = vi.fn()
+    HTMLCanvasElement.prototype.getBoundingClientRect = () => ({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 300,
+      bottom: 200,
+      width: 300,
+      height: 200,
+      toJSON: () => ({}),
+    }) as DOMRect
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('pans instead of painting while Space is held with a brush armed', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <Harness />
+        <Canvas brushMaskId="mask-1" />
+      </>,
+    )
+    await user.click(screen.getByRole('button', { name: 'load' }))
+    const canvas = getCanvas()
+
+    fireEvent.keyDown(window, { code: 'Space', key: ' ' })
+    expect(canvas).toHaveStyle({ cursor: 'grab' })
+
+    fireEvent.pointerDown(canvas, { button: 0, clientX: 10, clientY: 10, pointerId: 1 })
+    expect(canvas).toHaveStyle({ cursor: 'grabbing' })
+    fireEvent.pointerMove(canvas, { clientX: 60, clientY: 40, pointerId: 1 })
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 1 })
+
+    await waitFor(() => {
+      const view = gpu.views.at(-1)
+      expect(view?.offsetX).toBeCloseTo(1 / 3, 5)
+      expect(view?.offsetY).toBeCloseTo(-0.3, 5)
+    })
+
+    fireEvent.keyUp(window, { code: 'Space', key: ' ' })
+    expect(canvas).toHaveStyle({ cursor: 'none' })
+  })
+
+  it('pans with the middle button even when a brush is armed', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <Harness />
+        <Canvas brushMaskId="mask-1" />
+      </>,
+    )
+    await user.click(screen.getByRole('button', { name: 'load' }))
+    const canvas = getCanvas()
+
+    fireEvent.pointerDown(canvas, { button: 1, clientX: 10, clientY: 10, pointerId: 2 })
+    fireEvent.pointerMove(canvas, { clientX: 50, clientY: 30, pointerId: 2 })
+    fireEvent.pointerUp(canvas, { button: 1, pointerId: 2 })
+
+    await waitFor(() => {
+      const view = gpu.views.at(-1)
+      expect(view?.offsetX).toBeCloseTo(4 / 15, 5)
+      expect(view?.offsetY).toBeCloseTo(-0.2, 5)
+    })
+    expect(canvas).toHaveStyle({ cursor: 'none' })
+  })
+
+  it('arms Space even when the last click left focus on a panel button', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <Harness />
+        <Canvas brushMaskId="mask-1" />
+      </>,
+    )
+    await user.click(screen.getByRole('button', { name: 'load' }))
+    const canvas = getCanvas()
+    const button = screen.getByRole('button', { name: 'load' })
+    button.focus()
+
+    fireEvent.keyDown(button, { key: ' ' })
+    expect(canvas).toHaveStyle({ cursor: 'grab' })
+    fireEvent.pointerDown(canvas, { button: 0, clientX: 10, clientY: 10, pointerId: 3 })
+    fireEvent.pointerMove(canvas, { clientX: 60, clientY: 40, pointerId: 3 })
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 3 })
+
+    await waitFor(() => {
+      const view = gpu.views.at(-1)
+      expect(view?.offsetX).toBeCloseTo(1 / 3, 5)
+      expect(view?.offsetY).toBeCloseTo(-0.3, 5)
+    })
+  })
+
+  it('leaves Space alone while typing in a text input', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <Harness />
+        <Canvas brushMaskId="mask-1" />
+      </>,
+    )
+    await user.click(screen.getByRole('button', { name: 'load' }))
+    const canvas = getCanvas()
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+
+    fireEvent.keyDown(input, { code: 'Space', key: ' ' })
+
+    expect(canvas).toHaveStyle({ cursor: 'none' })
+    input.remove()
   })
 })

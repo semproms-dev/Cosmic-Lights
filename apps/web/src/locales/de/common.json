@@ -191,7 +191,30 @@
   },
   "shortcuts": {
     "title": "Tastenkürzel",
-    "soon": " (bald)"
+    "soon": " (bald)",
+    "categories": {
+      "file": "Datei",
+      "edit": "Bearbeiten",
+      "view": "Ansicht",
+      "masks": "Masken"
+    },
+    "actions": {
+      "openImage": "Bild öffnen",
+      "resetAll": "Änderungen zurücksetzen",
+      "undo": "Rückgängig",
+      "redo": "Wiederholen",
+      "showShortcuts": "Tastenkürzel anzeigen",
+      "brushSmaller": "Pinsel verkleinern",
+      "brushLarger": "Pinsel vergrößern",
+      "move": "Verschieben bei aktivem Pinsel"
+    },
+    "keys": {
+      "space": "Leertaste",
+      "leftClick": "linker Klick",
+      "shift": "Umschalt",
+      "ctrl": "Strg",
+      "alt": "Alt"
+    }
   },
   "crop": {
     "title": "Zuschneiden",

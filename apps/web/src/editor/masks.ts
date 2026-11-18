@@ -219,7 +219,8 @@ export type BrushMode = 'add' | 'erase'
 
 /**
  * One freehand brush stroke: the polyline the pointer traced plus the brush
- * shape. Strokes are the *generative description* of a brush mask — the heavy
+ * shape. Strokes are the *generative description* of a brush mask, or a
+ * refinement layered on top of an AI mask's generated alpha — the heavy
  * rasterised alpha is derived from them on demand and cached outside history,
  * so undo/redo only ever moves these light vectors around.
  */
@@ -254,15 +255,18 @@ export interface BrushSettings {
   mode: BrushMode
 }
 
-/** Bounds of {@link BrushSettings.size}: a fine 0.5% detail brush up to half the frame. */
+/** Bounds of {@link BrushSettings.size}: a fine 0.5% detail brush up to a quarter of the short side. */
 export const BRUSH_SIZE_MIN = 0.005
-export const BRUSH_SIZE_MAX = 0.5
+export const BRUSH_SIZE_MAX = 0.25
+
+/** Slider granularity for brush size, as a fraction of the short side. */
+export const BRUSH_SIZE_SLIDER_STEP = 0.005
 
 /** What a fresh session (and every new image) starts with. */
 export const DEFAULT_BRUSH: BrushSettings = { size: 0.04, hardness: 0.5, mode: 'add' }
 
-/** Factor applied per `[` / `]` press. */
-const BRUSH_SIZE_STEP = 1.25
+/** Factor applied per `[` / `]` press. Small enough to refine without jumping. */
+const BRUSH_SIZE_STEP = 1.1
 
 /**
  * Resizes the brush by `steps` notches, clamped to the legal range.

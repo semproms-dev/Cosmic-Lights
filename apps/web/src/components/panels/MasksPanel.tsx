@@ -7,7 +7,8 @@ import {
   IconTrash,
   IconUser,
   IconDumpling,
-  IconCopy
+  IconCopy,
+  IconMinus
 } from '@tabler/icons-react'
 import {
   ActionIcon,
@@ -22,11 +23,13 @@ import {
   UnstyledButton,
 } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
+import type { ReactElement } from 'react'
 import { useEditor } from '../../editor/editorContext'
 import { basicAdjustments, colorAdjustement, detailsAdjustement } from '../../editor/adjustments'
 import {
   BRUSH_SIZE_MAX,
   BRUSH_SIZE_MIN,
+  BRUSH_SIZE_SLIDER_STEP,
   isPromptEmpty,
   MASK_ADJUSTMENT_KEYS,
   MASK_GRANULARITIES,
@@ -75,10 +78,37 @@ function awaitingPrompt(mask: Mask): boolean {
   return mask.type === 'object' && (mask.prompt === null || isPromptEmpty(mask.prompt))
 }
 
+interface BrushSizeSliderProps {
+  size: number
+  label: string
+  onChange: (size: number) => void
+}
+
+/** Brush-size control shared by hand-painted masks and AI-mask refinements. */
+function BrushSizeSlider({ size, label, onChange }: BrushSizeSliderProps): ReactElement {
+  return (
+    <>
+      <Group justify="space-between" gap="xs">
+        <Text size="sm">{label}</Text>
+        <Text size="sm" c="dimmed">{Math.round(size * 100)}</Text>
+      </Group>
+      <Slider
+        value={size}
+        onChange={onChange}
+        min={BRUSH_SIZE_MIN}
+        max={BRUSH_SIZE_MAX}
+        step={BRUSH_SIZE_SLIDER_STEP}
+        label={null}
+        thumbLabel={label}
+      />
+    </>
+  )
+}
+
 /**
  * Masks tool panel: recreates Lightroom's "Add New Mask" menu, lists the current
  * masks and — for the selected mask — exposes its local adjustment sliders, plus
- * the brush settings when the mask is painted by hand.
+ * the brush settings for hand-painted masks and Select Subject refinements.
  *
  * Each row carries a right-click menu for the per-mask operations that do not
  * deserve permanent buttons: duplicating it (with or without flipping its
@@ -101,6 +131,7 @@ export function MasksPanel() {
     setObjectPrompt,
     brush,
     setBrush,
+    setBrushArmedMask,
     commit,
     setMaskOverlayHidden,
     maskStatus,
@@ -120,6 +151,12 @@ export function MasksPanel() {
     (maskStatus.get(active.id) !== undefined && maskStatus.get(active.id) !== 'ready')
     || awaitingPrompt(active)
   )
+
+  const handleBrushModeChange = (value: string): void => {
+    if (active === null) return
+    setBrush({ mode: value as BrushMode })
+    setBrushArmedMask(active.id)
+  }
 
   return (
     <Stack gap="sm" p="xs">
@@ -190,6 +227,15 @@ export function MasksPanel() {
                             // No invert override: a plain copy keeps whatever the
                             // original was set to.
                             duplicateMask(mask.id, `${mask.name} ${t('masks.copySuffix')}`);
+                            commit();
+                          }
+                        },
+                        {
+                          key: 'remove',
+                          icon: <IconMinus size="1.5rem"/>,
+                          title: t('masks.remove'),
+                          onClick: () => {
+
                             commit();
                           }
                         }
@@ -274,24 +320,16 @@ export function MasksPanel() {
                 size="xs"
                 fullWidth
                 value={brush.mode}
-                onChange={(value) => setBrush({ mode: value as BrushMode })}
+                onChange={handleBrushModeChange}
                 data={[
                   { value: 'add', label: t('masks.brushAdd') },
                   { value: 'erase', label: t('masks.brushErase') },
                 ]}
               />
-              <Group justify="space-between" gap="xs">
-                <Text size="sm">{t('masks.brushSize')}</Text>
-                <Text size="sm" c="dimmed">{Math.round(brush.size * 100)}</Text>
-              </Group>
-              <Slider
-                value={brush.size}
-                onChange={(v) => setBrush({ size: v })}
-                min={BRUSH_SIZE_MIN}
-                max={BRUSH_SIZE_MAX}
-                step={0.005}
-                label={null}
-                thumbLabel={t('masks.brushSize')}
+              <BrushSizeSlider
+                size={brush.size}
+                label={t('masks.brushSize')}
+                onChange={(size) => setBrush({ size })}
               />
               <Group justify="space-between" gap="xs">
                 <Text size="sm">{t('masks.brushHardness')}</Text>
@@ -308,6 +346,27 @@ export function MasksPanel() {
               />
             </Stack>
           )}
+          {
+            active.type === 'subject' && (
+              <Stack gap={6}>
+                <SegmentedControl
+                  size="xs"
+                  fullWidth
+                  value={brush.mode}
+                  onChange={handleBrushModeChange}
+                  data={[
+                    { value: 'add', label: t('masks.brushAdd') },
+                    { value: 'erase', label: t('masks.brushErase') },
+                  ]}
+                />
+                <BrushSizeSlider
+                  size={brush.size}
+                  label={t('masks.brushSize')}
+                  onChange={(size) => setBrush({ size })}
+                />
+              </Stack>
+            )
+          }
           <Stack gap="md">
             {MASK_ADJUSTMENT_KEYS.map((key) => {
               const meta = ADJ_META.get(key)

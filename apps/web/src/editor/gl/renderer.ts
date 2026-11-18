@@ -1709,6 +1709,15 @@ export class WebGLRenderer {
     gl.viewport(0, 0, target.width, target.height)
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT)
+    this.stampStrokes(target, strokes)
+  }
+
+  /** Replays committed strokes into the currently relevant mask target. */
+  private stampStrokes(target: RenderTarget, strokes: BrushStroke[]): void {
+    if (strokes.length === 0) return
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer)
+    gl.viewport(0, 0, target.width, target.height)
     for (const stroke of strokes) {
       this.stampDiscsAlong(stroke.points, stroke.radius, stroke.hardness, stroke.mode)
     }
@@ -1774,11 +1783,12 @@ export class WebGLRenderer {
   }
 
   /**
-   * Reconciles the per-mask alpha targets with the store's masks: creates a
-   * target for each new mask, re-rasterises brush masks whose `version` changed,
-   * and frees targets for removed masks. Call once per frame before the mask
-   * passes. An AI mask whose alpha has not arrived yet keeps an empty target —
-   * and a stale version, so it is retried on the next frame.
+    * Reconciles the per-mask alpha targets with the store's masks: creates a
+    * target for each new mask, re-rasterises brush masks whose `version` changed,
+    * and frees targets for removed masks. Call once per frame before the mask
+    * passes. AI masks upload their cached alpha and replay any brush strokes
+    * layered on top of it; one whose alpha has not arrived yet keeps an empty
+    * target and a stale version, so it is retried on the next frame.
    *
    * @param masks - The store's current masks.
    * @param maskAlphas - Generated alphas for AI masks, keyed by mask id. An
@@ -1828,12 +1838,13 @@ export class WebGLRenderer {
             entry.version = mask.version
             break
           default: {
-            // subject/sky/object: the alpha arrives asynchronously from the segmentation
-            // worker. Until it does, leave the target empty and the version stale
-            // so the next frame tries again.
+            // subject/sky/object: the cached alpha is the model base. Brush strokes,
+            // if any, are refinements layered on top of it and must be replayed on
+            // every rebuild (commit, undo/redo or a newer segmentation).
             const alpha = maskAlphas.get(mask.id)
-            if (alpha !== undefined && alpha.version === mask.version) {
+            if (alpha !== undefined) {
               this.uploadMaskAlpha(mask.id, alpha)
+              this.stampStrokes(entry.target, mask.strokes)
               entry.version = mask.version
             }
           }

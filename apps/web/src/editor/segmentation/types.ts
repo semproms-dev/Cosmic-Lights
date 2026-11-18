@@ -14,10 +14,11 @@ export interface MaskAlpha {
 export type SegmentationKind = Exclude<MaskType, 'brush' | 'linear' | 'radial' | 'object'>
 
 /**
- * A generated alpha, tagged with the `Mask.version` it was produced for.
+ * A generated alpha, tagged with the `Mask.version` the segmentation produced.
  *
- * The tag is what lets `syncMasks` tell a fresh alpha from a stale one left over
- * by an earlier version of the same mask.
+ * The renderer treats it as the model base for an AI mask and replays any
+ * refinement strokes from the store on top; the tag records which segmentation
+ * run produced that base.
  */
 export interface CachedMaskAlpha extends MaskAlpha {
   version: number

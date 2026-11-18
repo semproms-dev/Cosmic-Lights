@@ -191,7 +191,30 @@
   },
   "shortcuts": {
     "title": "Lasterbideak",
-    "soon": " (laster)"
+    "soon": " (laster)",
+    "categories": {
+      "file": "Fitxategia",
+      "edit": "Editatu",
+      "view": "Ikusi",
+      "masks": "Maskarak"
+    },
+    "actions": {
+      "openImage": "Ireki irudia",
+      "resetAll": "Berrezarri aldaketak",
+      "undo": "Desegin",
+      "redo": "Berregin",
+      "showShortcuts": "Erakutsi lasterbideak",
+      "brushSmaller": "Pintzel txikiagoa",
+      "brushLarger": "Pintzel handiagoa",
+      "move": "Mugitu pintzela aktibo dagoenean"
+    },
+    "keys": {
+      "space": "Espazioa",
+      "leftClick": "ezkerreko klik",
+      "shift": "Maius",
+      "ctrl": "Ctrl",
+      "alt": "Alt"
+    }
   },
   "crop": {
     "title": "Mozketa",

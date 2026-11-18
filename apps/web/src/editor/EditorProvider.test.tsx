@@ -314,3 +314,71 @@ describe('EditorProvider · commitToken', () => {
     expect(result.current.commitToken).not.toBe(committed)
   })
 })
+
+describe('EditorProvider · brush arming', () => {
+  function addMask(
+    result: RenderHookResult<EditorState, unknown>['result'],
+    type: 'brush' | 'subject' | 'object',
+  ): string {
+    let id: string | null = null
+    act(() => {
+      id = result.current.addMask(type)
+    })
+    if (id === null) throw new Error('addMask refused')
+    return id
+  }
+
+  it('arms only paintable masks and disarms on selection change', () => {
+    const { result } = renderEditor()
+    const brushId = addMask(result, 'brush')
+    const subjectId = addMask(result, 'subject')
+    const objectId = addMask(result, 'object')
+
+    act(() => result.current.setBrushArmedMask(subjectId))
+    expect(result.current.brushArmedMaskId).toBe(subjectId)
+
+    act(() => result.current.setBrushArmedMask(objectId))
+    expect(result.current.brushArmedMaskId).toBeNull()
+
+    act(() => result.current.setBrushArmedMask(brushId))
+    expect(result.current.brushArmedMaskId).toBe(brushId)
+
+    act(() => result.current.setActiveMask(subjectId))
+    expect(result.current.brushArmedMaskId).toBe(subjectId)
+  })
+
+  it('loads Select Subject with the brush armed in Add mode', () => {
+    const { result } = renderEditor()
+    act(() => result.current.setBrush({ mode: 'erase' }))
+
+    const subjectId = addMask(result, 'subject')
+
+    expect(result.current.brush.mode).toBe('add')
+    expect(result.current.brushArmedMaskId).toBe(subjectId)
+  })
+
+  it('restores Add when reselecting a Select Subject from another mask', () => {
+    const { result } = renderEditor()
+    const subjectId = addMask(result, 'subject')
+    addMask(result, 'brush')
+    act(() => result.current.setBrush({ mode: 'erase' }))
+
+    act(() => result.current.setActiveMask(subjectId))
+
+    expect(result.current.brush.mode).toBe('add')
+    expect(result.current.brushArmedMaskId).toBe(subjectId)
+  })
+
+  it('keeps Erase when it is chosen on an already loaded Select Subject', () => {
+    const { result } = renderEditor()
+    const subjectId = addMask(result, 'subject')
+
+    act(() => {
+      result.current.setBrush({ mode: 'erase' })
+      result.current.setBrushArmedMask(subjectId)
+    })
+
+    expect(result.current.brush.mode).toBe('erase')
+    expect(result.current.brushArmedMaskId).toBe(subjectId)
+  })
+})
