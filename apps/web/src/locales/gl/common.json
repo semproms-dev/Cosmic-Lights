@@ -177,7 +177,7 @@
     "jpegImage": "Imaxe JPEG"
   },
   "info": {
-    "title": "Información",
+    "title": "Axustes da cámara",
     "file": "Ficheiro: ",
     "captureDate": "Data de captura: ",
     "brand": "Marca: ",
@@ -240,6 +240,7 @@
   "masks": {
     "title": "Máscaras",
     "addNew": "Engadir máscara nova",
+    "limitReached": "Non podes usar máis de {{max}} máscaras",
     "invert": "Inverter",
     "selectSubject": "Seleccionar o suxeito",
     "selectSky": "Seleccionar o ceo",
@@ -284,6 +285,7 @@
     "contextDuplicateInvert": "Duplicar e inverter a máscara",
     "contextDuplicate": "Duplicar a máscara",
     "contextRemoveMask": "Eliminar a máscara",
+    "edit": "Editar o nome da máscara",
     "copySuffix": "(copia)"
   },
   "presets": {

@@ -8,7 +8,7 @@ import {
   IconUser,
   IconDumpling,
   IconCopy,
-  IconMinus
+  IconEdit
 } from '@tabler/icons-react'
 import {
   ActionIcon,
@@ -19,11 +19,12 @@ import {
   Slider,
   Stack,
   Text,
+  TextInput,
   Tooltip,
   UnstyledButton,
 } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
-import type { ReactElement } from 'react'
+import { useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { useEditor } from '../../editor/editorContext'
 import { basicAdjustments, colorAdjustement, detailsAdjustement } from '../../editor/adjustments'
 import {
@@ -41,7 +42,7 @@ import {
   type MaskGranularity,
   type MaskType,
 } from '../../editor/masks'
-import { useContextMenu } from 'mantine-contextmenu'
+import { useContextMenu, type ContextMenuItemOptions } from 'mantine-contextmenu'
 
 /**
  * Slider metadata (label/range/step) for every mask-adjustment key. `details` is
@@ -67,6 +68,19 @@ const ADD_OPTIONS: AddOption[] = [
   { type: 'linear', labelKey: 'linearGradient', icon: IconLine },
   { type: 'radial', labelKey: 'radialGradient', icon: IconCircleDot },
   { type: 'object', labelKey: 'selectObject', icon: IconClick },
+]
+
+interface MaskOption {
+  key: string
+  icon: typeof IconBrush
+  titleKey: string
+}
+
+const CONTEXT_MENU_MASKS: MaskOption[] = [
+  { key: 'duplicateandinvert', icon: IconDumpling, titleKey: 'contextDuplicateInvert' },
+  { key: 'delete', icon: IconTrash, titleKey: 'contextRemoveMask' },
+  { key: 'duplicate', icon: IconCopy, titleKey: 'contextDuplicate' },
+  { key: 'edit', icon: IconEdit, titleKey: 'edit' },
 ]
 
 /**
@@ -137,7 +151,12 @@ export function MasksPanel() {
     maskStatus,
     modelProgress,
     retryMask,
+    renameMask,
   } = useEditor()
+
+  const [editingMaskId, setEditingMaskId] = useState<string | null>(null)
+  const [draftName, setDraftName] = useState('')
+  const skipBlurRef = useRef(false)
 
   const disabled = image === null
   const atCap = masks.length >= MAX_MASKS
@@ -158,28 +177,98 @@ export function MasksPanel() {
     setBrushArmedMask(active.id)
   }
 
+  const startRename = (mask: Mask): void => {
+    skipBlurRef.current = false
+    setEditingMaskId(mask.id)
+    setDraftName(mask.name)
+  }
+
+  const finishRename = (mask: Mask): void => {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false
+      setEditingMaskId(null)
+      return
+    }
+    const name = draftName.trim()
+    if (name !== '' && name !== mask.name) renameMask(mask.id, name)
+    setEditingMaskId(null)
+  }
+
+  const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>, mask: Mask): void => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      finishRename(mask)
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      skipBlurRef.current = true
+      setEditingMaskId(null)
+    }
+  }
+
+  const handleMaskMenuAction = (key: string, mask: Mask): void => {
+    switch (key) {
+      case 'duplicateandinvert':
+        // Only the selection is copied. Carrying the tone
+        // changes over would spread them across the whole
+        // frame, since the two masks are complements.
+        duplicateMask(mask.id, `${mask.name} ${t('masks.copySuffix')}`, {
+          invert: !mask.invert,
+          resetAdjustments: true,
+        })
+        commit()
+        break
+      case 'delete':
+        removeMask(mask.id)
+        commit()
+        break
+      case 'duplicate':
+        // No invert override: a plain copy keeps whatever the
+        // original was set to.
+        duplicateMask(mask.id, `${mask.name} ${t('masks.copySuffix')}`)
+        commit()
+        break
+      case 'edit':
+        setActiveMask(mask.id)
+        startRename(mask)
+        break
+    }
+  }
+
+  const maskContextMenu = (mask: Mask): ContextMenuItemOptions[] =>
+    CONTEXT_MENU_MASKS.map((option) => {
+      const Icon = option.icon
+      return {
+        key: option.key,
+        icon: <Icon size="1.5rem" />,
+        title: t(`masks.${option.titleKey}`),
+        onClick: () => handleMaskMenuAction(option.key, mask),
+      }
+    })
+
   return (
     <Stack gap="sm" p="xs">
       <Text fw={700} size="sm">{t('masks.addNew')}</Text>
       <Stack gap={2}>
+        {atCap ? <Text c="red" fw={700}>{t('masks.limitReached', { max: MAX_MASKS })}</Text> : null}
         {ADD_OPTIONS.map((opt) => (
-          <UnstyledButton
-            key={opt.labelKey}
-            disabled={disabled || opt.disabled || opt.type === null || atCap}
-            onClick={() => opt.type !== null && addMask(opt.type)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 8px',
-              borderRadius: 'var(--mantine-radius-sm)',
-              opacity: disabled || opt.disabled || atCap ? 0.4 : 1,
-              cursor: disabled || opt.disabled || atCap ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <opt.icon size="1.125rem" stroke={1.5} />
-            <Text size="sm">{t(`masks.${opt.labelKey}`)}</Text>
-          </UnstyledButton>
+            <UnstyledButton
+              key={opt.labelKey}
+              disabled={disabled || opt.disabled || opt.type === null || atCap}
+              onClick={() => opt.type !== null && addMask(opt.type)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 8px',
+                borderRadius: 'var(--mantine-radius-sm)',
+                opacity: disabled || opt.disabled || atCap ? 0.4 : 1,
+                cursor: disabled || opt.disabled || atCap ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <opt.icon size="1.125rem" stroke={1.5} />
+              <Text size="sm">{t(`masks.${opt.labelKey}`)}</Text>
+            </UnstyledButton>
         ))}
       </Stack>
 
@@ -191,71 +280,45 @@ export function MasksPanel() {
               const status = maskStatus.get(mask.id)
               return (
                 <Group key={mask.id} justify="space-between" gap="xs" wrap="nowrap">
-                  <UnstyledButton
-                    onClick={() => setActiveMask(mask.id)}
-                    style={{ flex: 1, padding: '4px 8px', borderRadius: 'var(--mantine-radius-sm)', minWidth: 0 }}
-                    data-active={mask.id === activeMaskId || undefined}
-                  >
-                    <Text onContextMenu={showContextMenu(
-                      [
-                        {
-                          key: 'duplicateandinvert',
-                          icon: <IconDumpling size="1.5rem" />,
-                          title: t('masks.contextDuplicateInvert'),
-                          onClick: () => {
-                            // Only the selection is copied. Carrying the tone
-                            // changes over would spread them across the whole
-                            // frame, since the two masks are complements.
-                            duplicateMask(mask.id, `${mask.name} ${t('masks.copySuffix')}`, {
-                              invert: !mask.invert,
-                              resetAdjustments: true,
-                            });
-                            commit();
-                          }
-                        },
-                        {
-                          key: 'delete',
-                          icon: <IconTrash size="1.5rem" />,
-                          title: t('masks.contextRemoveMask'),
-                          onClick: () => {removeMask(mask.id); commit();}
-                        },
-                        {
-                          key: 'duplicate',
-                          icon: <IconCopy size="1.5rem" />,
-                          title: t('masks.contextDuplicate'),
-                          onClick: () => {
-                            // No invert override: a plain copy keeps whatever the
-                            // original was set to.
-                            duplicateMask(mask.id, `${mask.name} ${t('masks.copySuffix')}`);
-                            commit();
-                          }
-                        },
-                        {
-                          key: 'remove',
-                          icon: <IconMinus size="1.5rem"/>,
-                          title: t('masks.remove'),
-                          onClick: () => {
-
-                            commit();
-                          }
-                        }
-                      ]
-                    )} size="sm" fw={mask.id === activeMaskId ? 700 : 400} truncate>{mask.name}
-                  </Text>
-                    {status === 'loading' && (
-                      // The two waits look identical to the user but are not: the
-                      // download is slow once and has a real percentage, while
-                      // inference is slow every time and has nothing to report.
-                      <Text size="xs" c="dimmed">
-                        {modelProgress === null
-                          ? t('masks.segmenting')
-                          : t('masks.downloadingModel', { progress: Math.round(modelProgress) })}
-                      </Text>
-                    )}
-                    {status === 'error' && (
-                      <Text size="xs" c="red">{t('masks.segmentFailed')}</Text>
-                    )}
-                  </UnstyledButton>
+                  {editingMaskId === mask.id ? (
+                    <TextInput
+                      size="xs"
+                      autoFocus
+                      value={draftName}
+                      aria-label={t('masks.edit')}
+                      onChange={(event) => setDraftName(event.currentTarget.value)}
+                      onBlur={() => finishRename(mask)}
+                      onKeyDown={(event) => handleRenameKeyDown(event, mask)}
+                      style={{ flex: 1 }}
+                    />
+                  ) : (
+                    <UnstyledButton
+                      onClick={() => setActiveMask(mask.id)}
+                      style={{ flex: 1, padding: '4px 8px', borderRadius: 'var(--mantine-radius-sm)', minWidth: 0 }}
+                      data-active={mask.id === activeMaskId || undefined}
+                    >
+                      <Text
+                        onDoubleClick={() => startRename(mask)}
+                        onContextMenu={showContextMenu(maskContextMenu(mask))}
+                        size="sm"
+                        fw={mask.id === activeMaskId ? 700 : 400}
+                        truncate
+                      >{mask.name}</Text>
+                      {status === 'loading' && (
+                        // The two waits look identical to the user but are not: the
+                        // download is slow once and has a real percentage, while
+                        // inference is slow every time and has nothing to report.
+                        <Text size="xs" c="dimmed">
+                          {modelProgress === null
+                            ? t('masks.segmenting')
+                            : t('masks.downloadingModel', { progress: Math.round(modelProgress) })}
+                        </Text>
+                      )}
+                      {status === 'error' && (
+                        <Text size="xs" c="red">{t('masks.segmentFailed')}</Text>
+                      )}
+                    </UnstyledButton>
+                  )}
                   {status === 'loading' && <Loader size="xs" />}
                   {status === 'error' && (
                     <Tooltip label={t('masks.retry')}>

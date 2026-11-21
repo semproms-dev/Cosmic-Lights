@@ -177,7 +177,7 @@
     "jpegImage": "Immagine JPEG"
   },
   "info": {
-    "title": "Info",
+    "title": "Impostazioni della fotocamera",
     "file": "File: ",
     "captureDate": "Data di scatto: ",
     "brand": "Marca: ",
@@ -240,6 +240,7 @@
   "masks": {
     "title": "Maschere",
     "addNew": "Aggiungi nuova maschera",
+    "limitReached": "Non puoi usare più di {{max}} maschere",
     "invert": "Inverti",
     "selectSubject": "Seleziona soggetto",
     "selectSky": "Seleziona cielo",
@@ -284,6 +285,7 @@
     "contextDuplicateInvert": "Duplica e inverti maschera",
     "contextDuplicate": "Duplica maschera",
     "contextRemoveMask": "Rimuovi maschera",
+    "edit": "Modifica il nome della maschera",
     "copySuffix": "(copia)"
   },
   "presets": {

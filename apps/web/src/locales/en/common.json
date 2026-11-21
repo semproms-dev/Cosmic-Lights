@@ -178,7 +178,7 @@
     "jpegImage": "JPEG image"
   },
   "info": {
-    "title": "Info",
+    "title": "Camera adjustments",
     "file": "File: ",
     "captureDate": "Capture date: ",
     "brand": "Brand: ",
@@ -241,6 +241,7 @@
   "masks": {
     "title": "Masks",
     "addNew": "Add New Mask",
+    "limitReached": "You can't use more than {{max}} masks",
     "invert": "Invert",
     "selectSubject": "Select Subject",
     "selectSky": "Select Sky",
@@ -285,6 +286,7 @@
     "contextDuplicateInvert": "Duplicate and invert mask",
     "contextDuplicate": "Duplicate mask",
     "contextRemoveMask": "Remove mask",
+    "edit": "Edit mask name",
     "copySuffix": "(copy)"
   },
   "presets": {

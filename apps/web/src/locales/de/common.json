@@ -177,7 +177,7 @@
     "jpegImage": "JPEG-Bild"
   },
   "info": {
-    "title": "Info",
+    "title": "Kameraeinstellungen",
     "file": "Datei: ",
     "captureDate": "Aufnahmedatum: ",
     "brand": "Marke: ",
@@ -240,6 +240,7 @@
   "masks": {
     "title": "Masken",
     "addNew": "Neue Maske hinzufügen",
+    "limitReached": "Du kannst nicht mehr als {{max}} Masken verwenden",
     "invert": "Invertieren",
     "selectSubject": "Motiv auswählen",
     "selectSky": "Himmel auswählen",
@@ -284,6 +285,7 @@
     "contextDuplicateInvert": "Maske duplizieren und invertieren",
     "contextDuplicate": "Maske duplizieren",
     "contextRemoveMask": "Maske entfernen",
+    "edit": "Maskennamen bearbeiten",
     "copySuffix": "(Kopie)"
   },
   "presets": {

@@ -177,7 +177,7 @@
     "jpegImage": "JPEG irudia"
   },
   "info": {
-    "title": "Informazioa",
+    "title": "Kameraren doikuntzak",
     "file": "Fitxategia: ",
     "captureDate": "Argazki-data: ",
     "brand": "Marka: ",
@@ -240,6 +240,7 @@
   "masks": {
     "title": "Maskarak",
     "addNew": "Gehitu maskara berria",
+    "limitReached": "Ezin dituzu {{max}} maskara baino gehiago erabili",
     "invert": "Alderantzikatu",
     "selectSubject": "Hautatu subjektua",
     "selectSky": "Hautatu zerua",
@@ -284,6 +285,7 @@
     "contextDuplicateInvert": "Bikoiztu eta alderantzikatu maskara",
     "contextDuplicate": "Bikoiztu maskara",
     "contextRemoveMask": "Kendu maskara",
+    "edit": "Editatu maskaren izena",
     "copySuffix": "(kopia)"
   },
   "presets": {

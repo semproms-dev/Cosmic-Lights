@@ -177,7 +177,7 @@
     "jpegImage": "Imatge JPEG"
   },
   "info": {
-    "title": "Informació",
+    "title": "Ajustos de la càmera",
     "file": "Fitxer: ",
     "captureDate": "Data de captura: ",
     "brand": "Marca: ",
@@ -240,6 +240,7 @@
   "masks": {
     "title": "Màscares",
     "addNew": "Afegeix màscara nova",
+    "limitReached": "No pots utilitzar més de {{max}} màscares",
     "invert": "Inverteix",
     "selectSubject": "Selecciona el subjecte",
     "selectSky": "Selecciona el cel",
@@ -284,6 +285,7 @@
     "contextDuplicateInvert": "Duplica i inverteix la màscara",
     "contextDuplicate": "Duplica la màscara",
     "contextRemoveMask": "Elimina la màscara",
+    "edit": "Edita el nom de la màscara",
     "copySuffix": "(còpia)"
   },
   "presets": {

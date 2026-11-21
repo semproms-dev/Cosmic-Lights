@@ -2,19 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MantineProvider } from '@mantine/core'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { createMask, type Mask } from '../../editor/masks'
+import { createMask, MAX_MASKS, type Mask } from '../../editor/masks'
 import type { MaskStatus } from '../../editor/segmentation/types'
 import '../../i18n'
 
 // Controlled editor store: the test drives the masks and their segmentation
 // status, and spies on the actions the panel triggers. `vi.hoisted` keeps the
 // refs reachable from the (hoisted) `vi.mock` factory.
-const { retryMask, addMask, setObjectPrompt, setBrush, setBrushArmedMask, state } = vi.hoisted(() => ({
+const { retryMask, addMask, setObjectPrompt, setBrush, setBrushArmedMask, renameMask, commit, state } = vi.hoisted(() => ({
   retryMask: vi.fn(),
   addMask: vi.fn(),
   setObjectPrompt: vi.fn(),
   setBrush: vi.fn(),
   setBrushArmedMask: vi.fn(),
+  renameMask: vi.fn(),
+  commit: vi.fn(),
   state: {
     masks: [] as Mask[],
     activeMaskId: null as string | null,
@@ -39,7 +41,8 @@ vi.mock('../../editor/editorContext', () => ({
     setActiveMask: vi.fn(),
     setMaskAdjustment: vi.fn(),
     setMaskInvert: vi.fn(),
-    commit: vi.fn(),
+    renameMask,
+    commit,
     setMaskOverlayHidden: vi.fn(),
     brush: state.brush,
     setBrush,
@@ -79,11 +82,21 @@ describe('MasksPanel', () => {
     setObjectPrompt.mockClear()
     setBrush.mockClear()
     setBrushArmedMask.mockClear()
+    renameMask.mockClear()
+    commit.mockClear()
     state.brush = { size: 0.04, hardness: 0.5, mode: 'add' }
     state.masks = []
     state.activeMaskId = null
     state.maskStatus = new Map()
     state.modelProgress = null
+  })
+
+  it('warns when the mask limit is reached', () => {
+    state.masks = Array.from({ length: MAX_MASKS }, (_, i) => createMask('brush', `Brush ${i + 1}`))
+
+    renderPanel()
+
+    expect(screen.getByText(`You can't use more than ${MAX_MASKS} masks`)).toBeInTheDocument()
   })
 
   it('tells the user it is downloading, with a percentage, while the model loads', () => {
@@ -327,5 +340,45 @@ describe('MasksPanel', () => {
     renderPanel()
 
     expect(screen.queryByText('Detail')).not.toBeInTheDocument()
+  })
+
+  it('renames a mask from the inline editor without committing a photo change', () => {
+    const mask = createMask('brush', 'Brush 1')
+    state.masks = [mask]
+
+    renderPanel()
+    fireEvent.doubleClick(screen.getByText('Brush 1'))
+    const input = screen.getByRole('textbox', { name: 'Edit mask name' })
+    fireEvent.change(input, { target: { value: '  Sky  ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(renameMask).toHaveBeenCalledWith(mask.id, 'Sky')
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('keeps the old name when the inline editor is left empty', () => {
+    const mask = createMask('brush', 'Brush 1')
+    state.masks = [mask]
+
+    renderPanel()
+    fireEvent.doubleClick(screen.getByText('Brush 1'))
+    const input = screen.getByRole('textbox', { name: 'Edit mask name' })
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(renameMask).not.toHaveBeenCalled()
+  })
+
+  it('discards the typed name on Escape', () => {
+    const mask = createMask('brush', 'Brush 1')
+    state.masks = [mask]
+
+    renderPanel()
+    fireEvent.doubleClick(screen.getByText('Brush 1'))
+    const input = screen.getByRole('textbox', { name: 'Edit mask name' })
+    fireEvent.change(input, { target: { value: 'Sky' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(renameMask).not.toHaveBeenCalled()
   })
 })

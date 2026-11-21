@@ -1,5 +1,20 @@
 # Change Log
 
+## [1.4.0] - 2026-11-21
+
+### Added
+
+- Ability to rename masks.
+- Message shown when the maximum number of masks is reached.
+
+### Fixed
+
+- Fixed the `masks.remove` context menu bug.
+
+### Changed
+
+- Changed the camera adjustments modal title.
+
 ## [1.1.0] - 2026-11-09
 
 ### Added

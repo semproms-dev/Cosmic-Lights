@@ -177,7 +177,7 @@
     "jpegImage": "Image JPEG"
   },
   "info": {
-    "title": "Info",
+    "title": "Réglages de l'appareil",
     "file": "Fichier : ",
     "captureDate": "Date de prise de vue : ",
     "brand": "Marque : ",
@@ -240,6 +240,7 @@
   "masks": {
     "title": "Masques",
     "addNew": "Ajouter un nouveau masque",
+    "limitReached": "Vous ne pouvez pas utiliser plus de {{max}} masques",
     "invert": "Inverser",
     "selectSubject": "Sélectionner le sujet",
     "selectSky": "Sélectionner le ciel",
@@ -284,6 +285,7 @@
     "contextDuplicateInvert": "Dupliquer et inverser le masque",
     "contextDuplicate": "Dupliquer le masque",
     "contextRemoveMask": "Supprimer le masque",
+    "edit": "Modifier le nom du masque",
     "copySuffix": "(copie)"
   },
   "presets": {
