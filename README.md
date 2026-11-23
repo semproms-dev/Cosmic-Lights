@@ -4,6 +4,8 @@ Welcome to CosmicLights! This is a web application for processing RAW photos and
 
 At the moment this is just a hobby. I wanted a free Lightroom-style app to run on my own browser so I can edit pictures in an easy and quick way. Probably later I will go with a full Desktop application, if life me allows me to.
 
+<img width="1876" height="1015" alt="Captura de pantalla_2026-11-23_17-35-02" src="https://github.com/user-attachments/assets/421e34e6-76a9-4431-8e02-64320e7c821f" />
+
 ## Privacy and data handling
 
 CosmicLights processes selected photos and editing data in your browser. The web app does not send photo files, masks, or editing settings to a remote service. Photo previews, edits, AI-mask inference, and exports are handled locally in the browser.
